@@ -1,0 +1,28 @@
+{
+  "name": "@bear/site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && pagefind --site dist",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/react": "7.0.1",
+    "@bear/core": "workspace:*",
+    "astro": "7.3.8",
+    "fast-formula-parser": "^1.0.19",
+    "matter-js": "0.20.0",
+    "motion": "14.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@types/matter-js": "0.20.2",
+    "pagefind": "1.5.2",
+    "typescript": "^5.7.0"
+  }
+}
