@@ -9,3 +9,4 @@ test-results/
 playwright-report/
 apps/desktop/src/renderer/public/excalidraw/
 .superpowers/
+.claude/worktrees/
