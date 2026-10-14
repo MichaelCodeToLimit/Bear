@@ -28,8 +28,8 @@ const box = {
 
 const input = (password: string): MailAccountInput => ({
   name: 'Bear Tester',
-  email: 'bear@bear.local',
-  username: 'bear@bear.local',
+  email: 'bear@bear.com',
+  username: 'bear@bear.com',
   auth: 'password',
   password,
   imap: { host: '127.0.0.1', port: IMAP, security: 'none' },
@@ -37,7 +37,7 @@ const input = (password: string): MailAccountInput => ({
 })
 
 const raw = (subject: string, body = 'hello', date = new Date()) =>
-  `From: "Sender" <sender@example.test>\r\nTo: bear@bear.local\r\nSubject: ${subject}\r\nDate: ${date.toUTCString()}\r\n\r\n${body}`
+  `From: "Sender" <sender@example.test>\r\nTo: bear@bear.com\r\nSubject: ${subject}\r\nDate: ${date.toUTCString()}\r\n\r\n${body}`
 
 async function waitFor<T>(fn: () => Promise<T | undefined>, ms = 4000): Promise<T> {
   const until = Date.now() + ms
@@ -114,7 +114,7 @@ describe('reading', () => {
 describe('sending', () => {
   it('sends HTML with an attachment, hides Bcc from recipients, and files a copy in Sent', async () => {
     const r = await mail.send(accountId, {
-      to: [{ name: 'Bear', address: 'bear@bear.local' }],
+      to: [{ name: 'Bear', address: 'bear@bear.com' }],
       cc: [],
       bcc: [{ name: '', address: 'secret@example.test' }],
       subject: 'Report attached',
@@ -133,7 +133,7 @@ describe('sending', () => {
     const msg = await mail.message(accountId, 'INBOX', inbox[0].uid)
     expect(msg.ok).toBe(true)
     if (!msg.ok) return
-    expect(msg.value.from[0]).toEqual({ name: 'Bear Tester', address: 'bear@bear.local' })
+    expect(msg.value.from[0]).toEqual({ name: 'Bear Tester', address: 'bear@bear.com' })
     expect(msg.value.html).toContain('<b>report</b>')
     expect(msg.value.text).toContain('See the report.')
     expect(msg.value.attachments.map((a) => a.filename)).toEqual(['report.txt'])
@@ -143,7 +143,7 @@ describe('sending', () => {
 
     // The received copy has no Bcc header; the Sent copy keeps it for the sender.
     const { ImapFlow } = await import('imapflow')
-    const direct = new ImapFlow({ host: '127.0.0.1', port: IMAP, secure: false, auth: { user: 'bear@bear.local', pass: 'bear' }, logger: false })
+    const direct = new ImapFlow({ host: '127.0.0.1', port: IMAP, secure: false, auth: { user: 'bear@bear.com', pass: 'bear' }, logger: false })
     await direct.connect()
     const lock = await direct.getMailboxLock('INBOX')
     const received = await direct.fetchOne(String(inbox[0].uid), { source: true }, { uid: true })

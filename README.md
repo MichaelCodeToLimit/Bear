@@ -12,7 +12,7 @@ A free, open-source desktop productivity suite. Documents, spreadsheets, slides,
 | **Sheets** | Spreadsheets | ✅ MVP |
 | **Slides** | Presentations | ✅ MVP |
 | **Notes** | Notebooks | ✅ MVP |
-| Mail | Email & calendar | Planned |
+| **Mail** | Email | ✅ MVP (calendar next) |
 | Chat | Team chat & calls | Planned |
 | Insights | Data dashboards | Planned |
 | **Sites** | Team sites | ✅ MVP (on this computer; sharing needs the coming server) |
@@ -53,6 +53,18 @@ A free, open-source desktop productivity suite. Documents, spreadsheets, slides,
 - Six themes (theme-coloured shapes follow the theme), per-slide backgrounds
 - Full-screen slide show (arrows/space/click, number + Enter to jump, B for black screen, Esc), slide sorter
 - Save and open **.pptx** (standard PowerPoint files; Bear imports text, shapes, pictures, backgrounds and notes from other apps' files), Print / Export to PDF, templates
+
+### Mail features
+
+- Works with any IMAP/SMTP mailbox: Gmail, iCloud, Yahoo, AOL, Fastmail, Zoho, GMX and Proton Bridge are recognised automatically (use an *app password* where the provider requires one); custom servers under Advanced settings
+- Sign in with Microsoft or Google (OAuth with PKCE). Register a free app with the provider and paste its client ID in Mail settings; Bear never sees your password
+- Folders with unread counts, paged message list, search, flag, mark unread, archive, delete, keyboard shortcuts and right-click menus
+- Compose in the Write editor with To/Cc/Bcc and attachments; reply, reply all and forward keep the original quoted and threaded. Bcc recipients are never revealed to other recipients, and a copy is filed in Sent
+- Unsent drafts are kept on this computer and survive a restart
+- Safe reading: emails are cleaned (no scripts, forms or frames, `javascript:` links removed) and shown in a locked-down frame; pictures from the internet (often trackers) stay blocked until you choose **Show pictures**
+- Passwords and sign-in tokens are encrypted with the operating system's key store
+
+**Try it without a real mailbox:** `pnpm mail-server` starts Bear's own mail server on this computer. In Mail, add `bear@bear.com` (password `bear`) with server `127.0.0.1`, IMAP port 1143, SMTP port 1025, security "None". Use `pnpm mail-server you@bear.com` for a different address. Everything stays on this computer: any message you send arrives back in that inbox. Sending to and receiving from the wider internet as `@bear.com` would need the real bear.com domain and a hosted mail server.
 
 ### Notes, Tasks, Board and Sites
 

@@ -514,7 +514,7 @@ function Welcome({ onAdd, onSettings }: { onAdd: () => void; onSettings: () => v
           <button onClick={onSettings} className="rounded-md border border-line px-4 py-2 text-sm text-ink hover:bg-hover">Sign-in settings</button>
         </div>
         <p className="mt-6 text-[12px] text-muted">
-          <FileIcon size={12} className="inline" /> Trying things out? Run <code>pnpm mail-server</code> and add <code>bear@bear.local</code> (password <code>bear</code>) with server 127.0.0.1, IMAP port 1143, SMTP port 1025, security "None".
+          <FileIcon size={12} className="inline" /> Trying things out? Run <code>pnpm mail-server</code> and add <code>bear@bear.com</code> (password <code>bear</code>) with server 127.0.0.1, IMAP port 1143, SMTP port 1025, security "None".
         </p>
       </div>
     </div>

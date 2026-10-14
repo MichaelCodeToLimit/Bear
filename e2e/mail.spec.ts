@@ -32,7 +32,7 @@ const body = () => page.frameLocator('iframe[title="Message body"]')
 
 async function fillAccount(password: string) {
   const dialog = page.getByRole('dialog', { name: 'Add an email account' })
-  await dialog.getByLabel('Email address').fill('bear@bear.local')
+  await dialog.getByLabel('Email address').fill('bear@bear.com')
   await dialog.getByLabel('Your name').fill('Bear Tester')
   await dialog.getByLabel('Password').fill(password)
   if (!(await dialog.getByLabel('Incoming (IMAP) server').isVisible())) await dialog.getByRole('button', { name: 'Advanced settings' }).click()
@@ -72,7 +72,7 @@ test('reads a message and updates the unread count', async () => {
 test('composes and sends to itself with an attachment, then receives it', async () => {
   await page.getByRole('button', { name: 'New mail' }).first().click()
   const composer = page.getByRole('region', { name: 'New message' })
-  await composer.getByLabel('To', { exact: true }).fill('Bear Tester <bear@bear.local>')
+  await composer.getByLabel('To', { exact: true }).fill('Bear Tester <bear@bear.com>')
   await composer.getByLabel('Subject').fill('Plans for Friday')
   await composer.locator('.page-doc').click()
   await page.keyboard.type('Lunch at noon?')
@@ -89,7 +89,7 @@ test('composes and sends to itself with an attachment, then receives it', async 
   await page.getByRole('button', { name: 'Refresh' }).click()
   await row(/Plans for Friday/).click()
   const message = page.getByRole('article', { name: 'Message' })
-  await expect(message).toContainText('Bear Tester <bear@bear.local>')
+  await expect(message).toContainText('Bear Tester <bear@bear.com>')
   await expect(body().locator('strong, b')).toContainText('Bring the slides.')
   await expect(message.getByRole('list', { name: 'Attachments' })).toContainText('agenda.txt')
 
@@ -101,10 +101,11 @@ test('composes and sends to itself with an attachment, then receives it', async 
 
 test('replies with the original quoted and threaded', async () => {
   await row(/Plans for Friday/).click()
+  await expect(page.getByRole('article', { name: 'Message' }).getByRole('heading', { name: 'Plans for Friday' })).toBeVisible()
   await page.getByRole('article', { name: 'Message' }).getByRole('button', { name: 'Reply', exact: true }).click()
   const composer = page.getByRole('region', { name: 'New message' })
   await expect(composer.getByLabel('Subject')).toHaveValue('Re: Plans for Friday')
-  await expect(composer.getByLabel('To', { exact: true })).toHaveValue('Bear Tester <bear@bear.local>')
+  await expect(composer.getByLabel('To', { exact: true })).toHaveValue('Bear Tester <bear@bear.com>')
   await expect(composer.locator('.page-doc blockquote')).toContainText('Lunch at noon?')
   await composer.locator('.page-doc p').first().click()
   await page.keyboard.type('Sounds good!')
@@ -117,7 +118,7 @@ test('replies with the original quoted and threaded', async () => {
 test('shows hostile email safely', async () => {
   server.deliver([
     'From: "Mallory" <mallory@evil.test>',
-    'To: bear@bear.local',
+    'To: bear@bear.com',
     'Subject: You won a prize',
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
