@@ -1,0 +1,16 @@
+{
+  "name": "@bear/app-tasks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@bear/core": "workspace:*",
+    "@bear/ui": "workspace:*",
+    "lucide-react": "^0.460.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

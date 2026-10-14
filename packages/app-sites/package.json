@@ -1,0 +1,20 @@
+{
+  "name": "@bear/app-sites",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@bear/app-write": "workspace:*",
+    "@bear/core": "workspace:*",
+    "@bear/ui": "workspace:*",
+    "@tiptap/core": "2.27.3",
+    "@tiptap/pm": "2.27.3",
+    "@tiptap/react": "2.27.3",
+    "lucide-react": "^0.460.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

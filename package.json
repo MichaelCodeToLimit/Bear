@@ -1,0 +1,31 @@
+{
+  "name": "bear-suite",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Bear: a free, open-source desktop productivity suite.",
+  "license": "MIT",
+  "packageManager": "pnpm@12.6.0",
+  "scripts": {
+    "dev": "pnpm --filter @bear/desktop dev",
+    "build": "pnpm --filter @bear/desktop build",
+    "build:win": "pnpm --filter @bear/desktop build:win",
+    "build:mac": "pnpm --filter @bear/desktop build:mac",
+    "build:linux": "pnpm --filter @bear/desktop build:linux",
+    "test": "vitest run",
+    "test:e2e": "pnpm build && playwright test",
+    "mail-server": "node tools/mail-server.cjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "hoodiecrow-imap": "^3.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "smtp-server": "^3.19.22",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0"
+  }
+}

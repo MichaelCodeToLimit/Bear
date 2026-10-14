@@ -1,0 +1,285 @@
+@import 'tailwindcss';
+
+/* Workspace packages contain Tailwind classes too. */
+@source '../../../../packages';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --canvas: #ecebe8;
+  --surface: #fbfaf8;
+  --paper: #ffffff;
+  --ink: #1f1f1f;
+  --muted: #6b6b6b;
+  --line: #dddad4;
+  --hover: rgb(0 0 0 / 0.055);
+  --active: rgb(0 0 0 / 0.1);
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: #1b1b1d;
+  --surface: #262628;
+  --paper: #ffffff;
+  --ink: #ececec;
+  --muted: #a3a3a3;
+  --line: #3a3a3d;
+  --hover: rgb(255 255 255 / 0.07);
+  --active: rgb(255 255 255 / 0.14);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-hover: var(--hover);
+  --color-active: var(--active);
+  --font-sans: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+input,
+textarea,
+.ProseMirror {
+  user-select: text;
+}
+
+/* ---------- Write: document typography ---------- */
+
+.write-doc {
+  outline: none;
+  font-family: Calibri, Carlito, 'Segoe UI', sans-serif;
+  font-size: 11pt;
+  line-height: 1.15;
+  min-height: 100%;
+  caret-color: #111;
+}
+
+.write-doc p {
+  margin: 0 0 8pt;
+}
+
+.write-doc h1,
+.write-doc h2,
+.write-doc h3,
+.write-doc h4,
+.write-doc h5,
+.write-doc h6 {
+  font-family: 'Calibri Light', Calibri, 'Segoe UI', sans-serif;
+  margin: 12pt 0 4pt;
+  line-height: 1.2;
+}
+.write-doc h1 { font-size: 20pt; font-weight: 400; color: #1e4d4a; }
+.write-doc h2 { font-size: 16pt; font-weight: 400; color: #1e4d4a; }
+.write-doc h3 { font-size: 13pt; font-weight: 600; color: #1e4d4a; }
+.write-doc h4 { font-size: 11pt; font-weight: 600; font-style: italic; color: #1e4d4a; }
+.write-doc h5,
+.write-doc h6 { font-size: 11pt; font-weight: 600; }
+
+.write-doc ul,
+.write-doc ol {
+  margin: 0 0 8pt;
+  padding-left: 0.375in;
+}
+.write-doc ul { list-style: disc; }
+.write-doc ul ul { list-style: circle; }
+.write-doc ul ul ul { list-style: square; }
+.write-doc ol { list-style: decimal; }
+.write-doc li p { margin: 0; }
+
+.write-doc blockquote {
+  margin: 0 0 8pt 0.25in;
+  padding-left: 12px;
+  border-left: 3px solid #bbb;
+  font-style: italic;
+  color: #444;
+}
+
+.write-doc pre {
+  background: #f4f4f4;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 10pt;
+  white-space: pre-wrap;
+  margin: 0 0 8pt;
+}
+
+.write-doc code {
+  font-family: Consolas, 'Courier New', monospace;
+  background: #f1f1f1;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-size: 0.95em;
+}
+.write-doc pre code { background: none; padding: 0; }
+
+.write-doc a { color: #0563c1; text-decoration: underline; cursor: text; }
+
+.write-doc hr {
+  border: none;
+  border-top: 1px solid #aaa;
+  margin: 10pt 0;
+}
+
+.write-doc img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 4pt 0;
+}
+.write-doc img.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+
+.write-doc table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0 0 8pt;
+  overflow: hidden;
+}
+.write-doc td,
+.write-doc th {
+  border: 1px solid #b7b7b7;
+  padding: 4px 6px;
+  vertical-align: top;
+  position: relative;
+  min-width: 2em;
+}
+.write-doc th { background: #f2f2f2; font-weight: 600; text-align: left; }
+.write-doc .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  pointer-events: none;
+}
+.write-doc .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.write-doc.resize-cursor { cursor: col-resize; }
+
+.write-doc .page-break {
+  border-top: 1px dashed #9a9a9a;
+  margin: 16pt -0.3in;
+  position: relative;
+  height: 0;
+}
+.write-doc .page-break::after {
+  content: 'Page break';
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 0 6px;
+  font: 10px 'Segoe UI', sans-serif;
+  color: #888;
+}
+.write-doc .page-break.ProseMirror-selectednode { border-color: var(--accent); }
+
+.write-doc p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #aaa;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.write-doc ::selection { background: #b4d5fe; }
+
+.search-hit { background: #fff3a3; border-radius: 1px; }
+.search-current { background: #ffb347; }
+
+.template-thumb h1 { font-size: 20pt; margin: 0 0 6pt; color: #1e4d4a; }
+.template-thumb h2 { font-size: 15pt; margin: 8pt 0 4pt; color: #1e4d4a; }
+.template-thumb h3 { font-size: 12pt; margin: 6pt 0 2pt; }
+.template-thumb p { margin: 0 0 6pt; font-size: 11pt; }
+.template-thumb ul, .template-thumb ol { padding-left: 20px; list-style: disc; font-size: 11pt; }
+.template-thumb table { border-collapse: collapse; width: 100%; font-size: 11pt; }
+.template-thumb td, .template-thumb th { border: 1px solid #bbb; padding: 2px 4px; }
+
+/* ---------- Print & PDF: only the page content ---------- */
+
+@media print {
+  html, body, #root { height: auto; background: #fff; }
+  .write-scroll { overflow: visible !important; padding: 0 !important; height: auto !important; }
+  .write-page {
+    width: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    zoom: 1 !important;
+  }
+  .write-doc .page-break { break-after: page; border: none; margin: 0; }
+  .write-doc .page-break::after { display: none; }
+  .search-hit, .search-current { background: none; }
+  .write-doc table, .write-doc img { break-inside: avoid; }
+}
+
+/* ---------- Sheets ---------- */
+
+.sheet-scroll::-webkit-scrollbar { width: 14px; height: 14px; }
+.sheet-scroll::-webkit-scrollbar-thumb { background: #c8c6c4; border: 3px solid #f3f2f1; border-radius: 8px; }
+.sheet-scroll::-webkit-scrollbar-track, .sheet-scroll::-webkit-scrollbar-corner { background: #f3f2f1; }
+
+@media print {
+  .sheet-print table { border-collapse: collapse; table-layout: fixed; font: 11pt Calibri, Carlito, 'Segoe UI', sans-serif; color: #111; }
+  .sheet-print td { border: 1px solid #d0d0d0; padding: 2px 4px; overflow: hidden; vertical-align: bottom; }
+  .sheet-print tr { break-inside: avoid; }
+}
+
+/* ---------- Write: table styles (editor and gallery previews) ---------- */
+
+table.tbl-accent th { background: #0f766e; color: #fff; border-color: #0f766e; }
+table.tbl-banded th { background: #d6e9e1; }
+table.tbl-banded tr:nth-child(even) td { background: #f3f7f6; }
+table.tbl-minimal td, table.tbl-minimal th { border-left: none; border-right: none; border-color: #c8c8c8; }
+table.tbl-minimal th { background: transparent; border-bottom: 2px solid #333; }
+
+.tbl-preview { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff; }
+.tbl-preview th, .tbl-preview td { height: 9px; border: 1px solid #b7b7b7; padding: 0; }
+.tbl-preview th { background: #f2f2f2; }
+
+/* ---------- Slides: one slide per printed page ---------- */
+
+@media print {
+  .slides-print-page { break-after: page; width: 1280px; height: 720px; overflow: hidden; }
+  .slides-print-page:last-child { break-after: auto; }
+}
+
+/* ---------- Checklists (Notes, Sites) ---------- */
+
+.write-doc ul[data-type='taskList'] { list-style: none; padding-left: 0.2em; }
+.write-doc ul[data-type='taskList'] li { display: flex; align-items: flex-start; gap: 0.5em; }
+.write-doc ul[data-type='taskList'] li > label { margin-top: 0.2em; user-select: none; }
+.write-doc ul[data-type='taskList'] li > label input { accent-color: var(--accent); width: 1em; height: 1em; }
+.write-doc ul[data-type='taskList'] li[data-checked='true'] > div { color: #888; text-decoration: line-through; }
+.write-doc ul[data-type='taskList'] li > div { flex: 1; }
+.page-doc { min-height: 100%; }
+
+/* Excalidraw sizes itself to its container. */
+[data-board] .excalidraw { --zIndex-modal: 60; }

@@ -1,0 +1,66 @@
+# Builds Bear's installers on each OS. Every run uploads them as workflow artifacts; pushing a
+# tag like v0.2.0 also attaches them to a draft GitHub release for you to review and publish.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+            files: |
+              apps/desktop/release/*.exe
+              apps/desktop/release/*.msi
+          - os: macos-latest
+            target: mac
+            files: |
+              apps/desktop/release/*.dmg
+              apps/desktop/release/*.zip
+          - os: ubuntu-latest
+            target: linux
+            files: |
+              apps/desktop/release/*.AppImage
+              apps/desktop/release/*.deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Build installers
+        run: pnpm --filter @bear/desktop build:${{ matrix.target }} --publish never
+        env:
+          # Optional code signing. Without these secrets the installers are built unsigned.
+          # Windows: a .pfx (base64) and its password. macOS: a Developer ID .p12 plus Apple ID
+          # credentials for notarization.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bear-${{ matrix.target }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: ${{ matrix.files }}

@@ -1,0 +1,18 @@
+{
+  "name": "@bear/app-mail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@bear/app-write": "workspace:*",
+    "@bear/core": "workspace:*",
+    "@bear/ui": "workspace:*",
+    "dompurify": "^3.4.17",
+    "lucide-react": "^0.460.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}
