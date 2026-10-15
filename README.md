@@ -100,7 +100,7 @@ The Bear website lives in `apps/site` (Astro and React) and is published at <htt
 | `pnpm site:preview` | Serve the built site locally |
 | `pnpm site:test` | Browser tests (Playwright); run `pnpm site:build` first |
 
-`.github/workflows/site.yml` tests and deploys the site to GitHub Pages when `main` changes the site, when a release is published, or when you run it by hand. The repo's Pages source must be set to "GitHub Actions".
+`.github/workflows/site.yml` tests and deploys the site to GitHub Pages when `main` changes the site, when a release is published, or when you run it by hand. The repo's Pages source must be set to "GitHub Actions". In Settings > Environments > github-pages, the deployment branches must include `main` (the default). The release event also builds from `main` rather than the release tag, so no tag rule is needed.
 
 To publish installers:
 

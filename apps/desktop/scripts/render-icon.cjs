@@ -9,6 +9,7 @@ const svg = fs.readFileSync(path.join(buildDir, 'icon.svg'), 'utf8')
 const SIZE = 512
 const outputs = [
   { size: 512, file: path.join(buildDir, 'icon.png') },
+  { size: 256, file: path.join(buildDir, 'icon-256.png') },
   { size: 128, file: path.join(buildDir, 'icon-128.png') },
   { size: 64, file: path.join(buildDir, 'icon-64.png') }
 ]

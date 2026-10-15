@@ -131,6 +131,12 @@ a.tile:hover {
   font-size: 1.1rem;
   color: var(--tile-color);
 }
+/* The app colours are dark shades that fail AA on the dark card; keep them on borders and use the ink for text. */
+@media (prefers-color-scheme: dark) {
+  .tile__name {
+    color: var(--ink);
+  }
+}
 .tile__tagline {
   color: var(--ink-muted);
   font-size: 0.9rem;

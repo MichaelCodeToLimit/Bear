@@ -38,6 +38,18 @@ describe('classifyAsset', () => {
     expect(classifyAsset('Bear-0.1.0.dmg')).toMatchObject({ os: 'mac', recommended: true })
     expect(classifyAsset('Bear-0.1.0-mac.zip')).toMatchObject({ os: 'mac', recommended: false })
   })
+  it('puts the architecture in mac labels', () => {
+    expect(classifyAsset('Bear-0.1.0-arm64.dmg')?.label).toBe('Disk image (Apple silicon)')
+    expect(classifyAsset('Bear-0.1.0-x64.dmg')?.label).toBe('Disk image (Intel)')
+    expect(classifyAsset('Bear-0.1.0.dmg')?.label).toBe('Disk image')
+    expect(classifyAsset('Bear-0.1.0-arm64-mac.zip')?.label).toBe('Zip (Apple silicon)')
+    expect(classifyAsset('Bear-0.1.0-x64-mac.zip')?.label).toBe('Zip (Intel)')
+    expect(classifyAsset('Bear-0.1.0-mac.zip')?.label).toBe('Zip')
+  })
+  it('keeps Windows and Linux labels when names carry an arch', () => {
+    expect(classifyAsset('Bear-Setup-0.1.0-x64.exe')?.label).toBe('Installer (just for you, no admin needed)')
+    expect(classifyAsset('Bear-0.1.0-x86_64.AppImage')?.label).toBe('AppImage (any distro)')
+  })
   it('is case-insensitive', () => {
     expect(classifyAsset('BEAR.EXE')?.os).toBe('windows')
   })
@@ -143,5 +155,16 @@ describe('detectOS', () => {
   it('returns null for Android and iOS', () => {
     expect(detectOS('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36')).toBeNull()
     expect(detectOS('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15')).toBeNull()
+  })
+})
+
+describe('pickBest on mac', () => {
+  it('does not guess when both architectures are offered', () => {
+    const files = [file('Bear-0.1.0-arm64.dmg', 'mac', true), file('Bear-0.1.0-x64.dmg', 'mac', true), file('Bear-0.1.0-mac.zip', 'mac', false)]
+    expect(pickBest(files, 'mac')).toBeNull()
+  })
+  it('returns the single recommended mac file', () => {
+    const files = [file('Bear-0.1.0.dmg', 'mac', true), file('Bear-0.1.0-mac.zip', 'mac', false)]
+    expect(pickBest(files, 'mac')?.name).toBe('Bear-0.1.0.dmg')
   })
 })

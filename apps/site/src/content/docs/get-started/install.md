@@ -37,14 +37,14 @@ You only need to do this once. After that, Bear opens like any other app.
 **AppImage.** The AppImage runs without installing anything. Make it executable, then start it:
 
 ```bash
-chmod +x Bear-*-x86_64.AppImage
-./Bear-*-x86_64.AppImage
+chmod +x Bear-*.AppImage
+./Bear-*.AppImage
 ```
 
 **.deb.** On Debian, Ubuntu and friends, install the package with your package manager:
 
 ```bash
-sudo apt install ./bear_*_amd64.deb
+sudo apt install ./bear_*.deb
 ```
 
 ## Open your files with Bear

@@ -74,7 +74,7 @@ function Search() {
         hidden={status === 'ready' || status === 'unavailable'}
       />
       {status === 'loading' && <p className="docs-search__note" role="status">Loading search...</p>}
-      {status === 'unavailable' && <p className="docs-search__note" role="status">Search works in the built site.</p>}
+      {status === 'unavailable' && <p className="docs-search__note" role="status">{import.meta.env.DEV ? 'Search works in the built site.' : "Search couldn't load. Try reloading."}</p>}
       <div ref={mount} />
     </div>
   )

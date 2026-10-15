@@ -94,6 +94,11 @@ const apps = tourApps()
     color: var(--tile-color);
     margin-bottom: 0.2em;
   }
+  @media (prefers-color-scheme: dark) {
+    .picker__info h2 {
+      color: var(--ink);
+    }
+  }
   .picker__tagline {
     margin: 0 0 0.6rem;
     color: var(--ink-muted);

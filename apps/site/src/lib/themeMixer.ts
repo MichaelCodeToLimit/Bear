@@ -29,8 +29,8 @@ export function mixToCss(m: Mix): Record<'--hue-shift' | '--hue-shift-n' | '--ro
 
 /* ---------- Colour maths (hex <-> OKLCH) ---------- */
 
-const LIGHT = { bg: '#fbf4ea', bgTo: '#f1e2cc', ink: '#3b2a1a', muted: '#6f5a46', surface: '#ffffff' }
-const DARK = { bg: '#2a1d14', bgTo: '#1d130d', ink: '#fbf4ea', muted: '#cdb89f', surface: '#3a2a1d' }
+const LIGHT = { bg: '#fbf4ea', bgTo: '#f1e2cc', ink: '#3b2a1a', muted: '#6f5a46', surface: '#ffffff', accent: '#9a4508' }
+const DARK = { bg: '#2a1d14', bgTo: '#1d130d', ink: '#fbf4ea', muted: '#cdb89f', surface: '#3a2a1d', accent: '#f59e0b' }
 
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
 const fromLinear = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055)
@@ -86,7 +86,13 @@ export function themedPairs(m: Mix, dark: boolean): [string, string][] {
   const ink = rotate(base.ink, m.hue)
   const muted = rotate(base.muted, m.hue)
   const bgs = [rotate(base.bg, m.hue), rotate(base.bgTo, m.hue)]
-  return [...bgs.flatMap((bg): [string, string][] => [[ink, bg], [muted, bg]]), [ink, base.surface], [muted, base.surface]]
+  // The accent (links) is not rotated by the mixer.
+  return [
+    ...bgs.flatMap((bg): [string, string][] => [[ink, bg], [muted, bg], [base.accent, bg]]),
+    [ink, base.surface],
+    [muted, base.surface],
+    [base.accent, base.surface]
+  ]
 }
 
 export function isReadable(m: Mix): boolean {

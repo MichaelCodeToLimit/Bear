@@ -4,7 +4,7 @@ const BASE = `
 .demo{--c:var(--accent);position:relative;width:100%;max-width:340px;margin:0 auto;overflow:hidden;
   background:var(--surface);border:1px solid var(--surface-edge);border-radius:var(--r-md);box-shadow:var(--shadow-sm);
   font-size:.78rem;color:var(--ink);user-select:none}
-.demo__bar{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--c);color:#fff;font-weight:700;font-size:.72rem}
+.demo__bar{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--c);color:var(--demo-ink,#fff);font-weight:700;font-size:.72rem}
 .demo__dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.7)}
 .demo__body{padding:12px;min-height:130px;position:relative}
 `
@@ -15,7 +15,7 @@ export function Frame({ id, title, playing, children }: { id: string; title: str
     <div
       className={`demo${playing ? ' is-playing' : ''}`}
       data-demo={id}
-      style={{ '--c': id === 'sleeping' ? 'var(--ink-muted)' : `var(--app-${id})` } as CSSProperties}
+      style={{ ...(id === 'sleeping' ? { '--c': 'var(--ink-muted)', '--demo-ink': 'var(--surface)' } : { '--c': `var(--app-${id})` }) } as CSSProperties}
     >
       <style dangerouslySetInnerHTML={{ __html: BASE }} />
       <div className="demo__bar">

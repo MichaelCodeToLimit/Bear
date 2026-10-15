@@ -21,11 +21,13 @@ export interface ReleaseInfo {
 /** Map an asset file name to a system and label. Returns null for files that should not be shown. */
 export function classifyAsset(name: string): { os: OS; label: string; recommended: boolean } | null {
   const n = name.toLowerCase()
+  // electron-builder puts the architecture in the file name; only mac needs it in the label.
+  const macArch = /arm64/.test(n) ? ' (Apple silicon)' : /x64|x86_64|amd64/.test(n) ? ' (Intel)' : ''
   if (n.endsWith('.exe')) return { os: 'windows', label: 'Installer (just for you, no admin needed)', recommended: true }
   if (n.endsWith('.msi')) return { os: 'windows', label: 'MSI package (whole computer, for IT)', recommended: false }
-  if (n.endsWith('.dmg')) return { os: 'mac', label: 'Disk image', recommended: true }
+  if (n.endsWith('.dmg')) return { os: 'mac', label: `Disk image${macArch}`, recommended: true }
   if (n.endsWith('.zip') && (n.endsWith('-mac.zip') || n.includes('-darwin'))) {
-    return { os: 'mac', label: 'Zip', recommended: false }
+    return { os: 'mac', label: `Zip${macArch}`, recommended: false }
   }
   if (n.endsWith('.appimage')) return { os: 'linux', label: 'AppImage (any distro)', recommended: true }
   if (n.endsWith('.deb')) return { os: 'linux', label: '.deb (Debian, Ubuntu)', recommended: false }
@@ -88,5 +90,11 @@ export function detectOS(userAgent: string): OS | null {
 export function pickBest(files: DownloadFile[], os: OS | null): DownloadFile | null {
   if (!os) return null
   const mine = files.filter((f) => f.os === os)
+  if (os === 'mac') {
+    // A browser cannot tell Apple silicon from Intel, so do not guess between the two disk images.
+    const rec = mine.filter((f) => f.recommended)
+    if (rec.length > 1) return null
+    return rec[0] ?? mine[0] ?? null
+  }
   return mine.find((f) => f.recommended) ?? mine[0] ?? null
 }
