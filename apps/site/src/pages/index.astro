@@ -1,11 +1,12 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bear</title>
-  </head>
-  <body>
-    <h1>Bear</h1>
-  </body>
-</html>
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import Bear from '../components/Bear.astro'
+---
+
+<BaseLayout title="Bear">
+  <h1>Bear</h1>
+  <div data-reveal class="card">
+    <Bear size={96} mood="bob" />
+    <p>A cozy, open-source office suite. The full home page is on its way.</p>
+  </div>
+</BaseLayout>

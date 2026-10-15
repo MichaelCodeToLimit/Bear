@@ -1,0 +1,233 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg-to);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--bg-from), var(--bg-to)) fixed;
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.55;
+  overflow-x: hidden;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 2rem var(--gutter) 3rem;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.6em;
+}
+
+a {
+  color: var(--accent);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--gutter);
+  top: -4rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-bounce),
+    box-shadow var(--dur-fast) ease;
+}
+.btn:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: var(--shadow-md);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Cards and tiles */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem 1.5rem;
+}
+
+.tile {
+  --tile-color: var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--surface-edge);
+  border-top: 5px solid var(--tile-color);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    transform var(--dur-med) var(--ease-bounce),
+    box-shadow var(--dur-med) ease;
+}
+a.tile:hover {
+  transform: translateY(-4px) rotate(-1deg);
+  box-shadow: var(--shadow-md);
+}
+.tile__name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--tile-color);
+}
+.tile__tagline {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.badge {
+  align-self: flex-start;
+  margin-top: 0.4rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: var(--r-pill);
+  background: var(--surface-edge);
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Ambient motion */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+@keyframes wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-8deg);
+  }
+}
+@keyframes nap {
+  0%,
+  100% {
+    transform: rotate(-6deg) scale(1);
+  }
+  50% {
+    transform: rotate(-6deg) scale(1.04);
+  }
+}
+
+.bob {
+  animation: bob calc(3s * var(--motion-speed)) ease-in-out infinite;
+}
+.float {
+  animation: float calc(5s * var(--motion-speed)) ease-in-out infinite;
+}
+.bear--wave {
+  transform-origin: 70% 90%;
+  animation: wave calc(2.4s * var(--motion-speed)) ease-in-out infinite;
+}
+.bear--nap {
+  animation: nap calc(4s * var(--motion-speed)) ease-in-out infinite;
+}
+
+/* Calm pages (docs) have no ambient motion. */
+body[data-calm] .bob,
+body[data-calm] .float,
+body[data-calm] .bear--wave,
+body[data-calm] .bear--nap {
+  animation: none;
+}
+
+/* Reveal on scroll: hidden only when JS is on and motion is allowed. */
+html.js:not([data-motion='off']) [data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity var(--dur-slow) ease,
+    transform var(--dur-slow) var(--ease-bounce);
+}
+html.js:not([data-motion='off']) [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Motion off: freeze ambient animation and drop transitions. */
+html[data-motion='off'] *,
+html[data-motion='off'] *::before,
+html[data-motion='off'] *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}

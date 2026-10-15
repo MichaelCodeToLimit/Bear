@@ -10,9 +10,8 @@ function storage(): Storage | undefined {
 
 function syncToggles(value: Motion): void {
   document.querySelectorAll<HTMLElement>('[data-motion-toggle]').forEach((btn) => {
+    // The visible label is chosen by CSS from html[data-motion].
     btn.setAttribute('aria-pressed', String(value === 'on'))
-    const label = btn.querySelector('[data-motion-label]')
-    if (label) label.textContent = value === 'on' ? 'Motion on' : 'Motion off'
   })
 }
 

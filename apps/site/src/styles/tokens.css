@@ -1,0 +1,55 @@
+:root {
+  color-scheme: light;
+  --bg-from: #fbf4ea;
+  --bg-to: #f1e2cc;
+  --ink: #3b2a1a;
+  --ink-muted: #7a6450;
+  --surface: #ffffff;
+  --surface-edge: rgba(59, 42, 26, 0.12);
+  --accent: #b45309;
+  --accent-ink: #ffffff;
+  --focus: #1d4ed8;
+
+  --round: 1;
+  --r-sm: calc(8px * var(--round));
+  --r-md: calc(14px * var(--round));
+  --r-lg: calc(24px * var(--round));
+  --r-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(92, 58, 24, 0.12), 0 2px 6px rgba(92, 58, 24, 0.08);
+  --shadow-md: 0 6px 18px rgba(92, 58, 24, 0.16), 0 2px 6px rgba(92, 58, 24, 0.1);
+
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-pop: cubic-bezier(0.2, 0.9, 0.3, 1.4);
+
+  /* Multiplier for every animation duration; the Theme mixer changes it. */
+  --motion-speed: 1;
+  /* Colour rotation applied by the Theme mixer. */
+  --hue-shift: 0deg;
+
+  --dur-fast: calc(180ms * var(--motion-speed));
+  --dur-med: calc(420ms * var(--motion-speed));
+  --dur-slow: calc(700ms * var(--motion-speed));
+
+  --font: ui-rounded, 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --gutter: 16px;
+  --max: 1080px;
+}
+
+/* "Cabin at night" */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg-from: #2a1d14;
+    --bg-to: #1d130d;
+    --ink: #fbf4ea;
+    --ink-muted: #cdb89f;
+    --surface: #3a2a1d;
+    --surface-edge: rgba(251, 244, 234, 0.14);
+    --accent: #f59e0b;
+    --accent-ink: #2a1d14;
+    --focus: #93c5fd;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+}

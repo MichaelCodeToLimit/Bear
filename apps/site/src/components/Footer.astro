@@ -1,0 +1,39 @@
+---
+import { SITE, url } from '../site.config'
+---
+
+<footer class="footer">
+  <div class="footer__inner">
+    <nav aria-label="Footer" class="footer__links">
+      <a href={url('tour/')}>Tour</a>
+      <a href={url('docs/')}>Docs</a>
+      <a href={url('playground/')}>Playground</a>
+      <a href={url('download/')}>Download</a>
+      <a href={SITE.repoUrl}>GitHub</a>
+    </nav>
+    <p>Released under the MIT licence.</p>
+    <p>Bear is an independent project. It is not affiliated with or endorsed by Microsoft.</p>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--surface-edge);
+    padding: 1.5rem var(--gutter);
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+  }
+  .footer__inner {
+    max-width: var(--max);
+    margin: 0 auto;
+  }
+  .footer__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  p {
+    margin: 0.2rem 0;
+  }
+</style>

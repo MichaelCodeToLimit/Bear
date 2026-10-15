@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import Bear from '../components/Bear.astro'
+import { url } from '../site.config'
+---
+
+<BaseLayout title="Page not found">
+  <div class="lost">
+    <Bear size={120} mood="wave" />
+    <h1>This bear is lost</h1>
+    <p>It wandered off the map looking for this page. Let's head back to the cabin.</p>
+    <a class="btn btn--primary" href={url('')}>Back home</a>
+  </div>
+</BaseLayout>
+
+<style>
+  .lost {
+    text-align: center;
+    padding: 2rem 0;
+  }
+</style>

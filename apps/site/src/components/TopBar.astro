@@ -1,0 +1,120 @@
+---
+import Bear from './Bear.astro'
+import MotionToggle from './MotionToggle.astro'
+import { SITE, url } from '../site.config'
+
+const links = [
+  { label: 'Home', href: url('') },
+  { label: 'Tour', href: url('tour/') },
+  { label: 'Docs', href: url('docs/') },
+  { label: 'Playground', href: url('playground/') },
+  { label: 'GitHub', href: SITE.repoUrl }
+]
+---
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href={url('')}>
+      <Bear size={32} />
+      <span>Bear</span>
+    </a>
+    <button
+      type="button"
+      class="topbar__menu"
+      aria-expanded="false"
+      aria-controls="nav-sheet"
+      data-menu-button
+    >
+      Menu
+    </button>
+    <nav id="nav-sheet" class="topbar__nav" aria-label="Main" data-nav-sheet>
+      {links.map((l) => <a href={l.href}>{l.label}</a>)}
+      <MotionToggle />
+      <a class="btn btn--primary" href={url('download/')}>Download</a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--bg-from) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--surface-edge);
+  }
+  .topbar__inner {
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: 0.5rem var(--gutter);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .topbar__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ink);
+    font-weight: 800;
+    font-size: 1.25rem;
+    text-decoration: none;
+  }
+  .topbar__nav {
+    display: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 0 0.5rem;
+  }
+  .topbar__nav[data-open] {
+    display: flex;
+  }
+  .topbar__nav a:not(.btn) {
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .topbar__nav a:not(.btn):hover {
+    color: var(--accent);
+  }
+  .topbar__menu {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+  }
+  @media (min-width: 768px) {
+    .topbar__menu {
+      display: none;
+    }
+    .topbar__nav {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      width: auto;
+      padding: 0;
+      gap: 1.1rem;
+    }
+  }
+</style>
+
+<script>
+  const button = document.querySelector<HTMLButtonElement>('[data-menu-button]')
+  const sheet = document.querySelector<HTMLElement>('[data-nav-sheet]')
+  function setOpen(open: boolean): void {
+    button?.setAttribute('aria-expanded', String(open))
+    sheet?.toggleAttribute('data-open', open)
+  }
+  button?.addEventListener('click', () => setOpen(button.getAttribute('aria-expanded') !== 'true'))
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setOpen(false)
+  })
+</script>

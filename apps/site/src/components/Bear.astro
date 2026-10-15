@@ -1,0 +1,24 @@
+---
+import { Image } from 'astro:assets'
+import icon64 from '../../../desktop/build/icon-64.png'
+import icon128 from '../../../desktop/build/icon-128.png'
+import iconFull from '../../../desktop/build/icon.png'
+
+interface Props {
+  size: number
+  mood?: 'bob' | 'wave' | 'nap' | 'still'
+}
+const { size, mood = 'still' } = Astro.props
+const moodClass = mood === 'bob' ? 'bob' : mood === 'still' ? '' : `bear--${mood}`
+// Images are not resized at build time, so pick the smallest pre-sized copy of the logo that covers 2x density.
+const src = size * 2 <= 64 ? icon64 : size * 2 <= 128 ? icon128 : iconFull
+---
+
+<Image
+  src={src}
+  alt=""
+  width={size}
+  height={size}
+  class:list={['bear', moodClass]}
+  style={`width:${size}px;height:${size}px`}
+/>

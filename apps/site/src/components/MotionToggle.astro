@@ -8,10 +8,12 @@
       <circle cx="18.5" cy="11" r="2" />
     </g>
   </svg>
-  <span data-motion-label>Motion on</span>
+  <!-- CSS picks the label from html[data-motion], which the head script sets before paint. -->
+  <span class="motion-toggle__on">Motion on</span>
+  <span class="motion-toggle__off">Motion off</span>
 </button>
 
-<style>
+<style is:global>
   .motion-toggle {
     display: inline-flex;
     align-items: center;
@@ -25,7 +27,14 @@
     font-size: 0.875rem;
     cursor: pointer;
   }
-  .motion-toggle[aria-pressed='false'] .motion-toggle__icon {
+  .motion-toggle__off,
+  html[data-motion='off'] .motion-toggle__on {
+    display: none;
+  }
+  html[data-motion='off'] .motion-toggle__off {
+    display: inline;
+  }
+  html[data-motion='off'] .motion-toggle__icon {
     opacity: 0.5;
   }
 </style>
