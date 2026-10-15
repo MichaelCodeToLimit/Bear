@@ -207,8 +207,9 @@ test('hue shift keeps computed colours valid and changes the background', async 
   const after = await colours()
   expect(after.color).toMatch(/^oklch\(0\.94\d* 0\.026\d* 196\.7\d*\)$/)
   expect(after.color).not.toBe(before.color)
-  const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
-  expect(bodyBg).toContain('gradient')
+  // The page gradient lives on html so the starfield canvas can sit above it.
+  const pageBg = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundImage)
+  expect(pageBg).toContain('gradient')
 })
 
 test('a garbage saved mix is ignored without console errors', async ({ page }) => {

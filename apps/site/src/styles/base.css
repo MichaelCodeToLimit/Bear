@@ -5,17 +5,12 @@
 }
 
 html {
-  background: var(--bg-to);
   -webkit-text-size-adjust: 100%;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  /* Top to bottom: amber glow, faint grid, the cocoa gradient. */
-  background:
+  background-color: var(--bg-to);
+  /* Top to bottom: amber glow, faint grid, the cocoa gradient. Lives on html so the
+     z-index:-1 starfield canvas paints above it and below all content, with no
+     stacking context needed on main/footer. */
+  background-image:
     radial-gradient(ellipse 70% 45% at 50% 0%, var(--glow), transparent 70%),
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
@@ -26,25 +21,26 @@ body {
     40px 40px,
     auto;
   background-attachment: fixed;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   color: var(--ink);
   font-family: var(--font);
   line-height: 1.55;
 }
 
-/* Firefly canvas: drawn over the body background, under all content. */
+/* Firefly canvas: above the html background, below all content. */
 .starfield {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
-}
-
-main,
-footer {
-  position: relative;
-  z-index: 1;
 }
 
 main {

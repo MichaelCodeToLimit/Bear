@@ -81,6 +81,22 @@ test('static list is hidden once JavaScript runs', async ({ page }) => {
   await expect(page.locator('[data-tour-static]')).toBeHidden()
 })
 
+test('open bottom sheet stays above the footer and starfield', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 700 })
+  await page.goto('tour/#write')
+  const panel = page.locator('[data-panel]')
+  await expect(panel).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  const hit = await page.evaluate(() => {
+    const p = document.querySelector('.picker__panel')!.getBoundingClientRect()
+    const el = document.elementFromPoint(p.left + p.width / 2, p.top + p.height / 2)
+    return !!el?.closest('.picker__panel')
+  })
+  expect(hit).toBe(true)
+  const pe = await page.locator('canvas.starfield').evaluate((el) => getComputedStyle(el).pointerEvents)
+  expect(pe).toBe('none')
+})
+
 test('no horizontal scroll at phone width, and panel is a bottom sheet', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
   await page.goto('tour/#write')
