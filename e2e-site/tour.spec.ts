@@ -11,6 +11,13 @@ function trackConsole(page: Page): string[] {
   return errors
 }
 
+test('tour heading has a gradient second line', async ({ page }) => {
+  await page.goto('tour/')
+  const h1 = page.locator('h1')
+  await expect(h1.locator('.grad')).toHaveText('Watch it work.')
+  await expect(h1).toContainText('Pick an app.')
+})
+
 test('deep link opens a panel with the demo', async ({ page }) => {
   await page.goto('tour/#sheets')
   const panel = page.locator('[data-panel]')

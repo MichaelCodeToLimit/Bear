@@ -46,6 +46,14 @@ function Stage({ app, motionOn }: { app: TourApp; motionOn: boolean }) {
 function Panel({ app, motionOn, narrow, onClose }: { app: TourApp; motionOn: boolean; narrow: boolean; onClose: () => void }) {
   const body = (
     <>
+      <div className="picker__bar" aria-hidden="true">
+        <span className="picker__back">← {app.name}</span>
+        <span className="picker__tabs">
+          <span className="is-on">Home</span>
+          <span>Insert</span>
+          <span>Layout</span>
+        </span>
+      </div>
       <button type="button" className="picker__close" aria-label={`Close ${app.name}`} onClick={onClose}>
         ×
       </button>
