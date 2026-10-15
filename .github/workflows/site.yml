@@ -27,6 +27,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,6 +46,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm site:test
+        timeout-minutes: 10
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/site/dist
