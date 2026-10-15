@@ -1,9 +1,14 @@
 :root {
   color-scheme: light;
-  --bg-from: #fbf4ea;
-  --bg-to: #f1e2cc;
-  --ink: #3b2a1a;
-  --ink-muted: #7a6450;
+  /* Un-rotated palette; --bg-from/--bg-to/--ink/--ink-muted below apply --hue-shift. */
+  --cream-from: #fbf4ea;
+  --cream-to: #f1e2cc;
+  --ink-base: #3b2a1a;
+  --ink-muted-base: #7a6450;
+  --bg-from: var(--cream-from);
+  --bg-to: var(--cream-to);
+  --ink: var(--ink-base);
+  --ink-muted: var(--ink-muted-base);
   --surface: #ffffff;
   --surface-edge: rgba(59, 42, 26, 0.12);
   --accent: #b45309;
@@ -40,10 +45,10 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg-from: #2a1d14;
-    --bg-to: #1d130d;
-    --ink: #fbf4ea;
-    --ink-muted: #cdb89f;
+    --cream-from: #2a1d14;
+    --cream-to: #1d130d;
+    --ink-base: #fbf4ea;
+    --ink-muted-base: #cdb89f;
     --surface: #3a2a1d;
     --surface-edge: rgba(251, 244, 234, 0.14);
     --accent: #f59e0b;
@@ -51,5 +56,15 @@
     --focus: #93c5fd;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* Rotate the cream and ink in OKLCH (lightness and chroma stay put, so contrast holds). */
+@supports (color: oklch(from red l c h)) {
+  :root {
+    --bg-from: oklch(from var(--cream-from) l c calc(h + var(--hue-shift)));
+    --bg-to: oklch(from var(--cream-to) l c calc(h + var(--hue-shift)));
+    --ink: oklch(from var(--ink-base) l c calc(h + var(--hue-shift)));
+    --ink-muted: oklch(from var(--ink-muted-base) l c calc(h + var(--hue-shift)));
   }
 }

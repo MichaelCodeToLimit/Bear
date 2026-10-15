@@ -215,7 +215,8 @@ function Doodle() {
 
 const TASKS = ['Pick a bear name', 'Open a spreadsheet', 'Write one note', 'Hit save']
 const CONFETTI_COUNT = 36
-const CONFETTI_MS = 2000
+/** Confetti lasts 1600ms x --motion-speed plus up to 300ms of stagger; the timer scales with the speed. */
+const CONFETTI_BASE_MS = 2000
 
 function Tasks({ motionOn }: { motionOn: boolean }) {
   const [done, setDone] = useState<boolean[]>(() => TASKS.map(() => false))
@@ -235,7 +236,8 @@ function Tasks({ motionOn }: { motionOn: boolean }) {
     clearTimer()
     if (next.every(Boolean) && motionOn) {
       setBurst(true)
-      timer.current = setTimeout(() => setBurst(false), CONFETTI_MS)
+      const speed = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--motion-speed')) || 1
+      timer.current = setTimeout(() => setBurst(false), CONFETTI_BASE_MS * speed)
     } else {
       setBurst(false)
     }

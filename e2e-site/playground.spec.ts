@@ -63,7 +63,7 @@ test('tile physics makes 12 bodies and Reset keeps them', async ({ page }) => {
   await page.goto('playground/')
   await page.locator('[data-tile-physics]').scrollIntoViewIfNeeded()
   await expect(page.locator('[data-bodies="12"]')).toBeVisible({ timeout: 5000 })
-  await page.getByRole('button', { name: /reset/i }).click()
+  await page.getByRole('button', { name: /reset/i }).first().click()
   await expect(page.locator('[data-bodies="12"]')).toBeVisible()
 })
 
@@ -155,4 +155,49 @@ test('playground has no horizontal scroll at 375px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
   await page.goto('playground/')
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375)
+})
+
+const setSpeed = (page: Page, value: string) =>
+  page.getByLabel('Animation speed').evaluate((el, v) => {
+    const input = el as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    setter.call(input, v)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }, value)
+
+const htmlSpeed = (page: Page) =>
+  page.evaluate(() => document.documentElement.style.getPropertyValue('--motion-speed'))
+
+test('theme mixer speed slider sets --motion-speed, survives reload, and Reset restores 1', async ({ page }) => {
+  await page.goto('playground/')
+  await page.getByLabel('Animation speed').scrollIntoViewIfNeeded()
+  await expect(page.getByLabel('Animation speed')).toBeEnabled()
+  await setSpeed(page, '1.5')
+  await expect.poll(() => htmlSpeed(page)).toBe('1.5')
+  await page.reload()
+  // applied by the head script before any island hydrates
+  expect(await htmlSpeed(page)).toBe('1.5')
+  await page.getByRole('button', { name: 'Reset mix' }).click()
+  await expect.poll(() => htmlSpeed(page)).toBe('1')
+  await page.reload()
+  // nothing saved any more, so the stylesheet default applies
+  expect(await htmlSpeed(page)).toBe('')
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--motion-speed').trim())).toBe('1')
+})
+
+test('a garbage saved mix is ignored without console errors', async ({ page }) => {
+  const errors = trackConsole(page)
+  await page.addInitScript(() => localStorage.setItem('bear-mix', 'garbage'))
+  await page.goto('playground/')
+  await page.getByLabel('Animation speed').scrollIntoViewIfNeeded()
+  await expect(page.getByLabel('Animation speed')).toHaveValue('1')
+  expect(await htmlSpeed(page)).toBe('')
+  expect(errors).toEqual([])
+})
+
+test('Surprise me persists a readable mix', async ({ page }) => {
+  await page.goto('playground/')
+  await page.getByRole('button', { name: 'Surprise me' }).scrollIntoViewIfNeeded()
+  await page.getByRole('button', { name: 'Surprise me' }).click()
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('bear-mix'))).not.toBeNull()
 })

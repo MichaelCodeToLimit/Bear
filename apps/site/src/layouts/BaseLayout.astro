@@ -34,6 +34,20 @@ const fullTitle = title === 'Bear' ? title : `${title} | Bear`
       var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       document.documentElement.dataset.motion =
         saved === 'on' || saved === 'off' ? saved : reduced ? 'off' : 'on'
+      // Applies a saved Theme mixer mix. Defensive mirror of parseSavedMix() in
+      // src/lib/themeMixer.ts (clamp ranges, ignore anything invalid); keep in sync.
+      try {
+        var mix = JSON.parse(localStorage.getItem('bear-mix'))
+        if (mix && typeof mix === 'object' && !Array.isArray(mix)) {
+          var clamp = function (v, lo, hi, d) {
+            return typeof v === 'number' && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d
+          }
+          var rs = document.documentElement.style
+          rs.setProperty('--hue-shift', clamp(mix.hue, -180, 180, 0) + 'deg')
+          rs.setProperty('--round', String(clamp(mix.round, 0, 2, 1)))
+          rs.setProperty('--motion-speed', String(clamp(mix.speed, 0.25, 2, 1)))
+        }
+      } catch (e) {}
     </script>
     <style set:html={appColorCss(APPS)} />
   </head>
