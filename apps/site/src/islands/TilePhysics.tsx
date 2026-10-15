@@ -46,9 +46,9 @@ function createWorld(Matter: MatterModule, canvas: HTMLCanvasElement, width: num
   const mouse = Mouse.create(canvas)
   // Canvas pixels differ from CSS pixels by dpr; tell Matter so pointer positions stay in CSS space.
   mouse.pixelRatio = dpr
-  // Let the page scroll when the wheel is over the canvas.
-  canvas.removeEventListener('mousewheel', (mouse as unknown as { mousewheel: EventListener }).mousewheel)
-  canvas.removeEventListener('DOMMouseScroll', (mouse as unknown as { mousewheel: EventListener }).mousewheel)
+  const handlers = mouse as unknown as Record<'mousemove' | 'mousedown' | 'mouseup' | 'mousewheel', EventListener>
+  // Matter's wheel handler calls preventDefault(); drop it so the page still scrolls over the canvas.
+  canvas.removeEventListener('wheel', handlers.mousewheel)
   const mouseConstraint = MouseConstraint.create(engine, { mouse, constraint: { stiffness: 0.2, render: { visible: false } } })
   Composite.add(engine.world, mouseConstraint)
 
@@ -96,6 +96,12 @@ function createWorld(Matter: MatterModule, canvas: HTMLCanvasElement, width: num
 
   const teardown = () => {
     setRunning(false)
+    canvas.removeEventListener('mousemove', handlers.mousemove)
+    canvas.removeEventListener('mousedown', handlers.mousedown)
+    canvas.removeEventListener('mouseup', handlers.mouseup)
+    canvas.removeEventListener('touchmove', handlers.mousemove)
+    canvas.removeEventListener('touchstart', handlers.mousedown)
+    canvas.removeEventListener('touchend', handlers.mouseup)
     Events.off(engine, 'afterUpdate', draw)
     Composite.clear(engine.world, false)
     Engine.clear(engine)
@@ -107,6 +113,7 @@ function TilePhysicsInner() {
   const motion = useMotion()
   const motionOn = motion === 'on'
   const [ready, setReady] = useState(false)
+  const [failed, setFailed] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const controller = useRef<Controller | null>(null)
@@ -151,14 +158,19 @@ function TilePhysicsInner() {
       }
     })
 
-    import('matter-js').then((mod) => {
-      if (cancelled) return
-      Matter = (mod as { default?: MatterModule }).default ?? (mod as MatterModule)
-      width = Math.floor(root.clientWidth)
-      if (width > 0) build()
-      setReady(true)
-      ro.observe(root)
-    })
+    import('matter-js')
+      .then((mod) => {
+        if (cancelled) return
+        Matter = (mod as { default?: MatterModule }).default ?? (mod as MatterModule)
+        width = Math.floor(root.clientWidth)
+        if (width > 0) build()
+        setReady(true)
+        ro.observe(root)
+      })
+      .catch((error: unknown) => {
+        console.warn('[island:tile-physics] matter-js failed to load', error)
+        if (!cancelled) setFailed(true)
+      })
 
     return () => {
       cancelled = true
@@ -174,6 +186,14 @@ function TilePhysicsInner() {
     sync()
     if (!motionOn) controller.current?.reset()
   }, [motionOn])
+
+  if (failed) {
+    return (
+      <p className="island-fallback" role="status" data-island-failed="tile-physics">
+        This one didn't load. Try reloading.
+      </p>
+    )
+  }
 
   return (
     <div ref={rootRef} className="tp" data-tile-physics data-bodies={ready ? APPS.length : undefined}>

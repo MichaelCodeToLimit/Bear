@@ -67,6 +67,25 @@ test('tile physics makes 12 bodies and Reset keeps them', async ({ page }) => {
   await expect(page.locator('[data-bodies="12"]')).toBeVisible()
 })
 
+test('wheel over the tile canvas is not default-prevented', async ({ page }) => {
+  await page.goto('playground/')
+  await page.locator('[data-tile-physics]').scrollIntoViewIfNeeded()
+  await expect(page.locator('[data-bodies="12"]')).toBeVisible({ timeout: 5000 })
+  const prevented = await page.locator('canvas.tp__canvas').evaluate((el) => {
+    const ev = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })
+    el.dispatchEvent(ev)
+    return ev.defaultPrevented
+  })
+  expect(prevented).toBe(false)
+})
+
+test('failed matter-js load shows the fallback message', async ({ page }) => {
+  await page.route(/matter/i, (route) => route.abort())
+  await page.goto('playground/')
+  await page.locator('[data-playground-card]').nth(1).scrollIntoViewIfNeeded()
+  await expect(page.locator('[data-island-failed="tile-physics"]')).toContainText("This one didn't load")
+})
+
 test('playground has no horizontal scroll at 375px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
   await page.goto('playground/')
