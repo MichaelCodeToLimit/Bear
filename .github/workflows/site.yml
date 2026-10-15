@@ -10,6 +10,8 @@ on:
       - 'packages/core/**'
       - 'README.md'
       - '.github/workflows/site.yml'
+      - 'playwright.site.config.ts'
+      - 'e2e-site/**'
       - 'pnpm-lock.yaml'
   release:
     types: [published]
