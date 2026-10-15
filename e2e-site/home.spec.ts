@@ -7,6 +7,20 @@ test('hero headline', async ({ page }) => {
   await expect(page.locator('h1')).toHaveText('Your office suite, no subscription.')
 })
 
+test('hero floats all 12 app tiles at desktop width without covering the copy', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('./')
+  const tiles = page.locator('.hero .tile.float')
+  await expect(tiles).toHaveCount(12)
+  for (const t of await tiles.all()) await expect(t).toBeVisible()
+  const body = (await page.locator('.hero__body').boundingBox())!
+  for (const t of await tiles.all()) {
+    const box = (await t.boundingBox())!
+    const overlaps = box.x < body.x + body.width && box.x + box.width > body.x
+    expect(overlaps).toBe(false)
+  }
+})
+
 test('app strip links every app to the tour', async ({ page }) => {
   await page.goto('./')
   const links = page.locator('[data-app-strip] a')

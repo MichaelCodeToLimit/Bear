@@ -6,7 +6,8 @@ import AppTile from '../components/AppTile.astro'
 import { url } from '../site.config'
 
 const downloadHref = url('download/')
-const heroTiles = APPS.slice(0, 6)
+const leftTiles = APPS.slice(0, 6)
+const rightTiles = APPS.slice(6)
 
 const why = [
   { title: 'Free, no subscription', body: 'Pay nothing, now or later. No trials, no seats, no renewal emails.' },
@@ -25,14 +26,8 @@ const rows = [
 
 <BaseLayout title="Bear">
   <section class="hero" aria-labelledby="hero-title">
-    <div class="hero__tiles" aria-hidden="true">
-      {
-        heroTiles.map((app, i) => (
-          <div class={`hero__tile hero__tile--${i + 1}`}>
-            <AppTile app={app} float />
-          </div>
-        ))
-      }
+    <div class="hero__side hero__side--left" aria-hidden="true">
+      {leftTiles.map((app) => <AppTile app={app} float />)}
     </div>
     <div class="hero__body">
       <Bear size={140} mood="bob" />
@@ -45,6 +40,9 @@ const rows = [
         <a class="btn btn--primary" href={downloadHref}>Download Bear</a>
         <a class="btn" href={url('tour/')}>Take the tour</a>
       </div>
+    </div>
+    <div class="hero__side hero__side--right" aria-hidden="true">
+      {rightTiles.map((app) => <AppTile app={app} float />)}
     </div>
   </section>
 
@@ -139,34 +137,34 @@ const rows = [
   .hero h1 {
     font-size: clamp(2rem, 6vw, 3.4rem);
   }
-  /* Floating tiles frame the hero on wide screens only. */
-  .hero__tiles {
+  /* Floating tiles flank the hero on wide screens only; in-flow columns so they never overlap the copy. */
+  .hero__side {
     display: none;
   }
   @media (min-width: 900px) {
     .hero {
+      display: grid;
+      grid-template-columns: 9rem minmax(0, 1fr) 9rem;
+      gap: 2rem;
+      align-items: center;
       padding: 3rem 0 4rem;
     }
-    .hero__tiles {
-      display: block;
-      position: absolute;
-      inset: 0;
+    .hero__side {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
       pointer-events: none;
     }
-    .hero__tile {
-      position: absolute;
-      width: 11rem;
-      opacity: 0.9;
+    .hero__side :global(.tile) {
+      padding: 0.6rem 0.8rem;
     }
-    .hero__tile:nth-child(even) :global(.tile) {
+    .hero__side :global(.tile__tagline),
+    .hero__side :global(.badge) {
+      display: none;
+    }
+    .hero__side :global(.tile:nth-child(even)) {
       animation-delay: -2s;
     }
-    .hero__tile--1 { top: 0; left: 0; }
-    .hero__tile--2 { top: 1rem; right: 0; }
-    .hero__tile--3 { top: 45%; left: -1rem; }
-    .hero__tile--4 { top: 45%; right: -1rem; }
-    .hero__tile--5 { bottom: 0; left: 4rem; }
-    .hero__tile--6 { bottom: 0; right: 4rem; }
   }
   .section {
     padding: 2rem 0;
