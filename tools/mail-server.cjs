@@ -3,19 +3,22 @@
  * same mailbox. For development and automated tests only — it accepts any password, stores
  * mail in memory, and listens on localhost.
  *
- *   pnpm mail-server              # IMAP on 1143, SMTP on 1025, sign in as bear@bear.local / bear
+ *   pnpm mail-server                 # IMAP on 1143, SMTP on 1025, sign in as bear@bear.com / bear
+ *   pnpm mail-server you@bear.com    # use your own @bear.com address instead
  *
  * In Bear: Mail > Add account > "Other", server 127.0.0.1, IMAP port 1143, SMTP port 1025, security "None".
  */
 const hoodiecrow = require('hoodiecrow-imap')
 const { SMTPServer } = require('smtp-server')
 
-const USER = 'bear@bear.local'
+// Bear's own address domain. The server keeps all mail on this computer, so it never reaches the real bear.com.
+const DOMAIN = 'bear.com'
+const USER = 'bear@' + DOMAIN
 const PASSWORD = 'bear'
 
-const welcome = [
-  'From: "Bear Team" <team@bear.local>',
-  `To: ${USER}`,
+const makeWelcome = (user) => [
+  'From: "Bear Team" <team@bear.com>',
+  `To: ${user}`,
   'Subject: Welcome to Bear Mail',
   `Date: ${new Date().toUTCString()}`,
   'MIME-Version: 1.0',
@@ -24,10 +27,13 @@ const welcome = [
   '<h2>Welcome to Bear Mail</h2><p>This message comes from Bear\'s <b>local test mail server</b>. Anything you send to any address arrives back here.</p>'
 ].join('\r\n')
 
-function start({ imapPort = 1143, smtpPort = 1025, seed = true, quiet = false } = {}) {
+function start({ imapPort = 1143, smtpPort = 1025, seed = true, quiet = false, user = USER } = {}) {
+  user = String(user).toLowerCase()
+  if (!user.includes('@')) user += '@' + DOMAIN
+  const welcome = makeWelcome(user)
   const imap = hoodiecrow({
     plugins: ['id', 'sasl-ir', 'auth-plain', 'namespace', 'idle', 'enable', 'condstore', 'unselect', 'special-use', 'create-special-use', 'literalplus', 'uidplus', 'move'],
-    users: { [USER]: { password: PASSWORD } },
+    users: { [user]: { password: PASSWORD } },
     storage: {
       INBOX: { messages: seed ? [{ raw: welcome, flags: [] }] : [] },
       '': {
@@ -48,7 +54,7 @@ function start({ imapPort = 1143, smtpPort = 1025, seed = true, quiet = false } 
     disabledCommands: ['STARTTLS'],
     logger: false,
     onAuth(auth, _session, done) {
-      if (auth.username === USER && auth.password === PASSWORD) return done(null, { user: auth.username })
+      if (String(auth.username).toLowerCase() === user && auth.password === PASSWORD) return done(null, { user: auth.username })
       done(new Error('Invalid username or password'))
     },
     onData(stream, _session, done) {
@@ -69,9 +75,9 @@ function start({ imapPort = 1143, smtpPort = 1025, seed = true, quiet = false } 
         // Port 0 picks any free port (tests do this so parallel runs never collide); report the real ones.
         imapPort = imap.server.address().port
         smtpPort = smtp.server.address().port
-        if (!quiet) console.log(`Bear test mail server: IMAP 127.0.0.1:${imapPort}, SMTP 127.0.0.1:${smtpPort}, user ${USER} / ${PASSWORD}`)
+        if (!quiet) console.log(`Bear test mail server: IMAP 127.0.0.1:${imapPort}, SMTP 127.0.0.1:${smtpPort}, user ${user} / ${PASSWORD}`)
         resolve({
-          user: USER,
+          user,
           password: PASSWORD,
           imapPort,
           smtpPort,
@@ -87,7 +93,7 @@ function start({ imapPort = 1143, smtpPort = 1025, seed = true, quiet = false } 
 module.exports = { start, USER, PASSWORD }
 
 if (require.main === module) {
-  start().catch((e) => {
+  start({ user: process.argv[2] || USER }).catch((e) => {
     console.error(e)
     process.exit(1)
   })
