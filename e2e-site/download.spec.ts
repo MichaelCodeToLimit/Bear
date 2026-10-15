@@ -16,3 +16,12 @@ test('download page renders a release or the fallback with no console errors', a
   await expect(page.getByText('pnpm install').first()).toBeVisible()
   expect(errors).toEqual([])
 })
+
+test('download page has the Windows download button', async ({ page }) => {
+  await page.goto('download/')
+  const btn = page.locator('[data-windows-download="exe"], [data-windows-download="releases"]').first()
+  await expect(btn).toBeVisible()
+  await expect(btn).toContainText('Download for Windows')
+  const href = (await btn.getAttribute('href')) ?? ''
+  expect(/\/releases\/download\/.+\.exe$/.test(href) || href === 'https://github.com/MichaelCodeToLimit/Bear/releases').toBe(true)
+})

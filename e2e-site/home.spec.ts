@@ -69,11 +69,24 @@ test('suite diagram links all 12 apps and marks the 4 not ready as soon', async 
   await expect(page.locator('.suite-diagram a[data-soon]')).toHaveCount(4)
 })
 
-test('download buttons link to the download page', async ({ page }) => {
+test('Windows download buttons: hero and final CTA point at the .exe or the Releases page', async ({ page }) => {
   await page.goto('./')
-  const buttons = page.getByRole('link', { name: /^Download/ })
+  const buttons = page.locator('[data-windows-download="exe"], [data-windows-download="releases"]')
   expect(await buttons.count()).toBeGreaterThanOrEqual(2)
-  for (const b of await buttons.all()) await expect(b).toHaveAttribute('href', '/Bear/download/')
+  for (const b of await buttons.all()) {
+    await expect(b).toContainText('Download for Windows')
+    const href = (await b.getAttribute('href')) ?? ''
+    expect(/\/releases\/download\/.+\.exe$/.test(href) || href === 'https://github.com/MichaelCodeToLimit/Bear/releases').toBe(true)
+  }
+  await expect(page.locator('.hero [data-windows-download]').first()).toBeVisible()
+})
+
+test('"Other systems" links and the top-bar Download go to the download page', async ({ page }) => {
+  await page.goto('./')
+  const other = page.getByRole('link', { name: /Other systems/ })
+  expect(await other.count()).toBeGreaterThanOrEqual(2)
+  for (const l of await other.all()) await expect(l).toHaveAttribute('href', '/Bear/download/')
+  await expect(page.locator('header.topbar').getByRole('link', { name: /^Download/ }).first()).toHaveAttribute('href', '/Bear/download/')
 })
 
 test('home has no horizontal scroll at 375px', async ({ page }) => {

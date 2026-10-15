@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
 import Bear from '../components/Bear.astro'
+import WindowsDownload from '../components/WindowsDownload.astro'
 import { SITE } from '../site.config'
 import { fetchLatestRelease, formatSize, type DownloadFile, type OS } from '../lib/releases'
 
@@ -49,6 +50,10 @@ const steps = [
         </>
       )}
     </header>
+
+    <div class="dl-windows">
+      <WindowsDownload release={release} />
+    </div>
 
     {release && (
       <>
@@ -146,6 +151,9 @@ const steps = [
   }
   [data-motion='off'] .dl-carry.is-catching {
     animation: none;
+  }
+  .dl-windows {
+    margin: 0 0 2rem;
   }
   .dl-best {
     max-width: 28rem;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { classifyAsset, formatSize, toRelease, fetchLatestRelease, pickBest, detectOS, type DownloadFile } from './releases'
+import { classifyAsset, formatSize, toRelease, fetchLatestRelease, pickBest, detectOS, windowsDownloads, type DownloadFile } from './releases'
 
 const file = (name: string, os: DownloadFile['os'], recommended: boolean): DownloadFile => ({
   name,
@@ -155,6 +155,30 @@ describe('detectOS', () => {
   it('returns null for Android and iOS', () => {
     expect(detectOS('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36')).toBeNull()
     expect(detectOS('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15')).toBeNull()
+  })
+})
+
+describe('windowsDownloads', () => {
+  const rel = (files: DownloadFile[]) => ({ version: '0.1.1', date: '2026-10-14T10:00:00Z', notesUrl: 'https://x/n', files })
+  it('returns nulls without a release', () => {
+    expect(windowsDownloads(null)).toEqual({ exe: null, msi: null, version: null })
+  })
+  it('picks the exe and msi out of a mixed release', () => {
+    const exe = file('Bear-Setup.exe', 'windows', true)
+    const msi = file('Bear.msi', 'windows', false)
+    expect(windowsDownloads(rel([file('Bear.dmg', 'mac', true), exe, msi]))).toEqual({ exe, msi, version: '0.1.1' })
+  })
+  it('picks Windows-only files', () => {
+    const exe = file('a.exe', 'windows', true)
+    const msi = file('a.msi', 'windows', false)
+    expect(windowsDownloads(rel([exe, msi]))).toMatchObject({ exe, msi })
+  })
+  it('gives exe null when only an msi exists', () => {
+    const msi = file('a.msi', 'windows', false)
+    expect(windowsDownloads(rel([msi]))).toEqual({ exe: null, msi, version: '0.1.1' })
+  })
+  it('gives nulls when there are no Windows files', () => {
+    expect(windowsDownloads(rel([file('a.dmg', 'mac', true)]))).toMatchObject({ exe: null, msi: null })
   })
 })
 

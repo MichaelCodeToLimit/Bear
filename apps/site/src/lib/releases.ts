@@ -18,6 +18,21 @@ export interface ReleaseInfo {
   files: DownloadFile[]
 }
 
+/** The Windows installer (.exe) and MSI package from a release, either of which may be missing. */
+export function windowsDownloads(release: ReleaseInfo | null): {
+  exe: DownloadFile | null
+  msi: DownloadFile | null
+  version: string | null
+} {
+  if (!release) return { exe: null, msi: null, version: null }
+  const win = release.files.filter((f) => f.os === 'windows')
+  return {
+    exe: win.find((f) => f.name.toLowerCase().endsWith('.exe')) ?? null,
+    msi: win.find((f) => f.name.toLowerCase().endsWith('.msi')) ?? null,
+    version: release.version
+  }
+}
+
 /** Map an asset file name to a system and label. Returns null for files that should not be shown. */
 export function classifyAsset(name: string): { os: OS; label: string; recommended: boolean } | null {
   const n = name.toLowerCase()
