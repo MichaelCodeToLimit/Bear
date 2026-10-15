@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro'
 import BearBuddy from '../islands/BearBuddy'
 import TilePhysics from '../islands/TilePhysics'
+import MiniDemos from '../islands/MiniDemos'
 ---
 
 <BaseLayout title="Playground" description="Little toys built from the Bear brand. Poke them, drag them, break nothing.">
@@ -24,7 +25,8 @@ import TilePhysics from '../islands/TilePhysics'
 
       <article class="card pg__card" data-playground-card>
         <h2>Mini live demos</h2>
-        <p class="pg__soon">Coming up</p>
+        <p>A tiny spreadsheet, a doodle pad and a checklist. Nothing is saved.</p>
+        <MiniDemos client:visible />
       </article>
 
       <article class="card pg__card" data-playground-card>
@@ -123,6 +125,159 @@ import TilePhysics from '../islands/TilePhysics'
     }
     to {
       transform: translateY(3px);
+    }
+  }
+
+  /* Mini demos */
+  .mini {
+    position: relative;
+    min-width: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .mini__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .mini__tab {
+    font: inherit;
+    font-weight: 600;
+    padding: 0.4rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid var(--surface-edge);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .mini__tab[aria-selected='true'] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+  .mini__tab:focus-visible,
+  .doodle__swatch:focus-visible,
+  .msheet__input:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .mini__panel {
+    min-width: 0;
+  }
+  .msheet__hint {
+    margin: 0 0 0.5rem;
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+  }
+  .msheet__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .msheet__cell {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+  .msheet__input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    font: inherit;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--r-md);
+    border: 1px solid var(--surface-edge);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .msheet__result {
+    min-height: 1.3em;
+    padding: 0 0.5rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+  .msheet__result[data-error] {
+    color: var(--accent);
+  }
+  .doodle {
+    display: grid;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+  .doodle__canvas {
+    display: block;
+    width: 100%;
+    touch-action: none;
+    cursor: crosshair;
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--bg-to) 55%, var(--surface));
+    border: 1px solid var(--surface-edge);
+  }
+  .doodle__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+  .doodle__swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .doodle__swatch {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 1px var(--surface-edge);
+    cursor: pointer;
+    padding: 0;
+  }
+  .doodle__swatch[aria-pressed='true'] {
+    box-shadow: 0 0 0 3px var(--ink);
+  }
+  .tasks__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.4rem;
+  }
+  .tasks__item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+  }
+  .tasks__item[data-done] span {
+    text-decoration: line-through;
+    color: var(--ink-muted);
+  }
+  .tasks__status {
+    margin: 0.6rem 0 0;
+    font-weight: 700;
+  }
+  .confetti {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .confetti span {
+    position: absolute;
+    top: -8px;
+    left: var(--x);
+    width: 8px;
+    height: 12px;
+    border-radius: 2px;
+    transform: rotate(var(--rot));
+    animation: confetti-fall calc(1600ms * var(--motion-speed, 1)) ease-in var(--delay) forwards;
+  }
+  @keyframes confetti-fall {
+    to {
+      transform: translate(var(--dx), 260px) rotate(calc(var(--rot) + 540deg));
+      opacity: 0;
     }
   }
 
