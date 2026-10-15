@@ -12,7 +12,10 @@ export default defineConfig({
   use: { baseURL: 'http://127.0.0.1:4321/Bear/' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'pnpm site:preview --host 127.0.0.1 --port 4321',
+    // Start Astro directly: through the pnpm wrappers the server outlived Playwright's
+    // shutdown on Linux and teardown hung ("Timed out waiting ... for the teardown").
+    command: 'node node_modules/astro/bin/astro.mjs preview --host 127.0.0.1 --port 4321',
+    cwd: 'apps/site',
     url: 'http://127.0.0.1:4321/Bear/',
     reuseExistingServer: !CI,
     timeout: 120_000,
