@@ -20,6 +20,14 @@ describe('tourApps', () => {
     for (const a of tourApps().filter((t) => !t.ready)) expect(a.docsSlug).toBeNull()
   })
 
+  it('keeps product names out of the feature copy', () => {
+    const banned = /\b(Microsoft|Office|Outlook|Word|Excel|PowerPoint|Teams|OneNote)\b/
+    for (const a of tourApps()) {
+      // A tagline fallback comes from @bear/core, not from the site copy.
+      for (const f of a.features.filter((x) => x !== a.tagline)) expect(f, a.id).not.toMatch(banned)
+    }
+  })
+
   it('follows the ready flag of the apps passed in', () => {
     const chat = tourApps(APPS.map((a) => (a.id === 'chat' ? { ...a, ready: true } : a))).find((a) => a.id === 'chat')!
     expect(chat.docsSlug).toBe('apps/chat')

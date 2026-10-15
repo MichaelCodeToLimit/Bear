@@ -36,7 +36,7 @@ export const FEATURES: Partial<Record<AppId, string[]>> = {
     'Saves automatically'
   ],
   mail: [
-    'Connect any IMAP account, or sign in with Google or Microsoft',
+    'Connect any IMAP account or sign in with your email provider',
     'Folders with unread counts, and search',
     'Reply, reply all and forward, with attachments',
     'Archive, delete and flag messages',
