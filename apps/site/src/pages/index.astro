@@ -1,12 +1,234 @@
 ---
+import { APPS } from '@bear/core'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import Bear from '../components/Bear.astro'
+import AppTile from '../components/AppTile.astro'
+import { url } from '../site.config'
+
+const downloadHref = url('download/')
+const heroTiles = APPS.slice(0, 6)
+
+const why = [
+  { title: 'Free, no subscription', body: 'Pay nothing, now or later. No trials, no seats, no renewal emails.' },
+  { title: 'MIT open source', body: 'Read the code, change it, share it. Bear belongs to everyone who uses it.' },
+  { title: 'Opens and saves .docx, .xlsx and .pptx', body: 'Swap files with colleagues and keep working in the formats you already use.' },
+  { title: 'Your files stay on your computer', body: 'Nothing is uploaded. Your documents live on your disk, under your control.' }
+]
+
+const rows = [
+  { label: 'Price', bear: 'Free, forever', other: 'Monthly or yearly fee' },
+  { label: 'Licence', bear: 'MIT open source', other: 'Closed source' },
+  { label: 'File formats', bear: '.docx, .xlsx and .pptx', other: '.docx, .xlsx and .pptx' },
+  { label: 'Where files live', bear: 'On your computer', other: 'In the vendor’s cloud' }
+]
 ---
 
 <BaseLayout title="Bear">
-  <h1>Bear</h1>
-  <div data-reveal class="card">
-    <Bear size={96} mood="bob" />
-    <p>A cozy, open-source office suite. The full home page is on its way.</p>
-  </div>
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero__tiles" aria-hidden="true">
+      {
+        heroTiles.map((app, i) => (
+          <div class={`hero__tile hero__tile--${i + 1}`}>
+            <AppTile app={app} float />
+          </div>
+        ))
+      }
+    </div>
+    <div class="hero__body">
+      <Bear size={140} mood="bob" />
+      <h1 id="hero-title">Your office suite, no subscription.</h1>
+      <p class="hero__sub">
+        Bear is a cozy, free and open-source office suite for your desktop: documents, spreadsheets,
+        slides and more.
+      </p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href={downloadHref}>Download Bear</a>
+        <a class="btn" href={url('tour/')}>Take the tour</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="apps-title">
+    <h2 id="apps-title">Twelve apps, one cozy suite</h2>
+    <div class="strip" data-app-strip>
+      {APPS.map((app) => <AppTile app={app} href={url(`tour/#${app.id}`)} />)}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="why-title">
+    <h2 id="why-title">Why Bear</h2>
+    <div class="why" data-why>
+      {
+        why.map((item, i) => (
+          <div class="card" data-reveal data-reveal-delay={i * 90}>
+            <h3>{item.title}</h3>
+            <p>{item.body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="compare-title">
+    <h2 id="compare-title">How it compares</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"><span class="sr-only">Feature</span></th>
+            <th scope="col">Bear</th>
+            <th scope="col">A typical subscription suite</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            rows.map((r) => (
+              <tr>
+                <th scope="row">{r.label}</th>
+                <td>{r.bear}</td>
+                <td>{r.other}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="cta" aria-labelledby="cta-title">
+    <Bear size={96} mood="wave" />
+    <h2 id="cta-title">Ready to give Bear a try?</h2>
+    <a class="btn btn--primary" href={downloadHref}>Download Bear</a>
+  </section>
 </BaseLayout>
+
+<style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .hero {
+    position: relative;
+    padding: 1rem 0 3rem;
+    text-align: center;
+  }
+  .hero__body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .hero__sub {
+    max-width: 36rem;
+    margin: 0 0 0.75rem;
+    color: var(--ink-muted);
+    font-size: 1.1rem;
+  }
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 6vw, 3.4rem);
+  }
+  /* Floating tiles frame the hero on wide screens only. */
+  .hero__tiles {
+    display: none;
+  }
+  @media (min-width: 900px) {
+    .hero {
+      padding: 3rem 0 4rem;
+    }
+    .hero__tiles {
+      display: block;
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .hero__tile {
+      position: absolute;
+      width: 11rem;
+      opacity: 0.9;
+    }
+    .hero__tile:nth-child(even) :global(.tile) {
+      animation-delay: -2s;
+    }
+    .hero__tile--1 { top: 0; left: 0; }
+    .hero__tile--2 { top: 1rem; right: 0; }
+    .hero__tile--3 { top: 45%; left: -1rem; }
+    .hero__tile--4 { top: 45%; right: -1rem; }
+    .hero__tile--5 { bottom: 0; left: 4rem; }
+    .hero__tile--6 { bottom: 0; right: 4rem; }
+  }
+  .section {
+    padding: 2rem 0;
+  }
+  .section > h2 {
+    text-align: center;
+    font-size: 1.8rem;
+  }
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 1rem;
+  }
+  .strip :global(.tile:hover),
+  .strip :global(.tile:focus-visible) {
+    animation: wiggle calc(0.5s * var(--motion-speed)) ease-in-out;
+  }
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-3deg); }
+    75% { transform: rotate(3deg); }
+  }
+  .why {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 1rem;
+  }
+  .why h3 {
+    font-size: 1.15rem;
+  }
+  .why p {
+    margin: 0;
+    color: var(--ink-muted);
+  }
+  .table-wrap {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--surface-edge);
+    border-radius: var(--r-md);
+  }
+  th,
+  td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--surface-edge);
+  }
+  tbody tr:last-child > * {
+    border-bottom: 0;
+  }
+  thead th:nth-child(2) {
+    color: var(--accent);
+  }
+  .cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 3rem 0 1rem;
+    text-align: center;
+  }
+</style>
