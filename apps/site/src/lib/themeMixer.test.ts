@@ -7,6 +7,7 @@ import {
   isReadable,
   mixToCss,
   mixedPalette,
+  themedPairs,
   parseSavedMix,
   surprise
 } from './themeMixer'
@@ -34,6 +35,14 @@ describe('isReadable', () => {
       expect(isReadable({ ...DEFAULT_MIX, hue })).toBe(true)
     }
   })
+  it('also covers muted ink on both backgrounds and ink on the cards, at default and across the sweep', () => {
+    for (let hue = -180; hue <= 180; hue += 15) {
+      for (const dark of [false, true]) {
+        const t = themedPairs({ ...DEFAULT_MIX, hue }, dark)
+        for (const [a, b] of t) expect(contrastRatio(a, b)).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
   it('leaves the default palette alone and rotates others', () => {
     expect(mixedPalette(DEFAULT_MIX, false)).toEqual({ bg: '#fbf4ea', ink: '#3b2a1a' })
     expect(mixedPalette({ ...DEFAULT_MIX, hue: 120 }, false).bg).not.toBe('#fbf4ea')
@@ -49,6 +58,7 @@ describe('clampMix / mixToCss', () => {
     expect(mixToCss(DEFAULT_MIX)['--motion-speed']).toBe('1')
     expect(mixToCss({ hue: 30, round: 1.5, speed: 2 })).toEqual({
       '--hue-shift': '30deg',
+      '--hue-shift-n': '30',
       '--round': '1.5',
       '--motion-speed': '2'
     })

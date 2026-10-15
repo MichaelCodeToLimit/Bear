@@ -43,7 +43,9 @@ const fullTitle = title === 'Bear' ? title : `${title} | Bear`
             return typeof v === 'number' && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d
           }
           var rs = document.documentElement.style
-          rs.setProperty('--hue-shift', clamp(mix.hue, -180, 180, 0) + 'deg')
+          var hue = clamp(mix.hue, -180, 180, 0)
+          rs.setProperty('--hue-shift', hue + 'deg')
+          rs.setProperty('--hue-shift-n', String(hue))
           rs.setProperty('--round', String(clamp(mix.round, 0, 2, 1)))
           rs.setProperty('--motion-speed', String(clamp(mix.speed, 0.25, 2, 1)))
         }

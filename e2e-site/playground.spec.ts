@@ -185,6 +185,32 @@ test('theme mixer speed slider sets --motion-speed, survives reload, and Reset r
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--motion-speed').trim())).toBe('1')
 })
 
+test('hue shift keeps computed colours valid and changes the background', async ({ page }) => {
+  await page.goto('playground/')
+  const colours = () =>
+    page.evaluate(() => {
+      const s = getComputedStyle(document.body)
+      return { color: s.color, bg: getComputedStyle(document.documentElement).getPropertyValue('--bg-from').trim() }
+    })
+  const before = await colours()
+  // unrotated ink #3b2a1a is oklch(0.3006 0.0367 63.95); Chromium serialises the computed value as oklch
+  expect(before.color).toMatch(/^oklch\(0\.30\d* 0\.036\d* 63\.9\d*\)$/)
+  expect(before.color).not.toMatch(/rgba\(.*, 0\)/)
+  await page.getByLabel('Hue shift').scrollIntoViewIfNeeded()
+  await expect(page.getByLabel('Hue shift')).toBeEnabled()
+  await page.getByLabel('Hue shift').evaluate((el) => {
+    const input = el as HTMLInputElement
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '120')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await expect.poll(async () => (await colours()).bg).not.toBe(before.bg)
+  const after = await colours()
+  expect(after.color).toMatch(/^oklch\(0\.30\d* 0\.036\d* 18[34]\.\d*\)$/)
+  expect(after.color).not.toBe(before.color)
+  const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
+  expect(bodyBg).toContain('gradient')
+})
+
 test('a garbage saved mix is ignored without console errors', async ({ page }) => {
   const errors = trackConsole(page)
   await page.addInitScript(() => localStorage.setItem('bear-mix', 'garbage'))

@@ -23,14 +23,14 @@ export function clampMix(m: Partial<Mix>): Mix {
   return { hue: clampField('hue', m.hue), round: clampField('round', m.round), speed: clampField('speed', m.speed) }
 }
 
-export function mixToCss(m: Mix): Record<'--hue-shift' | '--round' | '--motion-speed', string> {
-  return { '--hue-shift': `${m.hue}deg`, '--round': String(m.round), '--motion-speed': String(m.speed) }
+export function mixToCss(m: Mix): Record<'--hue-shift' | '--hue-shift-n' | '--round' | '--motion-speed', string> {
+  return { '--hue-shift': `${m.hue}deg`, '--hue-shift-n': String(m.hue), '--round': String(m.round), '--motion-speed': String(m.speed) }
 }
 
 /* ---------- Colour maths (hex <-> OKLCH) ---------- */
 
-const LIGHT = { bg: '#fbf4ea', ink: '#3b2a1a' }
-const DARK = { bg: '#2a1d14', ink: '#fbf4ea' }
+const LIGHT = { bg: '#fbf4ea', bgTo: '#f1e2cc', ink: '#3b2a1a', muted: '#6f5a46', surface: '#ffffff' }
+const DARK = { bg: '#2a1d14', bgTo: '#1d130d', ink: '#fbf4ea', muted: '#cdb89f', surface: '#3a2a1d' }
 
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
 const fromLinear = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055)
@@ -80,11 +80,17 @@ export function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
+/** Every text/background pair the site renders: [foreground, background]. Surfaces (cards) are not rotated. */
+export function themedPairs(m: Mix, dark: boolean): [string, string][] {
+  const base = dark ? DARK : LIGHT
+  const ink = rotate(base.ink, m.hue)
+  const muted = rotate(base.muted, m.hue)
+  const bgs = [rotate(base.bg, m.hue), rotate(base.bgTo, m.hue)]
+  return [...bgs.flatMap((bg): [string, string][] => [[ink, bg], [muted, bg]]), [ink, base.surface], [muted, base.surface]]
+}
+
 export function isReadable(m: Mix): boolean {
-  return [false, true].every((dark) => {
-    const p = mixedPalette(m, dark)
-    return contrastRatio(p.bg, p.ink) >= 4.5
-  })
+  return [false, true].every((dark) => themedPairs(m, dark).every(([fg, bg]) => contrastRatio(fg, bg) >= 4.5))
 }
 
 /** The inline head script in BaseLayout.astro mirrors this parse; keep the two in sync. */

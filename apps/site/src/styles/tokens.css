@@ -4,7 +4,7 @@
   --cream-from: #fbf4ea;
   --cream-to: #f1e2cc;
   --ink-base: #3b2a1a;
-  --ink-muted-base: #7a6450;
+  --ink-muted-base: #6f5a46;
   --bg-from: var(--cream-from);
   --bg-to: var(--cream-to);
   --ink: var(--ink-base);
@@ -31,6 +31,8 @@
   --motion-speed: 1;
   /* Colour rotation applied by the Theme mixer. */
   --hue-shift: 0deg;
+  /* Same rotation as a plain number: relative colour channels are numbers, not angles. */
+  --hue-shift-n: 0;
 
   --dur-fast: calc(180ms * var(--motion-speed));
   --dur-med: calc(420ms * var(--motion-speed));
@@ -60,11 +62,11 @@
 }
 
 /* Rotate the cream and ink in OKLCH (lightness and chroma stay put, so contrast holds). */
-@supports (color: oklch(from red l c h)) {
+@supports (color: oklch(from red l c calc(h + 1))) {
   :root {
-    --bg-from: oklch(from var(--cream-from) l c calc(h + var(--hue-shift)));
-    --bg-to: oklch(from var(--cream-to) l c calc(h + var(--hue-shift)));
-    --ink: oklch(from var(--ink-base) l c calc(h + var(--hue-shift)));
-    --ink-muted: oklch(from var(--ink-muted-base) l c calc(h + var(--hue-shift)));
+    --bg-from: oklch(from var(--cream-from) l c calc(h + var(--hue-shift-n)));
+    --bg-to: oklch(from var(--cream-to) l c calc(h + var(--hue-shift-n)));
+    --ink: oklch(from var(--ink-base) l c calc(h + var(--hue-shift-n)));
+    --ink-muted: oklch(from var(--ink-muted-base) l c calc(h + var(--hue-shift-n)));
   }
 }
