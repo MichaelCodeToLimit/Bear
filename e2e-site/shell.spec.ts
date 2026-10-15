@@ -66,6 +66,53 @@ test('404 page links home', async ({ page }) => {
   await expect(page.locator('main a[href="/Bear/"]')).toBeVisible()
 })
 
+test('a fresh visitor gets the dark theme', async ({ page }) => {
+  await page.goto('./')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(page.locator('[data-theme-toggle]').first()).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('theme toggle switches to light and survives a reload', async ({ page }) => {
+  await page.goto('./')
+  const toggle = page.locator('[data-theme-toggle]').first()
+  await toggle.click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(toggle.getByText('Dark theme')).toBeVisible()
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(page.locator('[data-theme-toggle]').first()).toHaveAttribute('aria-pressed', 'true')
+  await page.locator('[data-theme-toggle]').first().click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+})
+
+test('a saved light theme is applied before the first DOMContentLoaded', async ({ browser }) => {
+  const context = await browser.newContext()
+  await context.addInitScript(() => {
+    localStorage.setItem('bear-theme', 'light')
+    document.addEventListener('DOMContentLoaded', () => {
+      ;(window as unknown as { __themeAtDcl: string | undefined }).__themeAtDcl = document.documentElement.dataset.theme
+    })
+  })
+  const page = await context.newPage()
+  // Strip the bundled module scripts so only the inline head script has run.
+  await page.route('**/Bear/', async (route) => {
+    const response = await route.fetch()
+    const body = (await response.text()).replace(/<script type="module">[\s\S]*?<\/script>/g, '')
+    await route.fulfill({ response, body })
+  })
+  await page.goto('./')
+  expect(await page.evaluate(() => (window as unknown as { __themeAtDcl: string }).__themeAtDcl)).toBe('light')
+  await expect(page.locator('[data-theme-toggle]').first().getByText('Dark theme')).toBeVisible()
+  await context.close()
+})
+
+test('the top bar is translucent glass', async ({ page }) => {
+  await page.goto('./')
+  const filter = await page.locator('header.topbar').evaluate((el) => getComputedStyle(el).backdropFilter)
+  expect(filter).toContain('blur')
+})
+
 test('footer carries the independence note', async ({ page }) => {
   await page.goto('./')
   await expect(page.locator('footer')).toContainText(

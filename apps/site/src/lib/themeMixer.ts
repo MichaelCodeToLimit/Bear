@@ -29,8 +29,29 @@ export function mixToCss(m: Mix): Record<'--hue-shift' | '--hue-shift-n' | '--ro
 
 /* ---------- Colour maths (hex <-> OKLCH) ---------- */
 
-const LIGHT = { bg: '#fbf4ea', bgTo: '#f1e2cc', ink: '#3b2a1a', muted: '#6f5a46', surface: '#ffffff', accent: '#9a4508' }
-const DARK = { bg: '#2a1d14', bgTo: '#1d130d', ink: '#fbf4ea', muted: '#cdb89f', surface: '#3a2a1d', accent: '#f59e0b' }
+/** The two palettes, mirrored by src/styles/tokens.css (a test checks they match). Gradient stops and button colours are not rotated by the mixer. */
+export const LIGHT = {
+  bg: '#fbf4ea',
+  bgTo: '#f1e2cc',
+  ink: '#2a1c10',
+  muted: '#6f5a46',
+  surface: '#ffffff',
+  accent: '#9a4508',
+  grad: ['#9a4508', '#b23a0c', '#be123c'],
+  btnBg: '#2a1c10',
+  btnInk: '#fbf4ea'
+}
+export const DARK = {
+  bg: '#0d0907',
+  bgTo: '#140d09',
+  ink: '#f6ead9',
+  muted: '#b8a48e',
+  surface: '#1a120c',
+  accent: '#f59e0b',
+  grad: ['#fbbf24', '#f59e0b', '#fb923c'],
+  btnBg: '#fbf4ea',
+  btnInk: '#2a1c10'
+}
 
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
 const fromLinear = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055)
@@ -86,12 +107,13 @@ export function themedPairs(m: Mix, dark: boolean): [string, string][] {
   const ink = rotate(base.ink, m.hue)
   const muted = rotate(base.muted, m.hue)
   const bgs = [rotate(base.bg, m.hue), rotate(base.bgTo, m.hue)]
-  // The accent (links) is not rotated by the mixer.
+  // The accent (links), gradient stops and button are not rotated by the mixer.
   return [
-    ...bgs.flatMap((bg): [string, string][] => [[ink, bg], [muted, bg], [base.accent, bg]]),
+    ...bgs.flatMap((bg): [string, string][] => [[ink, bg], [muted, bg], [base.accent, bg], ...base.grad.map((g): [string, string] => [g, bg])]),
     [ink, base.surface],
     [muted, base.surface],
-    [base.accent, base.surface]
+    [base.accent, base.surface],
+    [base.btnInk, base.btnBg]
   ]
 }
 

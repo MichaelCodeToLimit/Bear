@@ -4,6 +4,7 @@ import favicon from '../../../desktop/build/icon-64.png'
 import { appColorCss } from '../lib/appColors'
 import TopBar from '../components/TopBar.astro'
 import Footer from '../components/Footer.astro'
+import '@fontsource-variable/inter'
 import '../styles/tokens.css'
 import '../styles/base.css'
 
@@ -24,8 +25,15 @@ const fullTitle = title === 'Bear' ? title : `${title} | Bear`
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="icon" type="image/png" href={favicon.src} />
-    <!-- Runs before first paint. Duplicates resolveMotion() in src/lib/motionPref.ts (saved wins, else system reduced-motion); keep the two in sync. -->
+    <!-- Runs before first paint. Theme first (so nothing flashes the wrong palette), then motion, then the saved mix.
+         The theme rule duplicates resolveTheme() in src/lib/themePref.ts (only a saved 'light' is light; everything else is dark); the motion rule
+         duplicates resolveMotion() in src/lib/motionPref.ts (saved wins, else system reduced-motion). Keep them in sync. -->
     <script is:inline>
+      var theme = null
+      try {
+        theme = localStorage.getItem('bear-theme')
+      } catch (e) {}
+      document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark'
       document.documentElement.classList.add('js')
       var saved = null
       try {

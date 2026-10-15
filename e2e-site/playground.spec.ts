@@ -193,8 +193,8 @@ test('hue shift keeps computed colours valid and changes the background', async 
       return { color: s.color, bg: getComputedStyle(document.documentElement).getPropertyValue('--bg-from').trim() }
     })
   const before = await colours()
-  // unrotated ink #3b2a1a is oklch(0.3006 0.0367 63.95); Chromium serialises the computed value as oklch
-  expect(before.color).toMatch(/^oklch\(0\.30\d* 0\.036\d* 63\.9\d*\)$/)
+  // unrotated dark ink #f6ead9 is oklch(0.942 0.0261 76.71); Chromium serialises the computed value as oklch
+  expect(before.color).toMatch(/^oklch\(0\.94\d* 0\.026\d* 76\.7\d*\)$/)
   expect(before.color).not.toMatch(/rgba\(.*, 0\)/)
   await page.getByLabel('Hue shift').scrollIntoViewIfNeeded()
   await expect(page.getByLabel('Hue shift')).toBeEnabled()
@@ -205,7 +205,7 @@ test('hue shift keeps computed colours valid and changes the background', async 
   })
   await expect.poll(async () => (await colours()).bg).not.toBe(before.bg)
   const after = await colours()
-  expect(after.color).toMatch(/^oklch\(0\.30\d* 0\.036\d* 18[34]\.\d*\)$/)
+  expect(after.color).toMatch(/^oklch\(0\.94\d* 0\.026\d* 196\.7\d*\)$/)
   expect(after.color).not.toBe(before.color)
   const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
   expect(bodyBg).toContain('gradient')

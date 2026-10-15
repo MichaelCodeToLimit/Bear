@@ -25,7 +25,7 @@ describe('contrastRatio', () => {
     expect(contrastRatio('#000000', '#ffffff')).toBeCloseTo(21, 1)
   })
   it('keeps the cozy ink readable on cream', () => {
-    expect(contrastRatio('#3b2a1a', '#fbf4ea')).toBeGreaterThan(4.5)
+    expect(contrastRatio('#2a1c10', '#fbf4ea')).toBeGreaterThan(4.5)
   })
 })
 
@@ -44,8 +44,19 @@ describe('isReadable', () => {
     }
   })
   it('leaves the default palette alone and rotates others', () => {
-    expect(mixedPalette(DEFAULT_MIX, false)).toEqual({ bg: '#fbf4ea', ink: '#3b2a1a' })
+    expect(mixedPalette(DEFAULT_MIX, false)).toEqual({ bg: '#fbf4ea', ink: '#2a1c10' })
+    expect(mixedPalette(DEFAULT_MIX, true)).toEqual({ bg: '#0d0907', ink: '#f6ead9' })
     expect(mixedPalette({ ...DEFAULT_MIX, hue: 120 }, false).bg).not.toBe('#fbf4ea')
+  })
+})
+
+describe('themedPairs', () => {
+  it.each([false, true])('also covers the gradient stops and the primary button (dark=%s)', (dark) => {
+    const pairs = themedPairs(DEFAULT_MIX, dark)
+    // ink/muted/accent on two backgrounds (6), ink/muted/accent on the surface (3),
+    // 3 gradient stops on two backgrounds (6), button text on button (1)
+    expect(pairs).toHaveLength(16)
+    for (const [fg, bg] of pairs) expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(4.5)
   })
 })
 

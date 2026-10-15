@@ -1,6 +1,7 @@
 ---
 import Bear from './Bear.astro'
 import MotionToggle from './MotionToggle.astro'
+import ThemeToggle from './ThemeToggle.astro'
 import { SITE, url } from '../site.config'
 
 const links = [
@@ -29,6 +30,7 @@ const links = [
     </button>
     <nav id="nav-sheet" class="topbar__nav" aria-label="Main" data-nav-sheet>
       {links.map((l) => <a href={l.href}>{l.label}</a>)}
+      <ThemeToggle />
       <MotionToggle />
       <a class="btn btn--primary" href={url('download/')}>Download</a>
     </nav>
@@ -40,9 +42,10 @@ const links = [
     position: sticky;
     top: 0;
     z-index: 50;
-    background: color-mix(in srgb, var(--bg-from) 88%, transparent);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--surface-edge);
+    background: color-mix(in srgb, var(--bg-from) 70%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--edge);
   }
   .topbar__inner {
     max-width: var(--max);

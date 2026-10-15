@@ -18,7 +18,7 @@ import { SITE, url } from '../site.config'
 
 <style>
   .footer {
-    border-top: 1px solid var(--surface-edge);
+    border-top: 1px solid var(--edge);
     padding: 1.5rem var(--gutter);
     color: var(--ink-muted);
     font-size: 0.9rem;
@@ -32,6 +32,13 @@ import { SITE, url } from '../site.config'
     flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 0.75rem;
+  }
+  .footer__links a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .footer__links a:hover {
+    color: var(--accent);
   }
   p {
     margin: 0.2rem 0;

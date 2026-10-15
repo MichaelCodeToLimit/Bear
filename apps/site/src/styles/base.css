@@ -14,7 +14,18 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--bg-from), var(--bg-to)) fixed;
+  /* Top to bottom: amber glow, faint grid, the cocoa gradient. */
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 0%, var(--glow), transparent 70%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(180deg, var(--bg-from), var(--bg-to));
+  background-size:
+    auto,
+    40px 40px,
+    40px 40px,
+    auto;
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font);
   line-height: 1.55;
@@ -31,7 +42,8 @@ main {
 h1,
 h2,
 h3 {
-  line-height: 1.2;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   margin: 0 0 0.6em;
 }
 
@@ -70,10 +82,10 @@ img {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  padding: 0.55rem 1.1rem;
-  border: 2px solid var(--ink);
+  padding: 0.55rem 1.15rem;
+  border: 1px solid var(--edge);
   border-radius: var(--r-pill);
-  background: transparent;
+  background: var(--glass);
   color: var(--ink);
   font: inherit;
   font-weight: 600;
@@ -81,61 +93,141 @@ img {
   cursor: pointer;
   transition:
     transform var(--dur-fast) var(--ease-bounce),
-    box-shadow var(--dur-fast) ease;
+    box-shadow var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
 }
 .btn:hover {
-  transform: translateY(-2px) scale(1.04);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 .btn:active {
   transform: scale(0.97);
 }
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-ink);
+}
+.btn--primary:hover {
+  box-shadow:
+    0 0 0 4px var(--glow),
+    var(--shadow-md);
+}
+.btn--ghost {
+  background: transparent;
+  border-color: var(--edge);
+  color: var(--ink);
+}
+.btn--ghost:hover {
+  border-color: var(--ink-muted);
+}
+
+/* Typography helpers */
+.display {
+  margin: 0 0 0.4em;
+  font-size: clamp(2.5rem, 8vw, 5.25rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+.grad {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.lede {
+  max-width: 38rem;
+  margin: 0 0 1.5rem;
+  color: var(--ink-muted);
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  line-height: 1.6;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.section {
+  padding: clamp(3rem, 8vw, 6rem) 0;
 }
 
 /* Cards and tiles */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--surface-edge);
+  background: var(--glass);
+  border: 1px solid var(--edge);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   padding: 1.25rem 1.5rem;
 }
 
 .tile {
   --tile-color: var(--accent);
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   padding: 1rem 1.1rem;
-  background: var(--surface);
-  border: 1px solid var(--surface-edge);
-  border-top: 5px solid var(--tile-color);
+  background: var(--glass);
+  border: 1px solid var(--edge);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   color: var(--ink);
   text-decoration: none;
   transition:
     transform var(--dur-med) var(--ease-bounce),
-    box-shadow var(--dur-med) ease;
+    box-shadow var(--dur-med) ease,
+    border-color var(--dur-med) ease;
+}
+/* The app colour is a glowing dot, never text: app colours fail AA as text on dark. */
+.tile::before {
+  content: '';
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-bottom: 0.35rem;
+  border-radius: 50%;
+  background: var(--tile-color);
+  box-shadow: 0 0 10px 2px var(--tile-color);
 }
 a.tile:hover {
-  transform: translateY(-4px) rotate(-1deg);
+  transform: translateY(-4px);
+  border-color: var(--tile-color);
   box-shadow: var(--shadow-md);
 }
 .tile__name {
   font-weight: 700;
   font-size: 1.1rem;
-  color: var(--tile-color);
-}
-/* The app colours are dark shades that fail AA on the dark card; keep them on borders and use the ink for text. */
-@media (prefers-color-scheme: dark) {
-  .tile__name {
-    color: var(--ink);
-  }
+  color: var(--ink);
 }
 .tile__tagline {
   color: var(--ink-muted);
@@ -147,10 +239,13 @@ a.tile:hover {
   margin-top: 0.4rem;
   padding: 0.1rem 0.6rem;
   border-radius: var(--r-pill);
-  background: var(--surface-edge);
+  border: 1px solid var(--edge);
+  background: var(--glass);
   color: var(--ink-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 
 /* Ambient motion */
