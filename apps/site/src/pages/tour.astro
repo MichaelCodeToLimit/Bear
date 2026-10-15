@@ -1,0 +1,141 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import AppPicker from '../islands/AppPicker'
+import { tourApps } from '../lib/tour'
+
+const apps = tourApps()
+---
+
+<BaseLayout title="Tour" description="Meet the twelve Bear apps and watch each one work.">
+  <section class="tour" aria-labelledby="tour-title">
+    <h1 id="tour-title">Take the tour</h1>
+    <p class="tour__lead">Pick an app to see it in action. Eight are ready today and four are on their way.</p>
+
+    <!-- AppPicker wraps itself in IslandBoundary, so a render error is caught inside this one island. -->
+    <AppPicker client:load apps={apps} />
+
+    <ul class="tour-static" data-tour-static>
+      {
+        apps.map((app) => (
+          <li class="card" id={`static-${app.id}`}>
+            <h2>{app.name}</h2>
+            <p>{app.tagline}{!app.ready && ' (Coming soon)'}</p>
+            <ul>
+              {app.features.map((f) => (
+                <li>{f}</li>
+              ))}
+            </ul>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  .tour__lead {
+    color: var(--ink-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  /* Without JavaScript the picker is inert, so show the plain list instead. */
+  html.js .tour-static,
+  html:not(.js) .picker {
+    display: none;
+  }
+  .tour-static {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.9rem;
+  }
+  .picker__tile {
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    align-items: flex-start;
+  }
+  .picker__tile:hover,
+  .picker__tile.is-open {
+    box-shadow: var(--shadow-md);
+  }
+  .picker__tile:hover {
+    transform: translateY(-3px) rotate(-1deg);
+  }
+  .picker__tile.is-open {
+    background: color-mix(in srgb, var(--tile-color) 12%, var(--surface));
+  }
+
+  .picker__panel {
+    grid-column: 1 / -1;
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--surface-edge);
+    border-top: 5px solid var(--tile-color);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+  }
+  .picker__stage {
+    min-width: 0;
+  }
+  .picker__info h2 {
+    color: var(--tile-color);
+    margin-bottom: 0.2em;
+  }
+  .picker__tagline {
+    margin: 0 0 0.6rem;
+    color: var(--ink-muted);
+  }
+  .picker__features {
+    margin: 0.75rem 0 1rem;
+    padding-left: 1.2rem;
+  }
+  .picker__close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.7rem;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--ink-muted);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .picker__close:hover {
+    background: var(--surface-edge);
+  }
+
+  /* Phones: the panel becomes a bottom sheet. */
+  @media (max-width: 639px) {
+    .picker {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .picker__panel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 50;
+      grid-template-columns: minmax(0, 1fr);
+      max-height: 78vh;
+      overflow-y: auto;
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
+      padding-top: 2.5rem;
+    }
+  }
+</style>

@@ -42,9 +42,11 @@ test('reduced motion starts with data-motion off', async ({ browser }) => {
 
 test('no horizontal scroll at phone width', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
-  await page.goto('./')
-  const width = await page.evaluate(() => document.documentElement.scrollWidth)
-  expect(width).toBeLessThanOrEqual(375)
+  for (const path of ['./', 'tour/']) {
+    await page.goto(path)
+    const width = await page.evaluate(() => document.documentElement.scrollWidth)
+    expect(width).toBeLessThanOrEqual(375)
+  }
 })
 
 test('menu button opens the nav sheet', async ({ page }) => {
