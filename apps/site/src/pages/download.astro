@@ -1,0 +1,192 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import Bear from '../components/Bear.astro'
+import { SITE } from '../site.config'
+import { fetchLatestRelease, formatSize, type DownloadFile, type OS } from '../lib/releases'
+
+const release = await fetchLatestRelease()
+
+const groups: Array<{ os: OS; title: string }> = [
+  { os: 'windows', title: 'Windows' },
+  { os: 'mac', title: 'macOS' },
+  { os: 'linux', title: 'Linux' }
+]
+const filesFor = (os: OS): DownloadFile[] => release?.files.filter((f) => f.os === os) ?? []
+const date = release
+  ? new Date(release.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  : ''
+const steps = [
+  `git clone ${SITE.repoUrl}.git`,
+  'cd Bear',
+  'pnpm install',
+  'pnpm dev'
+]
+---
+
+<BaseLayout title="Download" description="Download Bear for Windows, macOS or Linux. Free and open source.">
+  <section class="dl">
+    <header class="dl-hero">
+      <div class="dl-bear">
+        {release ? (
+          <div class="dl-carry" data-catch>
+            <Bear size={96} mood="bob" />
+            <span class="dl-box" aria-hidden="true"></span>
+          </div>
+        ) : (
+          <Bear size={96} mood="nap" />
+        )}
+      </div>
+      {release ? (
+        <>
+          <h1>Download Bear</h1>
+          <p class="dl-version">Bear {release.version} · {date}</p>
+          <p><a href={release.notesUrl}>Release notes</a></p>
+        </>
+      ) : (
+        <>
+          <h1>The first release is on its way</h1>
+          <p class="dl-lead">Bear is still packing its bags. In the meantime you can build it yourself, or watch the Releases page for the first installers.</p>
+        </>
+      )}
+    </header>
+
+    {release && (
+      <>
+        <div class="card dl-best" data-best hidden>
+          <p class="dl-best__title">Best for you</p>
+          <p class="dl-best__name" data-best-name></p>
+          <p class="dl-best__meta" data-best-meta></p>
+          <a class="btn btn--primary" data-best-link data-download href={release.files[0].url}>Download</a>
+        </div>
+
+        {groups.map(({ os, title }) => {
+          const files = filesFor(os)
+          return (
+            files.length > 0 && (
+              <section class="dl-group" data-os-group={os} aria-labelledby={`dl-${os}`}>
+                <h2 id={`dl-${os}`}>{title}</h2>
+                <ul class="dl-cards">
+                  {files.map((f, i) => (
+                    <li class="card dl-card" data-reveal data-reveal-delay={i * 80} data-file={f.name}>
+                      <p class="dl-card__label">{f.label}</p>
+                      <p class="dl-card__name">{f.name}</p>
+                      <p class="dl-card__size">{formatSize(f.size)}</p>
+                      <a class={f.recommended ? 'btn btn--primary' : 'btn'} data-download href={f.url}>Download</a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          )
+        })}
+
+        <script type="application/json" id="downloads" set:html={JSON.stringify(release.files).replace(/</g, '\\u003c')} />
+      </>
+    )}
+
+    <section class="dl-source" aria-labelledby="dl-source-title">
+      <h2 id="dl-source-title">Build from source</h2>
+      <p>You need Node 20 or newer and pnpm.</p>
+      <pre class="card"><code>{steps.join('\n')}</code></pre>
+      <p><a href={SITE.releasesUrl}>All releases on GitHub</a></p>
+    </section>
+  </section>
+</BaseLayout>
+
+<script>
+  import { initBestForYou, initCatch } from '../scripts/detectOS'
+  initBestForYou()
+  initCatch()
+</script>
+
+<style is:global>
+  .dl-hero {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .dl-lead,
+  .dl-version {
+    color: var(--ink-muted);
+  }
+  .dl-carry {
+    position: relative;
+    display: inline-block;
+  }
+  .dl-box {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    width: 52px;
+    height: 34px;
+    transform: translateX(-50%);
+    background: #c89a62;
+    border: 2px solid #8a5f33;
+    border-radius: 4px;
+  }
+  .dl-box::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    transform: translateX(-50%);
+    background: #e9d3a8;
+  }
+  .dl-carry.is-catching {
+    animation: dl-catch 0.5s var(--ease-bounce);
+  }
+  @keyframes dl-catch {
+    30% {
+      transform: translateY(-14px) rotate(-4deg);
+    }
+    60% {
+      transform: translateY(2px);
+    }
+  }
+  [data-motion='off'] .dl-carry.is-catching {
+    animation: none;
+  }
+  .dl-best {
+    max-width: 28rem;
+    margin: 0 auto 2rem;
+    text-align: center;
+  }
+  .dl-best[hidden] {
+    display: none;
+  }
+  .dl-best__title {
+    font-weight: 700;
+    margin: 0;
+  }
+  .dl-best__meta {
+    color: var(--ink-muted);
+  }
+  .dl-cards {
+    list-style: none;
+    margin: 0 0 2rem;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+  .dl-card__label {
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+  }
+  .dl-card__name {
+    overflow-wrap: anywhere;
+    color: var(--ink-muted);
+    margin: 0;
+  }
+  .dl-card__size {
+    margin: 0.25rem 0 0.75rem;
+  }
+  .dl-card.is-best {
+    outline: 2px solid currentColor;
+  }
+  .dl-source pre {
+    overflow-x: auto;
+    padding: 1rem;
+  }
+</style>
