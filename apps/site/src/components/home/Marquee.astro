@@ -29,7 +29,7 @@ const items = ['.docx', '.xlsx', '.pptx', '.csv', '.md', '.html', 'IMAP', 'Windo
   .marquee__track {
     display: flex;
     width: max-content;
-    animation: marquee calc(32s * var(--motion-speed)) linear infinite;
+    animation: marquee-scroll calc(32s * var(--motion-speed)) linear infinite;
   }
   .marquee:hover .marquee__track {
     animation-play-state: paused;
@@ -52,7 +52,7 @@ const items = ['.docx', '.xlsx', '.pptx', '.csv', '.md', '.html', 'IMAP', 'Windo
     font-size: 0.95rem;
     white-space: nowrap;
   }
-  @keyframes marquee {
+  @keyframes marquee-scroll {
     to {
       transform: translateX(-50%);
     }

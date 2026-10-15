@@ -222,21 +222,21 @@ const cards = [
   }
 
   :global(html:not([data-motion='off'])) .open__chip {
-    animation: drop calc(4s * var(--motion-speed)) var(--ease-pop) infinite;
+    animation: how-drop calc(4s * var(--motion-speed)) var(--ease-pop) infinite;
   }
   :global(html:not([data-motion='off'])) .open__chip--b {
     animation-delay: calc(0.5s * var(--motion-speed));
   }
   :global(html:not([data-motion='off'])) .edit__caret {
-    animation: blink calc(1s * var(--motion-speed)) steps(1) infinite;
+    animation: how-blink calc(1s * var(--motion-speed)) steps(1) infinite;
   }
   :global(html:not([data-motion='off'])) .edit__stack {
-    animation: tick calc(4s * var(--motion-speed)) steps(3, end) infinite;
+    animation: how-sum-tick calc(4s * var(--motion-speed)) steps(3, end) infinite;
   }
   :global(html:not([data-motion='off'])) .own__chip svg {
-    animation: pulse calc(2.4s * var(--motion-speed)) ease-in-out infinite;
+    animation: how-pulse calc(2.4s * var(--motion-speed)) ease-in-out infinite;
   }
-  @keyframes drop {
+  @keyframes how-drop {
     0% {
       transform: translateY(-3.2rem);
       opacity: 0;
@@ -251,7 +251,7 @@ const cards = [
       opacity: 0;
     }
   }
-  @keyframes tick {
+  @keyframes how-sum-tick {
     0% {
       transform: translateY(0);
     }
@@ -260,12 +260,12 @@ const cards = [
       transform: translateY(-75%);
     }
   }
-  @keyframes blink {
+  @keyframes how-blink {
     50% {
       opacity: 0;
     }
   }
-  @keyframes pulse {
+  @keyframes how-pulse {
     50% {
       transform: scale(1.2);
     }

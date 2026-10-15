@@ -142,10 +142,10 @@ const checks = [
     stroke-dasharray: 7 93;
     stroke-dashoffset: 100;
     filter: drop-shadow(0 0 1.2px var(--c));
-    animation: travel calc(3.6s * var(--motion-speed)) linear infinite;
+    animation: suite-travel calc(3.6s * var(--motion-speed)) linear infinite;
     animation-delay: calc(var(--i) * -0.45s * var(--motion-speed));
   }
-  @keyframes travel {
+  @keyframes suite-travel {
     to {
       stroke-dashoffset: 0;
     }
@@ -204,15 +204,20 @@ const checks = [
     box-shadow: 0 0 8px 2px var(--c);
   }
   .node[data-soon] {
-    opacity: 0.55;
+    border-style: dashed;
+    border-color: var(--edge);
   }
   .node[data-soon] .node__dot {
     box-shadow: none;
+    opacity: 0.45;
+  }
+  .node[data-soon] .node__name {
+    color: var(--ink-muted);
   }
   @media (max-width: 480px) {
     .node {
       padding: 0.25rem 0.3rem;
-      font-size: 0.6rem;
+      font-size: 0.68rem;
     }
   }
 </style>

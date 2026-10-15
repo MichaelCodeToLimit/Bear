@@ -214,27 +214,27 @@ const lines = [46, 100, 94, 100, 72, 0, 100, 88, 54]
 
   /* Ambient motion: only declared when motion is allowed, so a frozen page shows the finished state. */
   :global(html:not([data-motion='off'])) .stage {
-    animation: rise calc(1s * var(--motion-speed)) var(--ease-pop) both;
+    animation: pw-rise calc(1s * var(--motion-speed)) var(--ease-pop) both;
   }
   :global(html:not([data-motion='off'])) .line {
-    animation: type calc(0.9s * var(--motion-speed)) steps(14) calc(var(--i) * 0.35s * var(--motion-speed)) backwards;
+    animation: pw-type calc(0.9s * var(--motion-speed)) steps(14) calc(var(--i) * 0.35s * var(--motion-speed)) backwards;
     overflow: hidden;
   }
   :global(html:not([data-motion='off'])) .caret {
-    animation: blink calc(1s * var(--motion-speed)) steps(1) infinite;
+    animation: pw-blink calc(1s * var(--motion-speed)) steps(1) infinite;
   }
-  @keyframes rise {
+  @keyframes pw-rise {
     from {
       transform: translateY(40px);
       opacity: 0;
     }
   }
-  @keyframes type {
+  @keyframes pw-type {
     from {
       width: 0;
     }
   }
-  @keyframes blink {
+  @keyframes pw-blink {
     50% {
       opacity: 0;
     }

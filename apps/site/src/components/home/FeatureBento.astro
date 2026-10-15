@@ -211,18 +211,18 @@ const crash = ['App closed unexpectedly', 'Restoring AutoSave…', 'Back where y
   }
 
   :global(html:not([data-motion='off'])) .autosave i {
-    animation: glow calc(2s * var(--motion-speed)) ease-in-out infinite;
+    animation: bento-glow calc(2s * var(--motion-speed)) ease-in-out infinite;
   }
   :global(html:not([data-motion='off'])) .crash li {
-    animation: tick calc(6s * var(--motion-speed)) ease-in-out infinite;
+    animation: bento-crash-tick calc(6s * var(--motion-speed)) ease-in-out infinite;
     animation-delay: calc(var(--i) * 1.6s * var(--motion-speed));
   }
-  @keyframes glow {
+  @keyframes bento-glow {
     50% {
       opacity: 0.35;
     }
   }
-  @keyframes tick {
+  @keyframes bento-crash-tick {
     0%,
     30%,
     100% {

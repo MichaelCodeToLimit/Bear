@@ -30,6 +30,34 @@ test('marquee lists formats and pauses with the motion toggle', async ({ page })
   await expect(track).toHaveCSS('animation-play-state', 'paused')
 })
 
+test('SUM counter runs its own animation and no @keyframes name is defined twice', async ({ page }) => {
+  await page.goto('./')
+  await expect(page.locator('.edit__stack')).toHaveCSS('animation-name', 'how-sum-tick')
+  const names = await page.evaluate(() => {
+    const out: string[] = []
+    for (const sheet of Array.from(document.styleSheets)) {
+      for (const rule of Array.from(sheet.cssRules)) if (rule instanceof CSSKeyframesRule) out.push(rule.name)
+    }
+    return out
+  })
+  expect(names.length).toBeGreaterThan(5)
+  expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([])
+})
+
+test('diagram labels are readable and nodes do not overlap at 375px', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 })
+  await page.goto('./')
+  const nodes = page.locator('.suite-diagram .node')
+  expect(parseFloat(await nodes.first().evaluate((n) => getComputedStyle(n).fontSize))).toBeGreaterThanOrEqual(10.4)
+  const boxes = (await nodes.all()).length ? await nodes.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON())) : []
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j]
+      const overlap = a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+      expect(overlap, `${i} vs ${j}`).toBe(false)
+    }
+})
+
 test('how it works has three cards', async ({ page }) => {
   await page.goto('./')
   await expect(page.locator('.how-card')).toHaveCount(3)
