@@ -69,7 +69,7 @@ export async function fetchLatestRelease(
   try {
     const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
     if (token) headers.Authorization = `Bearer ${token}`
-    const res = await fetchFn(SITE.releasesApi, { headers })
+    const res = await fetchFn(SITE.releasesApi, { headers, signal: AbortSignal.timeout(10000) })
     if (res.status !== 200) return null
     return toRelease(await res.json())
   } catch {

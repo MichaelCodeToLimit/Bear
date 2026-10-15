@@ -89,6 +89,26 @@ The installers register Bear for .docx, .xlsx and .pptx files. Opening one of th
 
 Unsigned builds work, but Windows SmartScreen and macOS Gatekeeper warn on first launch. To sign them, set `CSC_LINK`/`CSC_KEY_PASSWORD` (plus the `APPLE_*` notarization variables on macOS) as repository secrets for the workflow.
 
+## Website
+
+The Bear website lives in `apps/site` (Astro and React) and is published at <https://michaelcodetolimit.github.io/Bear/>. It has a home page, an app tour, the docs, a playground and a download page.
+
+| Command | Does |
+|---|---|
+| `pnpm site:dev` | Run the site with hot reload |
+| `pnpm site:build` | Build the site into `apps/site/dist` and index the docs for search |
+| `pnpm site:preview` | Serve the built site locally |
+| `pnpm site:test` | Browser tests (Playwright); run `pnpm site:build` first |
+
+`.github/workflows/site.yml` tests and deploys the site to GitHub Pages when `main` changes the site, when a release is published, or when you run it by hand. The repo's Pages source must be set to "GitHub Actions".
+
+To publish installers:
+
+1. Bump `version` in `apps/desktop/package.json`, then push a tag such as `v0.2.0`.
+2. `release.yml` builds the installers on each OS and drafts a GitHub release.
+3. Review the draft and publish it.
+4. Publishing starts the site workflow, which rebuilds the site so the Download page lists the new files.
+
 ## Layout
 
 ```

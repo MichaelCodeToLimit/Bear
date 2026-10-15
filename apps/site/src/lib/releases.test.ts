@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { classifyAsset, formatSize, toRelease, fetchLatestRelease, pickBest, detectOS, type DownloadFile } from './releases'
 
 const file = (name: string, os: DownloadFile['os'], recommended: boolean): DownloadFile => ({
@@ -75,15 +75,38 @@ describe('fetchLatestRelease', () => {
   const res = (status: number, body: unknown = fixture) =>
     (async () => new Response(JSON.stringify(body), { status })) as typeof fetch
   it('resolves the release on 200', async () => {
-    expect((await fetchLatestRelease(res(200), undefined))?.version).toBe('0.1.0')
+    expect((await fetchLatestRelease(res(200), ''))?.version).toBe('0.1.0')
   })
   it('resolves null on 404, 403 and network errors', async () => {
-    expect(await fetchLatestRelease(res(404), undefined)).toBeNull()
-    expect(await fetchLatestRelease(res(403), undefined)).toBeNull()
+    expect(await fetchLatestRelease(res(404), '')).toBeNull()
+    expect(await fetchLatestRelease(res(403), '')).toBeNull()
     const down = (async () => {
       throw new Error('down')
     }) as typeof fetch
-    expect(await fetchLatestRelease(down, undefined)).toBeNull()
+    expect(await fetchLatestRelease(down, '')).toBeNull()
+  })
+  it('passes a timeout signal and resolves null when the request aborts', async () => {
+    let signal: AbortSignal | null | undefined
+    const aborting = (async (_u: unknown, init?: RequestInit) => {
+      signal = init?.signal
+      throw new DOMException('The operation timed out', 'TimeoutError')
+    }) as typeof fetch
+    expect(await fetchLatestRelease(aborting, '')).toBeNull()
+    expect(signal).toBeInstanceOf(AbortSignal)
+  })
+  it('ignores an empty GITHUB_TOKEN from the environment', async () => {
+    vi.stubEnv('GITHUB_TOKEN', '')
+    try {
+      const seen: Array<HeadersInit | undefined> = []
+      const f = (async (_u: unknown, init?: RequestInit) => {
+        seen.push(init?.headers)
+        return new Response(JSON.stringify(fixture))
+      }) as typeof fetch
+      await fetchLatestRelease(f)
+      expect(JSON.stringify(seen[0])).not.toContain('Authorization')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
   it('sends Authorization only when a token is set', async () => {
     const seen: Array<HeadersInit | undefined> = []
@@ -91,7 +114,7 @@ describe('fetchLatestRelease', () => {
       seen.push(init?.headers)
       return new Response(JSON.stringify(fixture))
     }) as typeof fetch
-    await fetchLatestRelease(f, undefined)
+    await fetchLatestRelease(f, '')
     await fetchLatestRelease(f, 'tok')
     expect(JSON.stringify(seen[0])).not.toContain('Authorization')
     expect(JSON.stringify(seen[1])).toContain('Bearer tok')
