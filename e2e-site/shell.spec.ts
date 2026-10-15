@@ -113,6 +113,22 @@ test('the top bar is translucent glass', async ({ page }) => {
   expect(filter).toContain('blur')
 })
 
+test('home draws a running starfield that pauses with the motion toggle', async ({ page }) => {
+  await page.goto('./')
+  const canvas = page.locator('canvas.starfield')
+  await expect(canvas).toHaveAttribute('data-state', 'running')
+  await expect(canvas).toHaveAttribute('aria-hidden', 'true')
+  await page.locator('[data-motion-toggle]').first().click()
+  await expect(canvas).toHaveAttribute('data-state', 'paused')
+  await page.locator('[data-motion-toggle]').first().click()
+  await expect(canvas).toHaveAttribute('data-state', 'running')
+})
+
+test('calm docs pages render no starfield', async ({ page }) => {
+  await page.goto('./docs/get-started/install/')
+  await expect(page.locator('canvas.starfield')).toHaveCount(0)
+})
+
 test('footer carries the independence note', async ({ page }) => {
   await page.goto('./')
   await expect(page.locator('footer')).toContainText(

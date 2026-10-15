@@ -31,6 +31,22 @@ body {
   line-height: 1.55;
 }
 
+/* Firefly canvas: drawn over the body background, under all content. */
+.starfield {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+}
+
+main,
+footer {
+  position: relative;
+  z-index: 1;
+}
+
 main {
   flex: 1;
   width: 100%;

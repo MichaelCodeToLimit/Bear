@@ -62,6 +62,7 @@ const fullTitle = title === 'Bear' ? title : `${title} | Bear`
     <style set:html={appColorCss(APPS)} />
   </head>
   <body data-calm={calm ? '' : undefined}>
+    {calm ? null : <canvas class="starfield" aria-hidden="true"></canvas>}
     <a class="skip-link" href="#main">Skip to content</a>
     <TopBar />
     <main id="main">
@@ -71,6 +72,9 @@ const fullTitle = title === 'Bear' ? title : `${title} | Bear`
     <script>
       import { initReveal } from '../scripts/reveal'
       initReveal()
+      import { initStarfield } from '../scripts/starfield'
+      const starfield = document.querySelector<HTMLCanvasElement>('canvas.starfield')
+      if (starfield) initStarfield(starfield)
     </script>
   </body>
 </html>
