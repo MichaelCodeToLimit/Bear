@@ -1,0 +1,184 @@
+---
+import BaseLayout from './BaseLayout.astro'
+import DocsSearch from '../islands/DocsSearch'
+import { url } from '../site.config'
+import type { DocGroup } from '../lib/docsNav'
+import { prevNext } from '../lib/docsNav'
+
+interface Props {
+  title: string
+  slug: string
+  groups: DocGroup[]
+}
+const { title, slug, groups } = Astro.props
+const { prev, next } = prevNext(groups, slug)
+---
+
+<BaseLayout title={title} calm>
+  <div class="docs">
+    <aside class="docs-side">
+      <p class="docs-side__head"><strong>Docs</strong></p>
+      <DocsSearch client:load />
+      <nav class="docs-nav" aria-label="Docs">
+        {
+          groups.map((g) => (
+            <section>
+              <h2 class="docs-nav__group">{g.group}</h2>
+              <ul>
+                {g.items.map((item) => (
+                  <li>
+                    <a href={url(`docs/${item.slug}/`)} aria-current={item.slug === slug ? 'page' : undefined}>
+                      {item.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        }
+      </nav>
+    </aside>
+
+    <article class="docs-article" data-pagefind-body>
+      <h1>{title}</h1>
+      <slot />
+      <nav class="docs-pager" aria-label="Previous and next page">
+        {prev ? <a rel="prev" href={url(`docs/${prev.slug}/`)}>&larr; {prev.title}</a> : <span />}
+        {next ? <a rel="next" href={url(`docs/${next.slug}/`)}>{next.title} &rarr;</a> : <span />}
+      </nav>
+    </article>
+  </div>
+</BaseLayout>
+
+<style is:global>
+  .docs {
+    display: grid;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+  .docs-side {
+    min-width: 0;
+  }
+  .docs-side__head {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+  }
+  .docs-search__stub {
+    width: 100%;
+    font: inherit;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--surface-edge);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .docs-search__stub[hidden] {
+    display: none;
+  }
+  .docs-search__note {
+    margin: 0;
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+  }
+  .docs-search {
+    --pagefind-ui-scale: 0.85;
+    --pagefind-ui-primary: var(--accent);
+    --pagefind-ui-text: var(--ink);
+    --pagefind-ui-background: var(--surface);
+    --pagefind-ui-border: var(--surface-edge);
+    --pagefind-ui-tag: var(--surface-edge);
+    --pagefind-ui-font: var(--font);
+    max-width: 100%;
+  }
+  .docs-nav {
+    margin-top: 1rem;
+  }
+  .docs-nav ul {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+  }
+  .docs-nav__group {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin: 0.5rem 0 0.35rem;
+  }
+  .docs-nav a {
+    display: block;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .docs-nav a:hover {
+    background: var(--surface-edge);
+  }
+  .docs-nav a[aria-current='page'] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+  }
+  .docs-article {
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--surface-edge);
+    border-radius: var(--r-lg);
+    padding: 1.25rem var(--gutter) 1.5rem;
+    overflow-wrap: anywhere;
+  }
+  .docs-article h2 {
+    margin-top: 1.6em;
+    font-size: 1.35rem;
+  }
+  .docs-article h3 {
+    margin-top: 1.2em;
+    font-size: 1.1rem;
+  }
+  .docs-article pre {
+    overflow-x: auto;
+    padding: 0.8rem 1rem;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--ink) 8%, var(--surface));
+    font-size: 0.9rem;
+  }
+  .docs-article code {
+    font-size: 0.92em;
+  }
+  .docs-article table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+  .docs-article th,
+  .docs-article td {
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--surface-edge);
+    text-align: left;
+  }
+  .docs-pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 2.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--surface-edge);
+    font-weight: 600;
+  }
+  @media (min-width: 900px) {
+    .docs {
+      grid-template-columns: 250px minmax(0, 1fr);
+      align-items: start;
+    }
+    .docs-side {
+      position: sticky;
+      top: 4.5rem;
+      max-height: calc(100vh - 5.5rem);
+      overflow-y: auto;
+    }
+    .docs-article {
+      padding: 1.75rem 2.25rem 2rem;
+    }
+  }
+</style>

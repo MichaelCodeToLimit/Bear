@@ -1,0 +1,19 @@
+---
+import { url } from '../../site.config'
+
+const target = url('docs/get-started/install/')
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bear docs</title>
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={target} />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <p>Taking you to the docs. If nothing happens, <a href={target}>open the Install page</a>.</p>
+  </body>
+</html>
