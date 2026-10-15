@@ -1,54 +1,58 @@
 import { test, expect } from '@playwright/test'
 import { gzipSync } from 'node:zlib'
 
-test('hero headline', async ({ page }) => {
+test('hero: pill, headline with gradient line, one h1', async ({ page }) => {
   await page.goto('./')
   await expect(page.locator('h1')).toHaveCount(1)
-  await expect(page.locator('h1')).toHaveText('Your office suite, no subscription.')
+  await expect(page.locator('h1')).toContainText('Your office suite.')
+  await expect(page.locator('h1 .grad')).toHaveText('No subscription.')
+  await expect(page.locator('.hero a.pill')).toHaveAttribute('href', /docs\/apps\/mail\/$/)
 })
 
-test('hero floats all 12 app tiles at desktop width without covering the copy', async ({ page }) => {
+test('product window shows the Bear apps panel with five Open links', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('./')
-  const tiles = page.locator('.hero .tile.float')
-  await expect(tiles).toHaveCount(12)
-  for (const t of await tiles.all()) await expect(t).toBeVisible()
-  const body = (await page.locator('.hero__body').boundingBox())!
-  for (const t of await tiles.all()) {
-    const box = (await t.boundingBox())!
-    const overlaps = box.x < body.x + body.width && box.x + box.width > body.x
-    expect(overlaps).toBe(false)
-  }
+  await expect(page.locator('.product-window')).toBeVisible()
+  const links = page.locator('.apps-panel a')
+  await expect(links).toHaveCount(5)
+  const ids = ['write', 'sheets', 'slides', 'notes', 'mail']
+  for (let i = 0; i < ids.length; i++) await expect(links.nth(i)).toHaveAttribute('href', new RegExp(`tour/#${ids[i]}$`))
 })
 
-test('app strip links every app to the tour', async ({ page }) => {
+test('marquee lists formats and pauses with the motion toggle', async ({ page }) => {
   await page.goto('./')
-  const links = page.locator('[data-app-strip] a')
-  await expect(links).toHaveCount(12)
-  await expect(links.filter({ hasText: 'Sheets' }).first()).toHaveAttribute('href', /tour\/#sheets$/)
+  const marquee = page.locator('.marquee')
+  for (const t of ['.docx', '.xlsx', '.pptx', 'IMAP', 'Linux']) await expect(marquee).toContainText(t)
+  const track = page.locator('.marquee__track')
+  await expect(track).toHaveCSS('animation-play-state', 'running')
+  await page.locator('[data-motion-toggle]').first().click()
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'off')
+  await expect(track).toHaveCSS('animation-play-state', 'paused')
 })
 
-test('why-bear cards reveal on scroll', async ({ page }) => {
+test('how it works has three cards', async ({ page }) => {
   await page.goto('./')
-  const cards = page.locator('[data-why] [data-reveal]')
-  await expect(cards).toHaveCount(4)
-  await page.locator('[data-why]').scrollIntoViewIfNeeded()
-  await page.mouse.wheel(0, 200)
-  for (const card of await cards.all()) await expect(card).toHaveClass(/is-visible/)
+  await expect(page.locator('.how-card')).toHaveCount(3)
+})
+
+test('suite diagram links all 12 apps and marks the 4 not ready as soon', async ({ page }) => {
+  await page.goto('./')
+  await expect(page.locator('.suite-diagram a[href*="tour/#"]')).toHaveCount(12)
+  await expect(page.locator('.suite-diagram a[data-soon]')).toHaveCount(4)
 })
 
 test('download buttons link to the download page', async ({ page }) => {
   await page.goto('./')
-  const buttons = page.getByRole('link', { name: 'Download Bear' })
+  const buttons = page.getByRole('link', { name: /^Download/ })
   expect(await buttons.count()).toBeGreaterThanOrEqual(2)
   for (const b of await buttons.all()) await expect(b).toHaveAttribute('href', '/Bear/download/')
 })
 
-test('comparison table compares against a generic suite', async ({ page }) => {
+test('home has no horizontal scroll at 375px', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 })
   await page.goto('./')
-  const table = page.locator('table')
-  await expect(table).toContainText('typical subscription suite')
-  await expect(table.locator('tbody tr')).toHaveCount(4)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(over).toBeLessThanOrEqual(0)
 })
 
 test('home ships at most 60 KB of gzipped JavaScript', async ({ page }) => {

@@ -1,0 +1,60 @@
+---
+const items = ['.docx', '.xlsx', '.pptx', '.csv', '.md', '.html', 'IMAP', 'Windows', 'macOS', 'Linux']
+---
+
+<section class="marquee" aria-labelledby="marquee-caption" data-reveal>
+  <p id="marquee-caption" class="eyebrow">Works with the files and accounts you already have</p>
+  <div class="marquee__viewport">
+    <div class="marquee__track">
+      <ul class="marquee__group">
+        {items.map((t) => <li>{t}</li>)}
+      </ul>
+      <ul class="marquee__group" aria-hidden="true">
+        {items.map((t) => <li>{t}</li>)}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+  .marquee {
+    padding: clamp(2rem, 5vw, 3.5rem) 0;
+    text-align: center;
+  }
+  .marquee__viewport {
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+  .marquee__track {
+    display: flex;
+    width: max-content;
+    animation: marquee calc(32s * var(--motion-speed)) linear infinite;
+  }
+  .marquee:hover .marquee__track {
+    animation-play-state: paused;
+  }
+  .marquee__group {
+    display: flex;
+    flex: none;
+    gap: 1rem;
+    margin: 0;
+    padding: 0 0.5rem;
+    list-style: none;
+  }
+  .marquee__group li {
+    padding: 0.5rem 1.3rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    background: var(--glass);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+</style>

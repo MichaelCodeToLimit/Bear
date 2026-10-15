@@ -1,0 +1,218 @@
+---
+import { APPS } from '@bear/core'
+import Bear from '../Bear.astro'
+import { url } from '../../site.config'
+
+// Nodes on a circle around the hub, starting at the top and going clockwise.
+const nodes = APPS.map((app, i) => {
+  const a = (i / APPS.length) * 2 * Math.PI - Math.PI / 2
+  return { app, x: 50 + 38 * Math.cos(a), y: 50 + 38 * Math.sin(a) } // percentages of the square diagram
+})
+
+const checks = [
+  'Free forever',
+  'MIT licensed',
+  'Your files stay on your computer',
+  'Opens Office formats'
+]
+---
+
+<section class="section suite" aria-labelledby="suite-title">
+  <div class="suite__copy" data-reveal>
+    <p class="eyebrow">The suite</p>
+    <h2 id="suite-title" class="display suite__title">Twelve apps. <span class="grad">One download.</span></h2>
+    <ul class="checks">
+      {checks.map((c) => <li>{c}</li>)}
+    </ul>
+  </div>
+
+  <div class="suite-diagram" data-reveal data-reveal-delay="100">
+    <svg class="suite-diagram__lines" viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="orbit" cx="50" cy="50" r="38" />
+      {
+        nodes.map(({ app, x, y }, i) => (
+          <>
+            <line class="spoke" x1="50" y1="50" x2={x} y2={y} style={`--c:var(--app-${app.id})`} />
+            {app.ready && (
+              <line
+                class="pulse"
+                x1="50"
+                y1="50"
+                x2={x}
+                y2={y}
+                pathLength="100"
+                style={`--c:var(--app-${app.id});--i:${i}`}
+              />
+            )}
+          </>
+        ))
+      }
+    </svg>
+    <div class="hub" aria-hidden="true">
+      <Bear size={64} mood="bob" />
+    </div>
+    {
+      nodes.map(({ app, x, y }) => (
+        <a
+          class="node"
+          href={url(`tour/#${app.id}`)}
+          style={`left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--c:var(--app-${app.id})`}
+          aria-label={`${app.name}: ${app.tagline}${app.ready ? '' : ' (coming soon)'}`}
+          data-soon={app.ready ? undefined : ''}
+        >
+          <span class="node__dot" aria-hidden="true" />
+          <span class="node__name" aria-hidden="true">{app.name}</span>
+        </a>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .suite {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+  @media (min-width: 900px) {
+    .suite {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .suite__title {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+  }
+  .checks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink);
+  }
+  .checks li {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .checks li::before {
+    content: '✓';
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    background: var(--glow);
+    color: var(--ink);
+    font-size: 0.75rem;
+  }
+
+  .suite-diagram {
+    position: relative;
+    width: 100%;
+    max-width: 30rem;
+    aspect-ratio: 1;
+    margin: 0 auto;
+  }
+  .suite-diagram__lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .orbit {
+    fill: none;
+    stroke: var(--edge);
+    stroke-width: 0.3;
+    stroke-dasharray: 1 1.4;
+  }
+  .spoke {
+    stroke: var(--c);
+    stroke-opacity: 0.28;
+    stroke-width: 0.35;
+  }
+  .pulse {
+    stroke: var(--c);
+    stroke-width: 0.9;
+    stroke-linecap: round;
+    stroke-dasharray: 7 93;
+    stroke-dashoffset: 100;
+    filter: drop-shadow(0 0 1.2px var(--c));
+    animation: travel calc(3.6s * var(--motion-speed)) linear infinite;
+    animation-delay: calc(var(--i) * -0.45s * var(--motion-speed));
+  }
+  @keyframes travel {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .hub {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: grid;
+    place-items: center;
+    width: 22%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--edge);
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 6px var(--glow),
+      0 0 50px -4px var(--glow),
+      var(--shadow-md);
+  }
+  .hub :global(img) {
+    width: 70% !important;
+    height: auto !important;
+  }
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.5rem;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    color: var(--ink);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition:
+      border-color var(--dur-fast) ease,
+      box-shadow var(--dur-fast) ease;
+  }
+  .node:hover,
+  .node:focus-visible {
+    border-color: var(--c);
+    box-shadow: 0 0 16px -2px var(--c);
+  }
+  .node__dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 8px 2px var(--c);
+  }
+  .node[data-soon] {
+    opacity: 0.55;
+  }
+  .node[data-soon] .node__dot {
+    box-shadow: none;
+  }
+  @media (max-width: 480px) {
+    .node {
+      padding: 0.25rem 0.3rem;
+      font-size: 0.6rem;
+    }
+  }
+</style>

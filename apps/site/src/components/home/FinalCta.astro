@@ -1,0 +1,36 @@
+---
+import Bear from '../Bear.astro'
+import { url } from '../../site.config'
+---
+
+<section class="cta section" aria-labelledby="cta-title" data-reveal>
+  <Bear size={96} mood="wave" />
+  <h2 id="cta-title" class="display cta__title">
+    Bring your files. <span class="grad">Leave the subscription.</span>
+  </h2>
+  <div class="cta__actions">
+    <!-- Task 4 swaps this plain button for <WindowsDownload />. -->
+    <a class="btn btn--primary" href={url('download/')}>Download →</a>
+    <a class="btn btn--ghost" href={url('tour/')}>Take the tour</a>
+  </div>
+</section>
+
+<style>
+  .cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .cta__title {
+    max-width: 16ch;
+    margin-top: 0.5rem;
+    font-size: clamp(2rem, 5.5vw, 3.6rem);
+  }
+  .cta__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+</style>

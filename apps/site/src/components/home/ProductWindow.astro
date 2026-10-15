@@ -1,0 +1,242 @@
+---
+import { APPS } from '@bear/core'
+import { url } from '../../site.config'
+
+const panelIds = ['write', 'sheets', 'slides', 'notes', 'mail']
+const panelApps = panelIds.map((id) => APPS.find((a) => a.id === id)!)
+// Widths (percent) of the page's text lines; the first is the heading.
+const lines = [46, 100, 94, 100, 72, 0, 100, 88, 54]
+---
+
+<div class="stage">
+  <div class="product-window glass" aria-hidden="true">
+    <div class="product-window__bar">
+      <span class="product-window__back">← Report.docx</span>
+      <span class="product-window__tabs">
+        <span class="is-on">Home</span><span>Insert</span><span>Layout</span>
+      </span>
+    </div>
+    <div class="product-window__page">
+      {
+        lines.map((w, i) =>
+          w === 0 ? (
+            <span class="gap" />
+          ) : (
+            <span class:list={['line', { 'line--head': i === 0 }]} style={`--w:${w}%;--i:${i}`} />
+          )
+        )
+      }
+      <span class="caret"></span>
+    </div>
+    <div class="product-window__dock">
+      {APPS.map((app) => <span class="dot" style={`--c:var(--app-${app.id})`} />)}
+    </div>
+  </div>
+
+  <aside class="apps-panel glass bob" aria-label="Bear apps">
+    <h2 class="apps-panel__title">Bear apps</h2>
+    <ul>
+      {
+        panelApps.map((app) => (
+          <li>
+            <span class="apps-panel__dot" style={`--c:var(--app-${app.id})`} aria-hidden="true" />
+            <span class="apps-panel__text">
+              <span class="apps-panel__name">{app.name}</span>
+              <span class="apps-panel__tag">{app.tagline}</span>
+            </span>
+            <a class="chip" href={url(`tour/#${app.id}`)} aria-label={`Open ${app.name}`}>
+              Open
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </aside>
+</div>
+
+<style>
+  .stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 62rem;
+    margin: 0 auto;
+  }
+  .product-window {
+    overflow: hidden;
+    box-shadow: var(--shadow-md), 0 0 80px -20px var(--glow);
+  }
+  .product-window__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--edge);
+    font-size: 0.85rem;
+  }
+  .product-window__back {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .product-window__tabs {
+    display: flex;
+    gap: 1rem;
+    color: var(--ink-muted);
+  }
+  .product-window__tabs .is-on {
+    color: var(--ink);
+    box-shadow: 0 2px 0 var(--accent);
+  }
+  .product-window__page {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    align-items: flex-start;
+    min-height: 15rem;
+    padding: clamp(1rem, 4vw, 2.2rem) clamp(1rem, 5vw, 3rem);
+  }
+  .line {
+    display: block;
+    height: 0.6rem;
+    width: var(--w);
+    border-radius: var(--r-pill);
+    background: var(--edge);
+  }
+  .line--head {
+    height: 1.1rem;
+    background: var(--ink-muted);
+    opacity: 0.55;
+  }
+  .gap {
+    height: 0.4rem;
+  }
+  .caret {
+    width: 2px;
+    height: 1.1rem;
+    background: var(--accent);
+  }
+  .product-window__dock {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.8rem 1rem;
+    border-top: 1px solid var(--edge);
+    background: var(--glass);
+  }
+  .dot {
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 10px 1px var(--c);
+  }
+
+  .apps-panel {
+    padding: 1rem 1.1rem;
+    text-align: left;
+    background: var(--surface);
+    box-shadow: var(--shadow-md), 0 0 60px -24px var(--glow);
+  }
+  .apps-panel__title {
+    margin: 0 0 0.6rem;
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .apps-panel ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .apps-panel li {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .apps-panel__dot {
+    flex: none;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 10px 2px var(--c);
+  }
+  .apps-panel__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+  }
+  .apps-panel__name {
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .apps-panel__tag {
+    color: var(--ink-muted);
+    font-size: 0.8rem;
+  }
+  .chip {
+    padding: 0.15rem 0.7rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition:
+      border-color var(--dur-fast) ease,
+      background var(--dur-fast) ease;
+  }
+  .chip:hover {
+    border-color: var(--accent);
+    background: var(--glow);
+  }
+
+  @media (min-width: 900px) {
+    .apps-panel {
+      position: absolute;
+      top: 3.5rem;
+      right: -2.5rem;
+      width: 17rem;
+    }
+  }
+
+  /* Ambient motion: only declared when motion is allowed, so a frozen page shows the finished state. */
+  :global(html:not([data-motion='off'])) .stage {
+    animation: rise calc(1s * var(--motion-speed)) var(--ease-pop) both;
+  }
+  :global(html:not([data-motion='off'])) .line {
+    animation: type calc(0.9s * var(--motion-speed)) steps(14) calc(var(--i) * 0.35s * var(--motion-speed)) backwards;
+    overflow: hidden;
+  }
+  :global(html:not([data-motion='off'])) .caret {
+    animation: blink calc(1s * var(--motion-speed)) steps(1) infinite;
+  }
+  @keyframes rise {
+    from {
+      transform: translateY(40px);
+      opacity: 0;
+    }
+  }
+  @keyframes type {
+    from {
+      width: 0;
+    }
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+</style>

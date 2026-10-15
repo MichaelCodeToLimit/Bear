@@ -1,0 +1,273 @@
+---
+const cards = [
+  { id: 'open', title: 'Open', body: 'Drop in a .docx, .xlsx or .pptx. It opens as it is, nothing to convert.' },
+  { id: 'edit', title: 'Edit', body: 'Type, calculate, present. The tools are where you expect them.' },
+  { id: 'own', title: 'Own', body: 'Files save to your computer. No account, no upload, no renewal.' }
+]
+---
+
+<section class="section how" aria-labelledby="how-title">
+  <p class="eyebrow" data-reveal>How it works</p>
+  <h2 id="how-title" class="display how__title" data-reveal>Open. Edit. <span class="grad">Own.</span></h2>
+  <div class="how__grid">
+    {
+      cards.map((c, i) => (
+        <article class="how-card glass" data-reveal data-reveal-delay={i * 100}>
+          <div class="viz" aria-hidden="true">
+            {c.id === 'open' && (
+              <div class="open">
+                <span class="open__win" />
+                <span class="open__chip open__chip--a">.docx</span>
+                <span class="open__chip open__chip--b">.xlsx</span>
+              </div>
+            )}
+            {c.id === 'edit' && (
+              <div class="edit">
+                <div class="edit__text">
+                  <span class="edit__line" />
+                  <span class="edit__line edit__line--short" />
+                  <span class="edit__caret" />
+                </div>
+                <div class="edit__sum">
+                  <span class="edit__label">SUM</span>
+                  <span class="edit__window">
+                    <span class="edit__stack">
+                      <span>1,085</span>
+                      <span>1,142</span>
+                      <span>1,203</span>
+                      <span>1,240</span>
+                    </span>
+                  </span>
+                </div>
+              </div>
+            )}
+            {c.id === 'own' && (
+              <div class="own">
+                <span class="own__chip">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="7" width="10" height="7" rx="1.5" />
+                    <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+                  </svg>
+                  Saved to this computer · .docx
+                </span>
+                <span class="own__cloud">
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 8.5a4.5 4.5 0 0 1 .5 9.5Z" />
+                    <path d="M3 3l18 18" stroke-width="2" />
+                  </svg>
+                  <s>Cloud</s>
+                </span>
+              </div>
+            )}
+          </div>
+          <h3>{c.title}</h3>
+          <p>{c.body}</p>
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .how {
+    text-align: center;
+  }
+  .how__title {
+    font-size: clamp(2rem, 5.5vw, 3.6rem);
+  }
+  .how__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1.25rem;
+    margin-top: 2rem;
+    text-align: left;
+  }
+  .how-card {
+    padding: 1.4rem;
+  }
+  .how-card h3 {
+    margin: 1.1rem 0 0.35rem;
+    font-size: 1.4rem;
+  }
+  .how-card p {
+    margin: 0;
+    color: var(--ink-muted);
+  }
+  .viz {
+    display: grid;
+    place-items: center;
+    height: 9rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: var(--glass);
+    overflow: hidden;
+  }
+
+  /* Open */
+  .open {
+    position: relative;
+    width: 70%;
+    height: 70%;
+  }
+  .open__win {
+    position: absolute;
+    inset: 22% 0 0;
+    border: 1.5px dashed var(--ink-muted);
+    border-radius: var(--r-sm);
+    opacity: 0.6;
+  }
+  .open__chip {
+    position: absolute;
+    top: 0;
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .open__chip--a {
+    left: 8%;
+    top: 38%;
+  }
+  .open__chip--b {
+    right: 8%;
+    top: 38%;
+  }
+
+  /* Edit */
+  .edit {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    width: 70%;
+  }
+  .edit__text {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .edit__line {
+    width: 55%;
+    height: 0.55rem;
+    border-radius: var(--r-pill);
+    background: var(--ink-muted);
+    opacity: 0.45;
+  }
+  .edit__line--short {
+    width: 20%;
+  }
+  .edit__caret {
+    width: 2px;
+    height: 1.1rem;
+    background: var(--accent);
+  }
+  .edit__sum {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+  }
+  .edit__label {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--ink-muted);
+  }
+  .edit__window {
+    height: 1.4em;
+    overflow: hidden;
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .edit__stack {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.4;
+    /* Rest state is the finished total; the animation below ticks up to it. */
+    transform: translateY(-75%);
+  }
+
+  /* Own */
+  .own {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .own__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+  .own__chip svg {
+    color: var(--accent);
+  }
+  .own__cloud {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+    opacity: 0.8;
+  }
+
+  :global(html:not([data-motion='off'])) .open__chip {
+    animation: drop calc(4s * var(--motion-speed)) var(--ease-pop) infinite;
+  }
+  :global(html:not([data-motion='off'])) .open__chip--b {
+    animation-delay: calc(0.5s * var(--motion-speed));
+  }
+  :global(html:not([data-motion='off'])) .edit__caret {
+    animation: blink calc(1s * var(--motion-speed)) steps(1) infinite;
+  }
+  :global(html:not([data-motion='off'])) .edit__stack {
+    animation: tick calc(4s * var(--motion-speed)) steps(3, end) infinite;
+  }
+  :global(html:not([data-motion='off'])) .own__chip svg {
+    animation: pulse calc(2.4s * var(--motion-speed)) ease-in-out infinite;
+  }
+  @keyframes drop {
+    0% {
+      transform: translateY(-3.2rem);
+      opacity: 0;
+    }
+    18%,
+    80% {
+      transform: none;
+      opacity: 1;
+    }
+    100% {
+      transform: none;
+      opacity: 0;
+    }
+  }
+  @keyframes tick {
+    0% {
+      transform: translateY(0);
+    }
+    55%,
+    100% {
+      transform: translateY(-75%);
+    }
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes pulse {
+    50% {
+      transform: scale(1.2);
+    }
+  }
+</style>

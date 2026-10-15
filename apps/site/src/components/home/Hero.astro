@@ -1,0 +1,65 @@
+---
+import { url } from '../../site.config'
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <a class="pill hero__pill" href={url('docs/apps/mail/')}>
+    <span class="hero__new">New</span>
+    Bear Mail: your inbox, built in →
+  </a>
+  <h1 id="hero-title" class="display">
+    Your office suite.<br /><span class="grad">No subscription.</span>
+  </h1>
+  <p class="lede">
+    Write, Sheets, Slides, Notes, Mail and more. Free, open source, and your files stay yours.
+  </p>
+  <div class="hero__actions">
+    <!-- Task 4 swaps this plain button for <WindowsDownload />. -->
+    <a class="btn btn--primary" href={url('download/')}>Download →</a>
+    <a class="btn btn--ghost" href={url('tour/')}>See every app →</a>
+  </div>
+  <p class="hero__note">Windows, Mac and Linux · Opens .docx, .xlsx and .pptx</p>
+</section>
+
+<style>
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: clamp(1.5rem, 5vw, 3.5rem) 0 clamp(1.5rem, 4vw, 2.5rem);
+    text-align: center;
+  }
+  .hero__pill {
+    margin-bottom: 1.5rem;
+    color: var(--ink);
+    text-decoration: none;
+    transition: border-color var(--dur-fast) ease;
+  }
+  .hero__pill:hover {
+    border-color: var(--ink-muted);
+  }
+  .hero__new {
+    padding: 0.05rem 0.5rem;
+    border-radius: var(--r-pill);
+    background: var(--btn-bg);
+    color: var(--btn-ink);
+    font-weight: 700;
+  }
+  .hero h1 {
+    margin-bottom: 0.35em;
+  }
+  .hero .lede {
+    margin-inline: auto;
+  }
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+  .hero__note {
+    margin: 1.1rem 0 0;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+  }
+</style>

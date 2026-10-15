@@ -1,0 +1,236 @@
+---
+const bars = [
+  { label: 'File formats', value: '.docx .xlsx .pptx', fill: 100 },
+  { label: 'Works offline', value: 'Yes', fill: 100 },
+  { label: 'Subscription', value: 'None', fill: 0 }
+]
+const crash = ['App closed unexpectedly', 'Restoring AutoSave…', 'Back where you left off ✓']
+---
+
+<section class="section bento" aria-label="Features">
+  <div class="bento__grid">
+    <article class="glass bento__wide" data-reveal>
+      <h2>Feels like the apps you know.</h2>
+      <p>A familiar ribbon, AutoSave that never forgets, and templates to start from.</p>
+      <div class="viz" aria-hidden="true">
+        <div class="ribbon">
+          <span class="ribbon__tab is-on">Home</span><span class="ribbon__tab">Insert</span>
+          <span class="ribbon__tab">Layout</span>
+          <span class="ribbon__spacer"></span>
+          <span class="autosave"><i></i>AutoSave</span>
+        </div>
+        <div class="templates">
+          <span class="tpl"><b></b><b></b><b></b></span>
+          <span class="tpl"><b></b><b></b><b></b></span>
+          <span class="tpl"><b></b><b></b><b></b></span>
+          <span class="tpl__label">Templates</span>
+        </div>
+      </div>
+      <ul class="bars">
+        {
+          bars.map((b) => (
+            <li>
+              <span class="bars__label">{b.label}</span>
+              <span class="bars__track"><span class="bars__fill" style={`--f:${b.fill}%`} /></span>
+              <span class="bars__value">{b.value}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </article>
+
+    <article class="glass bento__tall" data-reveal data-reveal-delay="100">
+      <h2>Crash? Keep working.</h2>
+      <p>Bear saves as you go, so a crash costs you seconds, not hours.</p>
+      <ol class="crash">
+        {crash.map((row, i) => <li style={`--i:${i}`}>{row}</li>)}
+      </ol>
+    </article>
+  </div>
+</section>
+
+<style>
+  .bento__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  @media (min-width: 800px) {
+    .bento__grid {
+      grid-template-columns: 1.7fr 1fr;
+    }
+  }
+  .bento__wide,
+  .bento__tall {
+    padding: clamp(1.25rem, 3vw, 2rem);
+  }
+  .bento h2 {
+    margin-bottom: 0.3em;
+    font-size: clamp(1.4rem, 3vw, 1.9rem);
+  }
+  .bento p {
+    margin: 0 0 1.25rem;
+    color: var(--ink-muted);
+  }
+  .viz {
+    margin-bottom: 1.1rem;
+    padding: 0.9rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: var(--glass);
+  }
+  .ribbon {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--edge);
+    color: var(--ink-muted);
+    font-size: 0.82rem;
+  }
+  .ribbon__tab.is-on {
+    color: var(--ink);
+    box-shadow: 0 2px 0 var(--accent);
+  }
+  .ribbon__spacer {
+    flex: 1;
+  }
+  .autosave {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--ink);
+  }
+  .autosave i {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px 2px var(--accent);
+  }
+  .templates {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+    padding-top: 0.8rem;
+  }
+  .tpl {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 3.2rem;
+    height: 4rem;
+    padding: 0.45rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+  }
+  .tpl b {
+    height: 0.25rem;
+    border-radius: 2px;
+    background: var(--ink-muted);
+    opacity: 0.4;
+  }
+  .tpl b:first-child {
+    width: 60%;
+  }
+  .tpl__label {
+    margin-left: auto;
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+  }
+  .bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .bars li {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr auto;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.88rem;
+  }
+  .bars__label {
+    color: var(--ink-muted);
+  }
+  .bars__track {
+    height: 0.45rem;
+    border-radius: var(--r-pill);
+    background: var(--edge);
+    overflow: hidden;
+  }
+  .bars__fill {
+    display: block;
+    width: var(--f);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--grad);
+  }
+  .bars__value {
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    text-align: right;
+  }
+  @media (max-width: 520px) {
+    .bars li {
+      grid-template-columns: 1fr auto;
+    }
+    .bars__track {
+      grid-column: 1 / -1;
+      order: 3;
+    }
+  }
+
+  .crash {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .crash li {
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: var(--glass);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .crash li:last-child {
+    border-color: var(--accent);
+  }
+
+  :global(html:not([data-motion='off'])) .autosave i {
+    animation: glow calc(2s * var(--motion-speed)) ease-in-out infinite;
+  }
+  :global(html:not([data-motion='off'])) .crash li {
+    animation: tick calc(6s * var(--motion-speed)) ease-in-out infinite;
+    animation-delay: calc(var(--i) * 1.6s * var(--motion-speed));
+  }
+  @keyframes glow {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  @keyframes tick {
+    0%,
+    30%,
+    100% {
+      background: var(--glass);
+    }
+    10%,
+    20% {
+      background: var(--glow);
+    }
+  }
+</style>
