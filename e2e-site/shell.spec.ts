@@ -107,6 +107,29 @@ test('a saved light theme is applied before the first DOMContentLoaded', async (
   await context.close()
 })
 
+test('a saved light theme has the toggle pressed at DOMContentLoaded, before any bundle runs', async ({ browser }) => {
+  const context = await browser.newContext()
+  await context.addInitScript(() => {
+    localStorage.setItem('bear-theme', 'light')
+    document.addEventListener('DOMContentLoaded', () => {
+      ;(window as unknown as { __pressedAtDcl: (string | null)[] }).__pressedAtDcl = [...document.querySelectorAll('[data-theme-toggle]')].map((b) =>
+        b.getAttribute('aria-pressed')
+      )
+    })
+  })
+  const page = await context.newPage()
+  await page.route('**/Bear/', async (route) => {
+    const response = await route.fetch()
+    const body = (await response.text()).replace(/<script type="module">[\s\S]*?<\/script>/g, '')
+    await route.fulfill({ response, body })
+  })
+  await page.goto('./')
+  const pressed = await page.evaluate(() => (window as unknown as { __pressedAtDcl: (string | null)[] }).__pressedAtDcl)
+  expect(pressed.length).toBeGreaterThan(0)
+  expect(pressed.every((v) => v === 'true')).toBe(true)
+  await context.close()
+})
+
 test('the top bar is translucent glass', async ({ page }) => {
   await page.goto('./')
   const filter = await page.locator('header.topbar').evaluate((el) => getComputedStyle(el).backdropFilter)

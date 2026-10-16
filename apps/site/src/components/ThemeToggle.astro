@@ -10,6 +10,10 @@
   <span class="theme-toggle__to-light">Light theme</span>
   <span class="theme-toggle__to-dark">Dark theme</span>
 </button>
+<!-- Sets the pressed state before the bundle runs (the head script cannot: the button is not parsed yet). -->
+<script is:inline>
+  document.currentScript.previousElementSibling.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'light'))
+</script>
 
 <style is:global>
   .theme-toggle {

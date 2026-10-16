@@ -18,7 +18,7 @@ export function Frame({ id, title, playing, children }: { id: string; title: str
     <div
       className={`demo${playing ? ' is-playing' : ''}`}
       data-demo={id}
-      style={{ ...(id === 'sleeping' ? { '--c': 'var(--ink-muted)', '--demo-ink': 'var(--surface)' } : { '--c': `var(--app-${id})` }) } as CSSProperties}
+      style={{ ...(id === 'sleeping' ? { '--c': 'var(--ink-muted)' } : { '--c': `var(--app-${id})` }) } as CSSProperties}
     >
       <style dangerouslySetInnerHTML={{ __html: BASE }} />
       <div className="demo__bar">

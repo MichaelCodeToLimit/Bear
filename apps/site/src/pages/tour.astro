@@ -126,6 +126,10 @@ const apps = tourApps()
     color: var(--ink);
     box-shadow: 0 2px 0 var(--accent);
   }
+  /* The panel bar above already names the app and shows the tabs; hide the demo's duplicate bar. */
+  .picker__panel .demo__bar {
+    display: none;
+  }
   .picker__stage {
     min-width: 0;
   }

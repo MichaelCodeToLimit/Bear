@@ -12,7 +12,7 @@ const { exe, msi, version } = windowsDownloads(release)
 <div class="windl">
   <div class="windl__row">
     {exe ? (
-      <a class="btn btn--primary windl__main" href={exe.url} data-windows-download="exe">
+      <a class="btn btn--primary windl__main" href={exe.url} data-windows-download="exe" aria-label={`Download for Windows, Bear ${version}, .exe, ${formatSize(exe.size)}`}>
         <span class="windl__title">Download for Windows</span>
         <span class="windl__sub">Bear {version} · .exe · {formatSize(exe.size)}</span>
       </a>
@@ -25,7 +25,7 @@ const { exe, msi, version } = windowsDownloads(release)
       <a class="btn btn--ghost windl__msi" href={msi.url} data-windows-download="msi">.msi for IT / whole computer</a>
     )}
   </div>
-  {!exe && <p class="windl__note">First release coming soon</p>}
+  {!exe && !msi && <p class="windl__note">First release coming soon</p>}
   <a class="windl__other" href={url('download/')}>Other systems →</a>
 </div>
 

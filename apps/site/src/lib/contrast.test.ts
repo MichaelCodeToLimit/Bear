@@ -61,3 +61,18 @@ describe('tokens.css matches the palettes tested above', () => {
     }
   })
 })
+
+describe('Windows download button sub-line', () => {
+  const src = readFileSync(new URL('../components/WindowsDownload.astro', import.meta.url), 'utf8')
+  const rule = /\.windl__sub\s*\{([^}]*)\}/.exec(src)?.[1] ?? ''
+  it('inherits the primary button ink (no own colour or opacity)', () => {
+    expect(rule).not.toBe('')
+    expect(rule).not.toMatch(/color|opacity/)
+  })
+  it.each([
+    ['light', LIGHT],
+    ['dark', DARK]
+  ])('is readable on the primary button in the %s theme', (_n, t) => {
+    expect(contrastRatio(t.btnInk, t.btnBg)).toBeGreaterThanOrEqual(4.5)
+  })
+})

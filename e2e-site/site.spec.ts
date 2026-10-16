@@ -23,6 +23,22 @@ for (const path of PAGES) {
       expect(overflow).toBeLessThanOrEqual(0)
     })
 
+    test('light theme: no console errors and no horizontal scroll at 375px', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('bear-theme', 'light'))
+      const errors: string[] = []
+      page.on('console', (m) => {
+        if (m.type() === 'error') errors.push(m.text())
+      })
+      page.on('pageerror', (e) => errors.push(e.message))
+      await page.setViewportSize({ width: 375, height: 812 })
+      await page.goto(path)
+      await page.waitForLoadState('networkidle')
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+      expect(errors).toEqual([])
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow).toBeLessThanOrEqual(0)
+    })
+
     test('every internal link resolves', async ({ page, request }) => {
       await page.goto(path)
       const hrefs = await page.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href') ?? ''))
