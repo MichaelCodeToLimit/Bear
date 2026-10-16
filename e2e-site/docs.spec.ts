@@ -36,6 +36,12 @@ test('search finds the Sheets guide for "formula"', async ({ page }) => {
   await expect(result).toBeVisible({ timeout: 10_000 })
 })
 
+test('code blocks sit inside a terminal frame', async ({ page }) => {
+  await page.goto('docs/contribute/dev-setup/')
+  await expect(page.locator('.terminal pre').first()).toBeVisible()
+  await expect(page.locator('.terminal .terminal__dots').first()).toBeVisible()
+})
+
 test('no horizontal scroll at 375px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
   for (const path of ['docs/get-started/install/', 'docs/apps/sheets/', 'docs/contribute/new-app/']) {

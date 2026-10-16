@@ -190,6 +190,60 @@ img {
   padding: clamp(3rem, 8vw, 6rem) 0;
 }
 
+/* Terminal window: docs code blocks and build-from-source steps. Dark in both themes. */
+.terminal {
+  margin: 1.1em 0;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-md);
+  background: #0f0a07;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  min-width: 0;
+}
+.terminal__bar {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid rgba(246, 234, 217, 0.1);
+  background: rgba(246, 234, 217, 0.04);
+}
+.terminal__dots {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.terminal__dots span {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: rgba(246, 234, 217, 0.22);
+}
+.terminal__dots span:nth-child(1) {
+  background: #f87171;
+}
+.terminal__dots span:nth-child(2) {
+  background: #fbbf24;
+}
+.terminal__dots span:nth-child(3) {
+  background: #4ade80;
+}
+.terminal pre {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  background: transparent !important;
+  color: #f6ead9;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  border-radius: 0;
+}
+.terminal code {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+}
+
 /* Cards and tiles */
 .card {
   background: var(--glass);

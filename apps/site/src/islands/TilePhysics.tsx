@@ -63,10 +63,14 @@ function createWorld(Matter: MatterModule, canvas: HTMLCanvasElement, width: num
       ctx.beginPath()
       body.vertices.forEach((v, i) => (i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y)))
       ctx.closePath()
+      ctx.save()
+      ctx.shadowColor = color
+      ctx.shadowBlur = 16
       ctx.fillStyle = color
       ctx.fill()
-      ctx.lineWidth = 2
-      ctx.strokeStyle = 'rgba(59, 42, 26, 0.25)'
+      ctx.restore()
+      ctx.lineWidth = 1.5
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)'
       ctx.stroke()
       ctx.save()
       ctx.translate(body.position.x, body.position.y)

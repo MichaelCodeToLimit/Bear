@@ -7,30 +7,31 @@ import ThemeMixer from '../islands/ThemeMixer'
 ---
 
 <BaseLayout title="Playground" description="Little toys built from the Bear brand. Poke them, drag them, break nothing.">
-  <section class="pg" aria-labelledby="pg-title">
-    <h1 id="pg-title">Playground</h1>
-    <p class="pg__lead">A few toys to fiddle with. Everything here is optional. Only the theme mixer remembers anything, on this device.</p>
+  <section class="pg section" aria-labelledby="pg-title">
+    <p class="eyebrow">Playground</p>
+    <h1 id="pg-title" class="display pg__title">Little toys. <span class="grad">Zero stakes.</span></h1>
+    <p class="pg__lead lede">A few toys to fiddle with. Everything here is optional. Only the theme mixer remembers anything, on this device.</p>
 
     <div class="pg__grid">
-      <article class="card pg__card" data-playground-card>
+      <article class="card pg__card pg__card--buddy" data-playground-card>
         <h2>Bear buddy</h2>
         <p>Say hello. The bear watches your pointer. Tap the button to change its mood.</p>
         <BearBuddy client:visible />
       </article>
 
-      <article class="card pg__card" data-playground-card>
+      <article class="card pg__card pg__card--phys" data-playground-card>
         <h2>Tile physics</h2>
         <p>Twelve app tiles, one box. Drag them about or hit Reset to drop them again.</p>
         <TilePhysics client:visible />
       </article>
 
-      <article class="card pg__card" data-playground-card>
+      <article class="card pg__card pg__card--demos" data-playground-card>
         <h2>Mini live demos</h2>
         <p>A tiny spreadsheet, a doodle pad and a checklist. Nothing is saved.</p>
         <MiniDemos client:visible />
       </article>
 
-      <article class="card pg__card" data-playground-card>
+      <article class="card pg__card pg__card--mixer" data-playground-card>
         <h2>Theme mixer</h2>
         <p>Tilt the colours, round the corners, speed things up. It is remembered on this device.</p>
         <ThemeMixer client:visible />
@@ -40,14 +41,50 @@ import ThemeMixer from '../islands/ThemeMixer'
 </BaseLayout>
 
 <style is:global>
-  .pg__lead {
-    color: var(--ink-muted);
-    margin-bottom: 1.5rem;
+  .pg.section {
+    padding-top: clamp(1.25rem, 3vw, 2rem);
+    padding-bottom: 3rem;
   }
+  .pg .pg__title {
+    font-size: clamp(2.25rem, 7vw, 4rem);
+  }
+  .pg .pg__lead {
+    max-width: 62rem;
+    margin-bottom: 1.25rem;
+    font-size: 1rem;
+  }
+  /* Bento grid: one column on phones, three from 768px with the physics and demo cards two wide. */
   .pg__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    .pg__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    /* Demos sit in the first row so they are on screen (and hydrated) on load. */
+    .pg__grid {
+      grid-template-areas:
+        'demos demos buddy'
+        'phys phys mixer';
+    }
+    .pg__card--buddy {
+      grid-area: buddy;
+    }
+    .pg__card--phys {
+      grid-area: phys;
+    }
+    .pg__card--demos {
+      grid-area: demos;
+    }
+    .pg__card--mixer {
+      grid-area: mixer;
+    }
+  }
+  .pg__card h2 {
+    margin: 0;
+    font-size: 1.2rem;
   }
   .pg__card {
     min-width: 0;
@@ -326,8 +363,10 @@ import ThemeMixer from '../islands/ThemeMixer'
     height: 300px;
     touch-action: none;
     border-radius: var(--r-md);
-    background: color-mix(in srgb, var(--bg-to) 55%, var(--surface));
-    border: 1px solid var(--surface-edge);
+    background:
+      radial-gradient(ellipse at 50% 100%, var(--glow), transparent 70%),
+      #0f0a07;
+    border: 1px solid var(--edge);
     cursor: grab;
   }
   .tp__canvas:active {

@@ -12,6 +12,10 @@ interface Props {
 }
 const { title, slug, groups } = Astro.props
 const { prev, next } = prevNext(groups, slug)
+
+// Wrap each rendered code block in a terminal window frame.
+const bar = '<div class="terminal__bar"><span class="terminal__dots" aria-hidden="true"><span></span><span></span><span></span></span></div>'
+const body = (await Astro.slots.render('default')).replace(/<pre[\s\S]*?<\/pre>/g, (pre) => `<div class="terminal">${bar}${pre}</div>`)
 ---
 
 <BaseLayout title={title} calm>
@@ -41,7 +45,7 @@ const { prev, next } = prevNext(groups, slug)
 
     <article class="docs-article" data-pagefind-body>
       <h1>{title}</h1>
-      <slot />
+      <Fragment set:html={body} />
       <nav class="docs-pager" aria-label="Previous and next page">
         {prev ? <a rel="prev" href={url(`docs/${prev.slug}/`)}>&larr; {prev.title}</a> : <span />}
         {next ? <a rel="next" href={url(`docs/${next.slug}/`)}>{next.title} &rarr;</a> : <span />}
@@ -85,8 +89,10 @@ const { prev, next } = prevNext(groups, slug)
     --pagefind-ui-primary: var(--accent);
     --pagefind-ui-text: var(--ink);
     --pagefind-ui-background: var(--surface);
-    --pagefind-ui-border: var(--surface-edge);
-    --pagefind-ui-tag: var(--surface-edge);
+    --pagefind-ui-border: var(--edge);
+    --pagefind-ui-tag: var(--glass);
+    --pagefind-ui-border-width: 1px;
+    --pagefind-ui-border-radius: 14px;
     --pagefind-ui-font: var(--font);
     max-width: 100%;
   }
@@ -113,18 +119,20 @@ const { prev, next } = prevNext(groups, slug)
     text-decoration: none;
   }
   .docs-nav a:hover {
-    background: var(--surface-edge);
+    background: var(--glass);
   }
   .docs-nav a[aria-current='page'] {
-    background: var(--accent);
-    color: var(--accent-ink);
+    background: var(--glass);
+    box-shadow: inset 3px 0 0 var(--accent);
+    color: var(--ink);
     font-weight: 700;
   }
   .docs-article {
     min-width: 0;
-    background: var(--surface);
-    border: 1px solid var(--surface-edge);
+    background: var(--glass);
+    border: 1px solid var(--edge);
     border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
     padding: 1.25rem var(--gutter) 1.5rem;
     overflow-wrap: anywhere;
   }
@@ -136,15 +144,25 @@ const { prev, next } = prevNext(groups, slug)
     margin-top: 1.2em;
     font-size: 1.1rem;
   }
-  .docs-article pre {
-    overflow-x: auto;
-    padding: 0.8rem 1rem;
-    border-radius: var(--r-sm);
-    background: color-mix(in srgb, var(--ink) 8%, var(--surface));
-    font-size: 0.9rem;
+  .docs-article h1 {
+    margin-top: 0;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
   }
-  .docs-article code {
-    font-size: 0.92em;
+  .docs-article :not(pre) > code {
+    padding: 0.1em 0.35em;
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+    background: var(--glass);
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+  }
+  .docs-article a {
+    color: var(--ink);
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
   }
   .docs-article table {
     display: block;

@@ -39,14 +39,16 @@ const steps = [
       </div>
       {release ? (
         <>
-          <h1>Download Bear</h1>
-          <p class="dl-version">Bear {release.version} · {date}</p>
+          <p class="eyebrow">Download</p>
+          <h1 class="display dl-title">Download <span class="grad">Bear</span></h1>
+          <p class="dl-version"><span class="pill">Bear {release.version} · {date}</span></p>
           <p><a href={release.notesUrl}>Release notes</a></p>
         </>
       ) : (
         <>
-          <h1>The first release is on its way</h1>
-          <p class="dl-lead">Bear is still packing its bags. In the meantime you can build it yourself, or watch the Releases page for the first installers.</p>
+          <p class="eyebrow">Download</p>
+          <h1 class="display dl-title">The first release <span class="grad">is on its way</span></h1>
+          <p class="dl-lead lede">Bear is still packing its bags. In the meantime you can build it yourself, or watch the Releases page for the first installers.</p>
         </>
       )}
     </header>
@@ -92,7 +94,10 @@ const steps = [
     <section class="dl-source" aria-labelledby="dl-source-title">
       <h2 id="dl-source-title">Build from source</h2>
       <p>You need Node 20 or newer and pnpm.</p>
-      <pre class="card"><code>{steps.join('\n')}</code></pre>
+      <div class="terminal">
+        <div class="terminal__bar"><span class="terminal__dots" aria-hidden="true"><span></span><span></span><span></span></span></div>
+        <pre><code>{steps.join('\n')}</code></pre>
+      </div>
       <p><a href={SITE.releasesUrl}>All releases on GitHub</a></p>
     </section>
   </section>
@@ -105,11 +110,19 @@ const steps = [
 </script>
 
 <style is:global>
+  .dl {
+    padding: clamp(2rem, 5vw, 4rem) 0;
+  }
   .dl-hero {
     text-align: center;
     margin-bottom: 2rem;
   }
-  .dl-lead,
+  .dl .dl-title {
+    font-size: clamp(2.25rem, 7vw, 4.5rem);
+  }
+  .dl .dl-lead {
+    margin-inline: auto;
+  }
   .dl-version {
     color: var(--ink-muted);
   }
@@ -191,10 +204,15 @@ const steps = [
     margin: 0.25rem 0 0.75rem;
   }
   .dl-card.is-best {
-    outline: 2px solid currentColor;
+    outline: 2px solid var(--accent);
+    box-shadow: 0 0 28px var(--glow);
   }
-  .dl-source pre {
-    overflow-x: auto;
-    padding: 1rem;
+  .dl-best {
+    border-color: var(--accent);
+    box-shadow: 0 0 36px var(--glow);
+  }
+  .dl-group h2,
+  .dl-source h2 {
+    font-size: 1.3rem;
   }
 </style>

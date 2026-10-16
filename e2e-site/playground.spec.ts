@@ -20,6 +20,16 @@ test('playground has one h1 and four headed cards, no console errors', async ({ 
   expect(errors).toEqual([])
 })
 
+test('the physics card spans two grid columns on desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('playground/')
+  const cards = page.locator('[data-playground-card]')
+  const physics = await cards.nth(1).boundingBox()
+  const buddy = await cards.nth(0).boundingBox()
+  expect(physics!.y).toBeGreaterThan(buddy!.y)
+  expect(physics!.width).toBeGreaterThan(buddy!.width * 1.8)
+})
+
 test('bear buddy mood button cycles data-mood', async ({ page }) => {
   await page.goto('playground/')
   const buddy = page.locator('[data-bear-buddy]')
