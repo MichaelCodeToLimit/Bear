@@ -89,6 +89,28 @@ test('"Other systems" links and the top-bar Download go to the download page', a
   await expect(page.locator('header.topbar').getByRole('link', { name: /^Download/ }).first()).toHaveAttribute('href', '/Bear/download/')
 })
 
+test('ghost buttons beside the Windows button are not stretched at 1280px', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('./')
+  const primary = await page.locator('.hero a.windl__main').boundingBox()
+  const ghost = await page.locator('.hero__actions a.btn--ghost').first().boundingBox()
+  expect(primary && ghost).toBeTruthy()
+  expect(ghost!.height).toBeLessThanOrEqual(primary!.height * 1.3)
+})
+
+test('with JavaScript off and reduced motion, the marquee is paused', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, reducedMotion: 'reduce' })
+  const page = await context.newPage()
+  await page.goto('http://127.0.0.1:4321/Bear/')
+  await expect(page.locator('.marquee__track')).toHaveCSS('animation-play-state', 'paused')
+  await context.close()
+})
+
+test('the Download page omits "Other systems"', async ({ page }) => {
+  await page.goto('download/')
+  await expect(page.getByRole('link', { name: /Other systems/ })).toHaveCount(0)
+})
+
 test('home has no horizontal scroll at 375px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
   await page.goto('./')

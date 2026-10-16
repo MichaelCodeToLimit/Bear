@@ -15,10 +15,10 @@ const fixture = {
   published_at: '2026-10-14T10:00:00Z',
   html_url: 'https://github.com/MichaelCodeToLimit/Bear/releases/tag/v0.1.0',
   assets: [
-    { name: 'Bear-Setup-0.1.0.exe', browser_download_url: 'https://x/a.exe', size: 113058239 },
-    { name: 'Bear-0.1.0.msi', browser_download_url: 'https://x/a.msi', size: 114000000 },
-    { name: 'Bear-Setup-0.1.0.exe.blockmap', browser_download_url: 'https://x/a.blockmap', size: 1000 },
-    { name: 'latest.yml', browser_download_url: 'https://x/latest.yml', size: 300 }
+    { name: 'Bear-Setup-0.1.0.exe', browser_download_url: 'https://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.0/a.exe', size: 113058239 },
+    { name: 'Bear-0.1.0.msi', browser_download_url: 'https://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.0/a.msi', size: 114000000 },
+    { name: 'Bear-Setup-0.1.0.exe.blockmap', browser_download_url: 'https://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.0/a.blockmap', size: 1000 },
+    { name: 'latest.yml', browser_download_url: 'https://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.0/latest.yml', size: 300 }
   ]
 }
 
@@ -74,7 +74,20 @@ describe('toRelease', () => {
     expect(r?.version).toBe('0.1.0')
     expect(r?.files).toHaveLength(2)
     expect(r?.notesUrl).toBe(fixture.html_url)
-    expect(r?.files[0]).toMatchObject({ name: 'Bear-Setup-0.1.0.exe', url: 'https://x/a.exe', size: 113058239 })
+    expect(r?.files[0]).toMatchObject({ name: 'Bear-Setup-0.1.0.exe', url: 'https://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.0/a.exe', size: 113058239 })
+  })
+  it('drops assets not served from this repository release downloads', () => {
+    const bad = [
+      'javascript:alert(1)',
+      'http://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.0/a.exe',
+      'https://github.com/someone-else/Bear/releases/download/v0.1.0/a.exe'
+    ]
+    for (const u of bad) {
+      const evil = { ...fixture, assets: [fixture.assets[0], { name: 'Evil.msi', browser_download_url: u, size: 1 }] }
+      expect(toRelease(evil)?.files.map((f) => f.name)).toEqual(['Bear-Setup-0.1.0.exe'])
+    }
+    const allBad = { ...fixture, assets: [{ name: 'Evil.exe', browser_download_url: bad[0], size: 1 }] }
+    expect(toRelease(allBad)).toBeNull()
   })
   it('returns null for a bad shape or no installable asset', () => {
     expect(toRelease(null)).toBeNull()

@@ -9,8 +9,8 @@ export default defineConfig({
   reporter: CI ? [['list'], ['github']] : 'list',
   // A hang in CI should fail in minutes, not hold the Pages deploy queue for hours.
   globalTimeout: CI ? 8 * 60_000 : undefined,
-  // Local runs were flaky at the default worker count: the dev server plus the animated starfield make many parallel
-  // Chromium workers timing-sensitive. Two workers is stable; CI gets one retry for the rare slow runner.
+  // Observed flaky locally at the default worker count (different unrelated tests failed in some runs); two workers
+  // was stable over repeated runs. CI gets one retry. A "flaky" line in the CI log means a retry happened and should be investigated.
   workers: 2,
   retries: CI ? 1 : 0,
   use: { baseURL: 'http://127.0.0.1:4321/Bear/' },

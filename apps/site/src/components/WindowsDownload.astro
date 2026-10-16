@@ -4,8 +4,10 @@ import { formatSize, windowsDownloads, type ReleaseInfo } from '../lib/releases'
 
 interface Props {
   release: ReleaseInfo | null
+  /** Show the "Other systems" link (hidden on the Download page itself). */
+  showOthers?: boolean
 }
-const { release } = Astro.props
+const { release, showOthers = true } = Astro.props
 const { exe, msi, version } = windowsDownloads(release)
 ---
 
@@ -26,7 +28,7 @@ const { exe, msi, version } = windowsDownloads(release)
     )}
   </div>
   {!exe && !msi && <p class="windl__note">First release coming soon</p>}
-  <a class="windl__other" href={url('download/')}>Other systems →</a>
+  {showOthers && <a class="windl__other" href={url('download/')}>Other systems →</a>}
 </div>
 
 <style>

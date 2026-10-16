@@ -19,7 +19,7 @@
   /* Glass cards, hairlines, headline gradient, primary button, ambient glow and grid. */
   --glass: rgba(246, 234, 217, 0.05);
   --edge: rgba(246, 234, 217, 0.12);
-  --grad: linear-gradient(180deg, #fbbf24, #f59e0b 55%, #fb923c);
+  --grad: linear-gradient(90deg, #fbbf24, #f59e0b 55%, #fb923c);
   --btn-bg: #fbf4ea;
   --btn-ink: #2a1c10;
   --glow: rgba(245, 158, 11, 0.16);
@@ -69,7 +69,7 @@ html[data-theme='light'] {
 
   --glass: rgba(255, 255, 255, 0.6);
   --edge: rgba(42, 28, 16, 0.14);
-  --grad: linear-gradient(180deg, #9a4508, #b23a0c 55%, #be123c);
+  --grad: linear-gradient(90deg, #9a4508, #b23a0c 55%, #be123c);
   --btn-bg: #2a1c10;
   --btn-ink: #fbf4ea;
   --glow: rgba(217, 119, 6, 0.14);
@@ -86,5 +86,35 @@ html[data-theme='light'] {
     --bg-to: oklch(from var(--cream-to) l c calc(h + var(--hue-shift-n)));
     --ink: oklch(from var(--ink-base) l c calc(h + var(--hue-shift-n)));
     --ink-muted: oklch(from var(--ink-muted-base) l c calc(h + var(--hue-shift-n)));
+  }
+}
+
+/* Print: browsers drop backgrounds, so always use the daylight ink, and hide chrome that makes no sense on paper. */
+@media print {
+  html[data-theme] {
+    color-scheme: light;
+    --cream-from: #ffffff;
+    --cream-to: #ffffff;
+    --ink-base: #2a1c10;
+    --ink-muted-base: #6f5a46;
+    --surface: #ffffff;
+    --accent: #9a4508;
+    --glass: transparent;
+    --edge: rgba(42, 28, 16, 0.25);
+    --grad: linear-gradient(90deg, #9a4508, #b23a0c 55%, #be123c);
+    --glow: transparent;
+    --grid-line: transparent;
+    --shadow-sm: none;
+    --shadow-md: none;
+  }
+  body {
+    background: #fff !important;
+    color: #2a1c10 !important;
+  }
+  canvas.starfield,
+  .topbar,
+  [data-theme-toggle],
+  [data-motion-toggle] {
+    display: none !important;
   }
 }

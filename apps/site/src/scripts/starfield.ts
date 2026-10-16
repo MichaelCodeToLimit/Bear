@@ -38,13 +38,25 @@ export function initStarfield(canvas: HTMLCanvasElement): () => void {
 
   const allowed = (): boolean => root.dataset.motion !== 'off' && !document.hidden
 
-  function build(): void {
+  function publish(): void {
+    // Test hook: a tiny fingerprint of the first stars, refreshed whenever the field is built or resized.
+    canvas.dataset.stars = stars
+      .slice(0, 6)
+      .map((s) => `${Math.round(s.x)},${Math.round(s.y)}`)
+      .join(';')
+  }
+
+  function size(): void {
     dpr = Math.min(window.devicePixelRatio || 1, 2)
     width = window.innerWidth
     height = window.innerHeight
     canvas.width = Math.round(width * dpr)
     canvas.height = Math.round(height * dpr)
     ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
+  }
+
+  function build(): void {
+    size()
     const count = Math.round(Math.min(MAX_STARS, (width * height) / AREA_PER_STAR))
     stars = Array.from({ length: count }, () => {
       const speed = 0.02 + Math.random() * 0.04 // px per ms
@@ -57,6 +69,7 @@ export function initStarfield(canvas: HTMLCanvasElement): () => void {
         r: 0.8 + Math.random() * 1.2
       }
     })
+    publish()
   }
 
   function draw(): void {
@@ -127,7 +140,13 @@ export function initStarfield(canvas: HTMLCanvasElement): () => void {
   const onResize = (): void => {
     clearTimeout(resizeTimer)
     resizeTimer = setTimeout(() => {
-      build()
+      // Phones fire height-only resizes as the address bar shows and hides: keep the stars, just wrap them into the new bounds.
+      if (window.innerWidth !== width) build()
+      else {
+        size()
+        for (const s of stars) if (s.y > height) s.y = Math.random() * height
+        publish()
+      }
       draw()
     }, 150)
   }

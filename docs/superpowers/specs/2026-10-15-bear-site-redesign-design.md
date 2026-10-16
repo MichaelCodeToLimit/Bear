@@ -231,3 +231,14 @@ Home still has **no React islands**. Its only scripts are reveal, starfield, mot
 - New pages, new interactive features, or copy changes beyond the headlines and labels above.
 - Any change to the desktop app.
 - Replacing the motion toggle or the theme mixer.
+
+## Implementation notes (2026-10-16)
+
+Accepted differences between this spec and what shipped:
+
+- The ambient glow alpha is 0.16 in dark and 0.14 in light (the spec said 0.55 and 0.35), tuned by eye.
+- The `.display` type metrics are slightly different from the spec.
+- `.glass` has no inset top highlight.
+- Docs pages do not dim the grid and glow.
+- The top bar has no ghost "Take the tour" button; it is in the hero.
+- The playground desktop grid order is demos + buddy, then physics + mixer, so the existing tests can act without scrolling.

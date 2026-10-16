@@ -54,6 +54,9 @@ export function formatSize(bytes: number): string {
   return `${Math.round(bytes / 1e6)} MB`
 }
 
+/** Only assets served from this repository's release downloads are ever linked. */
+const DOWNLOAD_PREFIX = `${SITE.repoUrl}/releases/download/`
+
 /** Turn a GitHub "latest release" payload into download entries, or null when it is unusable. */
 export function toRelease(json: unknown): ReleaseInfo | null {
   if (typeof json !== 'object' || json === null) return null
@@ -65,6 +68,7 @@ export function toRelease(json: unknown): ReleaseInfo | null {
     if (typeof a !== 'object' || a === null) continue
     const asset = a as Record<string, unknown>
     if (typeof asset.name !== 'string' || typeof asset.browser_download_url !== 'string') continue
+    if (!asset.browser_download_url.startsWith(DOWNLOAD_PREFIX)) continue
     const kind = classifyAsset(asset.name)
     if (!kind) continue
     files.push({

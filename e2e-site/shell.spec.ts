@@ -130,6 +130,43 @@ test('a saved light theme has the toggle pressed at DOMContentLoaded, before any
   await context.close()
 })
 
+test('print uses dark ink on white even when the saved theme is dark', async ({ page }) => {
+  await page.goto('./')
+  await page.emulateMedia({ media: 'print' })
+  const { color, canvas, bar } = await page.evaluate(() => ({
+    color: getComputedStyle(document.body).color,
+    canvas: getComputedStyle(document.querySelector('canvas.starfield')!).display,
+    bar: getComputedStyle(document.querySelector('header.topbar')!).display
+  }))
+  const lum = (rgb: string): number => {
+    const [r, g, b] = rgb.match(/[\d.]+/g)!.slice(0, 3).map(Number)
+    const f = (v: number): number => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+  }
+  expect(1.05 / (lum(color) + 0.05)).toBeGreaterThanOrEqual(4.5)
+  expect(canvas).toBe('none')
+  expect(bar).toBe('none')
+})
+
+test('the starfield keeps its stars when only the height changes', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('bear-motion', 'off'))
+  await page.setViewportSize({ width: 390, height: 800 })
+  await page.goto('./')
+  const canvas = page.locator('canvas.starfield')
+  await expect(canvas).toHaveAttribute('data-stars', /.+/)
+  const before = await canvas.getAttribute('data-stars')
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.waitForTimeout(500)
+  const after = await canvas.getAttribute('data-stars')
+  // Stars that were already inside the shorter viewport keep their place.
+  const inside = (s: string): string[] => s.split(';').filter((p) => Number(p.split(',')[1]) <= 700)
+  expect(inside(before!).length).toBeGreaterThan(0)
+  expect(inside(after!)).toEqual(inside(before!))
+  // A width change does rebuild.
+  await page.setViewportSize({ width: 500, height: 700 })
+  await expect.poll(() => canvas.getAttribute('data-stars')).not.toBe(after)
+})
+
 test('the top bar is translucent glass', async ({ page }) => {
   await page.goto('./')
   const filter = await page.locator('header.topbar').evaluate((el) => getComputedStyle(el).backdropFilter)

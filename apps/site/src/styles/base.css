@@ -151,12 +151,18 @@ img {
 }
 .eyebrow {
   margin: 0 0 0.75rem;
-  color: var(--ink-muted);
+  color: var(--accent);
   font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+.eyebrow::before {
+  content: '\25CF';
+  margin-right: 0.5em;
+  font-size: 0.7em;
+  vertical-align: 0.1em;
 }
 .lede {
   max-width: 38rem;
@@ -388,6 +394,16 @@ html.js:not([data-motion='off']) [data-reveal] {
 html.js:not([data-motion='off']) [data-reveal].is-visible {
   opacity: 1;
   transform: none;
+}
+
+/* No JavaScript means no data-motion, so honour the system reduced-motion setting directly. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion]) *,
+  html:not([data-motion]) *::before,
+  html:not([data-motion]) *::after {
+    animation-play-state: paused !important;
+    transition: none !important;
+  }
 }
 
 /* Motion off: freeze ambient animation and drop transitions. */
