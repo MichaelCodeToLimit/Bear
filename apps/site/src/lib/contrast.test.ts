@@ -23,6 +23,24 @@ describe('app colours as text', () => {
   })
 })
 
+// Mirrors color-mix(in srgb, <color> 12%, <surface>) from the open tour picker tile (tour.astro).
+function tint(color: string, over: string, pct: number): string {
+  const ch = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)
+  const out = [0, 1, 2].map((i) => Math.round((ch(color, i) * pct + ch(over, i) * (100 - pct)) / 100))
+  return '#' + out.map((v) => v.toString(16).padStart(2, '0')).join('')
+}
+
+describe('open tour picker tile (12% app-colour tint on the card surface)', () => {
+  it('shows that app colour text alone would fail on the tint (why the open tile uses the ink)', () => {
+    expect(APPS.some((a) => contrastRatio(a.color, tint(a.color, LIGHT.surface, 12)) < 4.5)).toBe(true)
+  })
+  it.each(APPS.map((a) => [a.id, a.color]))('%s (%s): ink name and muted tagline meet 4.5:1 on its tint', (_id, color) => {
+    const bg = tint(color, LIGHT.surface, 12)
+    expect(contrastRatio(LIGHT.ink, bg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio('#6f5a46', bg)).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
 describe('links and demo bars', () => {
   it('the light accent meets 4.5:1 on the whole page gradient and on white', () => {
     for (const bg of [LIGHT.bg, LIGHT.bgTo, LIGHT.surface]) expect(contrastRatio(LIGHT.accent, bg)).toBeGreaterThanOrEqual(4.5)

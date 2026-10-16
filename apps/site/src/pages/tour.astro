@@ -72,6 +72,10 @@ const apps = tourApps()
   .picker__tile.is-open {
     background: color-mix(in srgb, var(--tile-color) 12%, var(--surface));
   }
+  /* The app colour on its own 12% tint falls below 4.5:1 for some apps; the ink keeps the open tile's name readable. */
+  .picker__tile.is-open .tile__name {
+    color: var(--ink);
+  }
 
   .picker__panel {
     grid-column: 1 / -1;
