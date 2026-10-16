@@ -1,0 +1,38 @@
+---
+// Generic, original OS glyphs (not vendor logos): a window grid, a laptop, a terminal prompt.
+interface Props {
+  os: 'windows' | 'mac' | 'linux'
+  size?: number
+}
+const { os, size = 28 } = Astro.props
+---
+
+<svg class="os-glyph" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  {
+    os === 'windows' && (
+      <>
+        <rect x="3" y="3" width="8" height="8" rx="1.5" />
+        <rect x="13" y="3" width="8" height="8" rx="1.5" />
+        <rect x="3" y="13" width="8" height="8" rx="1.5" />
+        <rect x="13" y="13" width="8" height="8" rx="1.5" />
+      </>
+    )
+  }
+  {
+    os === 'mac' && (
+      <>
+        <rect x="4" y="5" width="16" height="11" rx="2" />
+        <path d="M2 19h20" />
+      </>
+    )
+  }
+  {
+    os === 'linux' && (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <path d="m7 10 3 2-3 2" />
+        <path d="M12.5 15h4" />
+      </>
+    )
+  }
+</svg>

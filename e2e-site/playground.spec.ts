@@ -20,6 +20,11 @@ test('playground has one h1 and four headed cards, no console errors', async ({ 
   expect(errors).toEqual([])
 })
 
+test('playground heading follows the spec copy', async ({ page }) => {
+  await page.goto('playground/')
+  await expect(page.locator('h1')).toHaveText('Toys, tests and tinkering.')
+})
+
 test('the physics card spans two grid columns on desktop', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto('playground/')

@@ -42,6 +42,16 @@ test('code blocks sit inside a terminal frame', async ({ page }) => {
   await expect(page.locator('.terminal .terminal__dots').first()).toBeVisible()
 })
 
+test('the sidebar is a glass panel', async ({ page }) => {
+  await page.goto('docs/get-started/install/')
+  const style = await page.locator('.docs-side').evaluate((el) => {
+    const s = getComputedStyle(el)
+    return { bg: s.backgroundColor, border: s.borderTopWidth }
+  })
+  expect(style.bg).not.toBe('rgba(0, 0, 0, 0)')
+  expect(style.border).not.toBe('0px')
+})
+
 test('no horizontal scroll at 375px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
   for (const path of ['docs/get-started/install/', 'docs/apps/sheets/', 'docs/contribute/new-app/']) {

@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
 import Bear from '../components/Bear.astro'
+import OsGlyph from '../components/OsGlyph.astro'
 import WindowsDownload from '../components/WindowsDownload.astro'
 import { SITE } from '../site.config'
 import { fetchLatestRelease, formatSize, type DownloadFile, type OS } from '../lib/releases'
@@ -40,7 +41,7 @@ const steps = [
       {release ? (
         <>
           <p class="eyebrow">Download</p>
-          <h1 class="display dl-title">Download <span class="grad">Bear</span></h1>
+          <h1 class="display dl-title">Get Bear. <span class="grad">Keep it.</span></h1>
           <p class="dl-version"><span class="pill">Bear {release.version} · {date}</span></p>
           <p><a href={release.notesUrl}>Release notes</a></p>
         </>
@@ -75,6 +76,7 @@ const steps = [
                 <ul class="dl-cards">
                   {files.map((f, i) => (
                     <li class="card dl-card" data-reveal data-reveal-delay={i * 80} data-file={f.name}>
+                      <span class="dl-card__glyph"><OsGlyph os={os} /></span>
                       <p class="dl-card__label">{f.label}</p>
                       <p class="dl-card__name">{f.name}</p>
                       <p class="dl-card__size">{formatSize(f.size)}</p>
@@ -190,6 +192,11 @@ const steps = [
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 1rem;
+  }
+  .dl-card__glyph {
+    display: inline-flex;
+    margin-bottom: 0.5rem;
+    color: var(--accent);
   }
   .dl-card__label {
     font-weight: 700;

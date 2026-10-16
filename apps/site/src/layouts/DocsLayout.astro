@@ -13,14 +13,14 @@ interface Props {
 const { title, slug, groups } = Astro.props
 const { prev, next } = prevNext(groups, slug)
 
-// Wrap each rendered code block in a terminal window frame.
+// Wrap each rendered code block in a terminal window frame. Astro 7 ignores rehype plugins and `pre` overrides, hence this post-processing.
 const bar = '<div class="terminal__bar"><span class="terminal__dots" aria-hidden="true"><span></span><span></span><span></span></span></div>'
-const body = (await Astro.slots.render('default')).replace(/<pre[\s\S]*?<\/pre>/g, (pre) => `<div class="terminal">${bar}${pre}</div>`)
+const body = (await Astro.slots.render('default')).replace(/<pre\b[\s\S]*?<\/pre>/g, (pre) => `<div class="terminal">${bar}${pre}</div>`)
 ---
 
 <BaseLayout title={title} calm>
   <div class="docs">
-    <aside class="docs-side">
+    <aside class="docs-side glass">
       <p class="docs-side__head"><strong>Docs</strong></p>
       <DocsSearch client:load />
       <nav class="docs-nav" aria-label="Docs">
@@ -62,6 +62,7 @@ const body = (await Astro.slots.render('default')).replace(/<pre[\s\S]*?<\/pre>/
   }
   .docs-side {
     min-width: 0;
+    padding: 1rem;
   }
   .docs-side__head {
     margin: 0 0 0.75rem;
@@ -123,7 +124,7 @@ const body = (await Astro.slots.render('default')).replace(/<pre[\s\S]*?<\/pre>/
   }
   .docs-nav a[aria-current='page'] {
     background: var(--glass);
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: inset 2px 0 0 var(--accent);
     color: var(--ink);
     font-weight: 700;
   }
