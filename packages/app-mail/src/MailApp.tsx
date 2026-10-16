@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Archive, ChevronDown, File as FileIcon, FileEdit, Flag, Folder, Inbox, Mail, MoreHorizontal, Paperclip, PenSquare,
-  RefreshCw, Search, Send, Settings, ShieldAlert, Trash2, UserPlus, X
+  Archive, ChevronDown, FileEdit, Flag, Folder, Inbox, Mail, MoreHorizontal, Paperclip, PenSquare,
+  ArrowDownToLine, AtSign, RefreshCw, Search, Send, Settings, ShieldAlert, Trash2, UserPlus, X
 } from 'lucide-react'
 import {
   displayName, getApp,
-  type MailAccount, type MailFolder, type MailMessage, type MessageHeader, type MessagePage, type SpecialUse
+  type ImportJob, type MailAccount, type MailFolder, type MailMessage, type MessageHeader, type MessagePage, type SpecialUse
 } from '@bear/core'
 import { ContextMenu, TitleBar, useStoredData, type MenuItem } from '@bear/ui'
 import { AccountDialog, MailSettings } from './AccountDialog'
+import { BearAccountDialog } from './BearAccountDialog'
+import { ImportDialog } from './ImportDialog'
 import { Composer } from './Composer'
 import { MessageView } from './MessageView'
 import { draftFrom, emptyDraft, type Draft } from './compose'
@@ -23,6 +25,15 @@ const FOLDER_ICON: Partial<Record<NonNullable<SpecialUse>, typeof Inbox>> = {
 
 interface DraftStore {
   drafts: Draft[]
+}
+
+/** One line for the sidebar about an import that needs attention or is under way. */
+function importLabel(j: ImportJob): string {
+  const total = j.folders.reduce((n, f) => n + f.total, 0)
+  const done = j.folders.reduce((n, f) => n + f.done, 0)
+  if (j.state === 'running') return total ? `Importing ${j.sourceEmail}… ${Math.round((done / total) * 100)}%` : `Importing ${j.sourceEmail}…`
+  if (j.state === 'paused') return `Import paused: ${j.sourceEmail}`
+  return `Import stopped: ${j.sourceEmail}`
 }
 
 function shortDate(t: number): string {
@@ -47,7 +58,10 @@ export function MailApp({ onHome, openPath }: { onHome: () => void; openPath: (p
   const [message, setMessage] = useState<MailMessage | null>(null)
   const [loadingMsg, setLoadingMsg] = useState(false)
   const [compose, setCompose] = useState<Draft | null>(null)
-  const [dialog, setDialog] = useState<null | { kind: 'add' } | { kind: 'edit'; account: MailAccount } | { kind: 'settings' }>(null)
+  const [dialog, setDialog] = useState<
+    null | { kind: 'add' } | { kind: 'bear' } | { kind: 'edit'; account: MailAccount } | { kind: 'settings' } | { kind: 'import'; sourceId?: string; jobId?: string }
+  >(null)
+  const [imports, setImports] = useState<ImportJob[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -80,6 +94,16 @@ export function MailApp({ onHome, openPath }: { onHome: () => void; openPath: (p
   useEffect(() => {
     void loadAccounts()
   }, [loadAccounts])
+
+  const loadImports = useCallback(async () => setImports(await window.bear.mail.listImports()), [])
+  // Imports run in the background; keep the sidebar note current while one is going.
+  const importing = imports.some((j) => j.state === 'running')
+  useEffect(() => {
+    void loadImports()
+    const t = setInterval(() => void loadImports(), importing ? 2000 : 15_000)
+    return () => clearInterval(t)
+  }, [loadImports, importing])
+  const busyImport = imports.find((j) => j.state === 'running') ?? imports.find((j) => j.state === 'paused' || j.state === 'failed')
 
   const loadFolders = useCallback(async (id: string) => {
     const r = await window.bear.mail.listFolders(id)
@@ -284,11 +308,18 @@ export function MailApp({ onHome, openPath }: { onHome: () => void; openPath: (p
     setMenu({
       x, y,
       items: [
-        { label: 'Edit account…', onClick: () => setDialog({ kind: 'edit', account: a }) },
+        // A Bear Mail address has no server settings to edit.
+        ...(a.auth === 'bear' ? [] : [
+          { label: 'Edit account…', onClick: () => setDialog({ kind: 'edit', account: a }) },
+          { label: 'Import into Bear Mail…', onClick: () => setDialog({ kind: 'import', sourceId: a.id }) }
+        ]),
         {
-          label: 'Remove account', divider: true,
+          label: a.auth === 'bear' ? 'Delete address' : 'Remove account', divider: a.auth !== 'bear',
           onClick: async () => {
-            if (!window.confirm(`Remove ${a.email} from Bear? Mail on the server isn't affected.`)) return
+            const question = a.auth === 'bear'
+              ? `Delete ${a.email}? The address and all of its mail are deleted from this computer. This can't be undone.`
+              : `Remove ${a.email} from Bear? Mail on the server isn't affected.`
+            if (!window.confirm(question)) return
             await window.bear.mail.removeAccount(a.id)
             await loadAccounts()
           }
@@ -318,7 +349,7 @@ export function MailApp({ onHome, openPath }: { onHome: () => void; openPath: (p
       )}
 
       {!accounts.length ? (
-        <Welcome onAdd={() => setDialog({ kind: 'add' })} onSettings={() => setDialog({ kind: 'settings' })} />
+        <Welcome onCreate={() => setDialog({ kind: 'bear' })} onAdd={() => setDialog({ kind: 'add' })} onSettings={() => setDialog({ kind: 'settings' })} />
       ) : (
         <div className="flex min-h-0 flex-1">
           {/* Accounts and folders */}
@@ -371,6 +402,13 @@ export function MailApp({ onHome, openPath }: { onHome: () => void; openPath: (p
                 </div>
               ))}
             </div>
+            {busyImport && (
+              <button onClick={() => setDialog({ kind: 'import', jobId: busyImport.id })} className="flex items-center gap-2 border-t border-line px-3 py-2 text-left text-[12px] text-muted hover:bg-hover">
+                <ArrowDownToLine size={14} className="shrink-0 text-[var(--accent)]" />
+                <span className="min-w-0 flex-1 truncate">{importLabel(busyImport)}</span>
+              </button>
+            )}
+            <button onClick={() => setDialog({ kind: 'bear' })} className="flex items-center gap-2 border-t border-line px-3 py-2.5 text-[var(--accent)] hover:bg-hover"><AtSign size={15} /> Create a Bear Mail address</button>
             <div className="flex border-t border-line">
               <button onClick={() => setDialog({ kind: 'add' })} className="flex flex-1 items-center gap-2 px-3 py-2.5 text-[var(--accent)] hover:bg-hover"><UserPlus size={15} /> Add account</button>
               <button aria-label="Mail settings" title="Sign-in settings" onClick={() => setDialog({ kind: 'settings' })} className="px-3 text-muted hover:bg-hover hover:text-ink"><Settings size={15} /></button>
@@ -492,7 +530,20 @@ export function MailApp({ onHome, openPath }: { onHome: () => void; openPath: (p
       {toast && <div role="status" className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-md bg-[#1f1f1f] px-4 py-2.5 text-sm text-white shadow-lg">{toast}</div>}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
       {dialog?.kind === 'add' && (
-        <AccountDialog accent={APP.color} onClose={() => setDialog(null)} openSettings={() => setDialog({ kind: 'settings' })} onSaved={async (a) => { setDialog(null); await loadAccounts(); setAcct(a.id); setFolder('INBOX') }} />
+        <AccountDialog accent={APP.color} onClose={() => setDialog(null)} openSettings={() => setDialog({ kind: 'settings' })} createBear={() => setDialog({ kind: 'bear' })} onSaved={async (a) => { setDialog(null); await loadAccounts(); setAcct(a.id); setFolder('INBOX') }} />
+      )}
+      {dialog?.kind === 'bear' && (
+        <BearAccountDialog accent={APP.color} onClose={() => setDialog(null)} onImport={() => setDialog({ kind: 'import' })} onCreated={async (a) => { setDialog(null); await loadAccounts(); setAcct(a.id); setFolder('INBOX') }} />
+      )}
+      {dialog?.kind === 'import' && (
+        <ImportDialog
+          accent={APP.color}
+          accounts={accounts}
+          sourceId={dialog.sourceId}
+          jobId={dialog.jobId}
+          onClose={() => { setDialog(null); void loadImports(); void refresh() }}
+          onCreated={() => void loadAccounts()}
+        />
       )}
       {dialog?.kind === 'edit' && (
         <AccountDialog accent={APP.color} existing={dialog.account} onClose={() => setDialog(null)} openSettings={() => setDialog({ kind: 'settings' })} onSaved={async () => { setDialog(null); await loadAccounts(); if (acct) void refresh() }} />
@@ -502,20 +553,18 @@ export function MailApp({ onHome, openPath }: { onHome: () => void; openPath: (p
   )
 }
 
-function Welcome({ onAdd, onSettings }: { onAdd: () => void; onSettings: () => void }) {
+function Welcome({ onCreate, onAdd, onSettings }: { onCreate: () => void; onAdd: () => void; onSettings: () => void }) {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="max-w-lg text-center">
         <Mail size={44} className="mx-auto text-[var(--accent)]" />
         <h1 className="mt-3 text-2xl font-semibold text-ink">Bear Mail</h1>
-        <p className="mt-2 text-sm text-muted">Connect Gmail, iCloud, Yahoo, Fastmail, Outlook.com or any IMAP account. Your password is encrypted on this computer and only ever sent to your mail provider.</p>
-        <div className="mt-5 flex justify-center gap-2">
-          <button onClick={onAdd} className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white" style={{ background: APP.color }}><UserPlus size={15} /> Add an account</button>
+        <p className="mt-2 text-sm text-muted">Create your own <strong className="text-ink">@bear.com</strong> address, or connect Gmail, iCloud, Yahoo, Fastmail, Outlook.com or any IMAP account. Passwords are encrypted on this computer and only ever sent to your mail provider.</p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <button onClick={onCreate} className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white" style={{ background: APP.color }}><AtSign size={15} /> Create a Bear Mail address</button>
+          <button onClick={onAdd} className="flex items-center gap-2 rounded-md border border-line px-4 py-2 text-sm text-ink hover:bg-hover"><UserPlus size={15} /> Add an account</button>
           <button onClick={onSettings} className="rounded-md border border-line px-4 py-2 text-sm text-ink hover:bg-hover">Sign-in settings</button>
         </div>
-        <p className="mt-6 text-[12px] text-muted">
-          <FileIcon size={12} className="inline" /> Trying things out? Run <code>pnpm mail-server</code> and add <code>bear@bear.com</code> (password <code>bear</code>) with server 127.0.0.1, IMAP port 1143, SMTP port 1025, security "None".
-        </p>
       </div>
     </div>
   )

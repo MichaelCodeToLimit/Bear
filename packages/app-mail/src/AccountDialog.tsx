@@ -13,6 +13,8 @@ interface Props {
   onClose: () => void
   onSaved: (a: MailAccount) => void
   openSettings: () => void
+  /** Offered to people without an email address yet. */
+  createBear?: () => void
 }
 
 const SECURITY: { value: Security; label: string }[] = [
@@ -34,7 +36,7 @@ function ServerFields({ label, value, onChange }: { label: string; value: Server
   )
 }
 
-export function AccountDialog({ accent, existing, onClose, onSaved, openSettings }: Props) {
+export function AccountDialog({ accent, existing, onClose, onSaved, openSettings, createBear }: Props) {
   const [email, setEmail] = useState(existing?.email ?? '')
   const [name, setName] = useState(existing?.name ?? '')
   const [password, setPassword] = useState('')
@@ -105,6 +107,11 @@ export function AccountDialog({ accent, existing, onClose, onSaved, openSettings
       }
     >
       <div className="space-y-3">
+        {createBear && !existing && (
+          <button onClick={createBear} className="w-full rounded border border-dashed border-[var(--accent)] px-3 py-2 text-left text-[13px] text-ink hover:bg-hover">
+            <strong className="text-[var(--accent)]">No email address yet?</strong> Create a free Bear Mail address (you@bear.com) instead.
+          </button>
+        )}
         <label className="block text-xs text-muted">Email address
           <input autoFocus aria-label="Email address" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="mt-1 h-8 w-full rounded border border-line bg-surface px-2 text-sm text-ink outline-none focus:border-[var(--accent)]" />
         </label>

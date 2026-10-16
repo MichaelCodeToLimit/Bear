@@ -60,13 +60,21 @@ const doc: JSONContent = {
   ]
 }
 
+/** What Word and other apps read: the .docx without Bear's own copy of the document. */
+async function wordOnly(bytes: Uint8Array): Promise<Uint8Array> {
+  const JSZip = (await import('jszip')).default
+  const zip = await JSZip.loadAsync(bytes)
+  zip.remove('bear/document.json')
+  return zip.generateAsync({ type: 'uint8array' })
+}
+
 describe('docx round trip', () => {
   it('exports a valid .docx that imports back with structure intact', async () => {
     const bytes = await exportDocx(doc, DEFAULT_LAYOUT, 'Test')
     expect(bytes[0]).toBe(0x50) // "PK" zip header
     expect(bytes[1]).toBe(0x4b)
 
-    const { html } = await importDocx(bytes)
+    const { html } = await importDocx(await wordOnly(bytes))
     expect(html).toContain('<h1>Quarterly Report</h1>')
     expect(html).toContain('<strong>Bold</strong>')
     expect(html).toContain('<em>italic</em>')
@@ -80,8 +88,53 @@ describe('docx round trip', () => {
 
   it('exports an empty document', async () => {
     const bytes = await exportDocx({ type: 'doc', content: [] }, { size: 'A4', landscape: true, margins: 'narrow' })
-    const { html } = await importDocx(bytes)
+    const { html } = await importDocx(await wordOnly(bytes))
     expect(html).toBe('')
+  })
+})
+
+describe('reopening a .docx saved by Bear', () => {
+  const rich: JSONContent = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        attrs: { textAlign: 'right' },
+        content: [
+          text('hi this cool doc', [
+            { type: 'bold' }, { type: 'italic' }, { type: 'underline' },
+            { type: 'textStyle', attrs: { fontFamily: 'Georgia', fontSize: '18pt', color: '#1d4ed8' } },
+            { type: 'highlight', attrs: { color: '#fde68a' } }
+          ])
+        ]
+      },
+      {
+        type: 'heading',
+        attrs: { level: 2 },
+        content: [text('hi this is a cool doc 2', [
+          { type: 'textStyle', attrs: { fontFamily: 'Verdana', color: '#b91c1c' } },
+          { type: 'highlight', attrs: { color: '#bbf7d0' } }
+        ])]
+      },
+      { type: 'table', attrs: { tableStyle: 'banded' }, content: (doc.content![3].content) }
+    ]
+  }
+  const layout = { size: 'A4' as const, landscape: true, margins: 'narrow' as const }
+
+  it('keeps every property, and the page setup', async () => {
+    const back = await importDocx(await exportDocx(rich, layout))
+    expect(back.json).toEqual(rich)
+    expect(back.layout).toEqual(layout)
+  })
+
+  it('reads the Word content instead when another app changed the file', async () => {
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(await exportDocx(rich, layout))
+    const xml = await zip.file('word/document.xml')!.async('string')
+    zip.file('word/document.xml', xml.replace('hi this cool doc', 'edited in another app'))
+    const back = await importDocx(await zip.generateAsync({ type: 'uint8array' }))
+    expect(back.json).toBeUndefined()
+    expect(back.html).toContain('edited in another app')
   })
 })
 

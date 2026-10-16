@@ -1,7 +1,7 @@
 {
   "name": "bear-suite",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Bear: a free, open-source desktop productivity suite.",
   "license": "MIT",
   "packageManager": "pnpm@12.6.0",

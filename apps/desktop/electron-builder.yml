@@ -38,7 +38,9 @@ win:
 nsis:
   oneClick: false
   perMachine: false
-  allowToChangeInstallationDirectory: true
+  # The install location page lives in build/installer.nsh, where it shares the second screen with
+  # Repair / Update when Bear is already installed. Keep this false so it isn't shown twice.
+  allowToChangeInstallationDirectory: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Bear

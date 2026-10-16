@@ -81,6 +81,7 @@ export function RibbonButton({ icon: Icon, label, onClick, active, disabled, lar
     return (
       <button
         title={title}
+        aria-pressed={active}
         onClick={onClick}
         disabled={disabled}
         onMouseDown={(e) => e.preventDefault()}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
+import type { JSONContent } from '@tiptap/core'
 import { EditorState, NodeSelection, Selection, TextSelection } from '@tiptap/pm/state'
 import { FileDown, FilePlus2, FolderOpen, Info, Printer, Redo2, Save, SaveAll, Undo2, X } from 'lucide-react'
 import { baseName, getApp, stripExtension, type OpenedFile } from '@bear/core'
@@ -9,7 +10,7 @@ import {
 import { writeExtensions } from './extensions'
 import { WriteRibbon, stepFontSize } from './WriteRibbon'
 import { FindPanel } from './FindPanel'
-import { editorToFile, fileToHtml, OPEN_FILTERS, SAVABLE, SAVE_FILTERS } from './doc-io'
+import { editorToFile, readFile, OPEN_FILTERS, SAVABLE, SAVE_FILTERS } from './doc-io'
 import { DEFAULT_LAYOUT, contentWidthPx, pageInches, type PageLayout } from './layout'
 import { TEMPLATES, type Template } from './templates'
 import { prepareImage } from '@bear/ui'
@@ -77,10 +78,10 @@ export function WriteApp({ input, onHome }: WriteAppProps) {
 
   /** Replace the editor content without marking the document dirty or polluting undo history. */
   const loadHtml = useCallback(
-    (html: string) => {
+    (content: JSONContent | string) => {
       if (!editor) return
       loading.current = true
-      editor.commands.setContent(html, false)
+      editor.commands.setContent(content, false)
       // A fresh state clears undo history, so undo can't step back into the previous document.
       editor.view.updateState(EditorState.create({ doc: editor.state.doc, plugins: editor.state.plugins }))
       loading.current = false
@@ -98,9 +99,9 @@ export function WriteApp({ input, onHome }: WriteAppProps) {
     savable: SAVABLE,
     serialize: (path) => editorToFile(editor!, path, layout, stripExtension(baseName(path))),
     load: async (f) => {
-      const { html, warnings } = await fileToHtml(f.path, f.data)
-      loadHtml(html)
-      setLayout(DEFAULT_LAYOUT)
+      const { content, layout: saved, warnings } = await readFile(f.path, f.data)
+      loadHtml(content)
+      setLayout(saved ?? DEFAULT_LAYOUT)
       return warnings
     },
     changeToken

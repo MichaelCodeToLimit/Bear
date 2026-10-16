@@ -5,6 +5,7 @@ import {
 } from 'docx'
 import type { JSONContent } from '@tiptap/core'
 import { contentWidthPx, pageInches, type PageLayout } from './layout'
+import { embedNative } from './native'
 
 type Para = Paragraph | Table
 type Align = (typeof AlignmentType)[keyof typeof AlignmentType]
@@ -303,5 +304,6 @@ export function buildDocx(doc: JSONContent, layout: PageLayout, title = 'Documen
 }
 
 export async function exportDocx(doc: JSONContent, layout: PageLayout, title?: string): Promise<Uint8Array> {
-  return new Uint8Array(await Packer.toArrayBuffer(buildDocx(doc, layout, title)))
+  const docx = new Uint8Array(await Packer.toArrayBuffer(buildDocx(doc, layout, title)))
+  return embedNative(docx, doc, layout)
 }

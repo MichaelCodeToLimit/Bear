@@ -1,7 +1,8 @@
 /** Mail types shared by the main process (IMAP/SMTP) and the Mail app. */
 
 export type Security = 'tls' | 'starttls' | 'none'
-export type AuthMethod = 'password' | 'oauth-microsoft' | 'oauth-google'
+/** 'bear' is a Bear Mail address hosted by Bear itself (see BEAR_DOMAIN). */
+export type AuthMethod = 'password' | 'oauth-microsoft' | 'oauth-google' | 'bear'
 
 export interface ServerSettings {
   host: string
@@ -133,12 +134,55 @@ export interface MailBridge {
   archive(accountId: string, folder: string, uids: number[]): Promise<MailResult<null>>
   search(accountId: string, folder: string, query: string): Promise<MailResult<MessageHeader[]>>
   send(accountId: string, message: OutgoingMessage): Promise<MailResult<null>>
+  /** Create a new name@bear.com address and add it as an account. */
+  createBearAccount(input: { username: string; name: string }): Promise<MailResult<MailAccount>>
+  /** Copy an account's mail (e.g. Gmail) into a Bear Mail address. Runs in the background. */
+  startImport(options: ImportOptions): Promise<MailResult<ImportJob>>
+  listImports(): Promise<ImportJob[]>
+  /** Stop an import (or stop keeping it in sync). What was copied stays. */
+  cancelImport(id: string): Promise<void>
+  /** Carry on an import that was interrupted (e.g. Bear was closed). */
+  resumeImport(id: string): Promise<void>
+}
+
+export interface ImportOptions {
+  sourceId: string
+  /** A new address to create, or an existing Bear Mail address. */
+  target: { create: { username: string; name: string } } | { address: string }
+  /** Only mail received on or after this time (ms); null for everything. */
+  since: number | null
+  /** Afterwards, keep copying new mail every few minutes. */
+  keepSyncing: boolean
+}
+
+export interface ImportFolder {
+  source: string
+  target: string
+  total: number
+  done: number
+}
+
+export interface ImportJob {
+  id: string
+  sourceId: string
+  sourceEmail: string
+  targetAddress: string
+  since: number | null
+  keepSyncing: boolean
+  /** syncing: copied everything and now checks for new mail every few minutes. */
+  state: 'running' | 'paused' | 'syncing' | 'done' | 'failed' | 'cancelled'
+  error?: string
+  folders: ImportFolder[]
+  startedAt: number
+  finishedAt?: number
+  lastSync?: number
 }
 
 /** Every MailBridge method; the preload exposes exactly these and the main process handles each. */
 export const MAIL_METHODS = [
   'listAccounts', 'testAccount', 'saveAccount', 'removeAccount', 'getOAuthClients', 'setOAuthClients', 'signIn',
-  'listFolders', 'listMessages', 'getMessage', 'getAttachment', 'setFlags', 'move', 'remove', 'archive', 'search', 'send'
+  'listFolders', 'listMessages', 'getMessage', 'getAttachment', 'setFlags', 'move', 'remove', 'archive', 'search', 'send',
+  'createBearAccount', 'startImport', 'listImports', 'cancelImport', 'resumeImport'
 ] as const satisfies readonly (keyof MailBridge)[]
 
 // ---------- Address helpers ----------
@@ -240,3 +284,20 @@ export const ACCOUNT_COLORS = ['#0369a1', '#0f766e', '#be123c', '#7c3aed', '#b45
 
 /** Hosts where self-signed certificates and unencrypted connections are acceptable (local test servers, bridges). */
 export const isLocalHost = (host: string) => /^(localhost|127\.0\.0\.1|::1|\[::1\])$/i.test(host.trim())
+
+// ---------- Bear Mail addresses ----------
+
+export const BEAR_DOMAIN = 'bear.com'
+
+const RESERVED = new Set(['postmaster', 'abuse', 'admin', 'administrator', 'root', 'hostmaster', 'webmaster', 'noreply', 'no-reply', 'support', 'security', 'team', 'mailer-daemon'])
+
+/** Why a Bear Mail user name can't be used, or null if it's fine. */
+export function bearUsernameProblem(username: string): string | null {
+  const u = username.trim().toLowerCase()
+  if (!u) return 'Choose a user name.'
+  if (u.length > 32) return 'Use 32 characters or fewer.'
+  if (!/^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/.test(u)) return 'Use letters, numbers, dots, dashes or underscores, starting and ending with a letter or number.'
+  if (/[._-]{2}/.test(u)) return "Dots, dashes and underscores can't be next to each other."
+  if (RESERVED.has(u)) return 'That name is reserved. Try another.'
+  return null
+}

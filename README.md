@@ -56,6 +56,8 @@ A free, open-source desktop productivity suite. Documents, spreadsheets, slides,
 
 ### Mail features
 
+- **Bear Mail addresses**: choose *Create a Bear Mail address* to get your own `name@bear.com` in seconds. Bear runs this mail service itself, on this computer only. Each message is kept as its own file in Bear's data folder, with an index for fast lists and search. Bear Mail addresses created here can email each other. Reaching Gmail, Outlook and the rest of the internet needs a hosted Bear Mail server and the bear.com domain, which is planned
+- **Import into Bear Mail**: copy a Gmail, Outlook or any other account's mail and folders into a new or existing Bear Mail address. You can choose how far back to go, and it can keep bringing in new mail every few minutes. Progress is saved as it goes, so an import interrupted by closing Bear carries on later
 - Works with any IMAP/SMTP mailbox: Gmail, iCloud, Yahoo, AOL, Fastmail, Zoho, GMX and Proton Bridge are recognised automatically (use an *app password* where the provider requires one); custom servers under Advanced settings
 - Sign in with Microsoft or Google (OAuth with PKCE). Register a free app with the provider and paste its client ID in Mail settings; Bear never sees your password
 - Folders with unread counts, paged message list, search, flag, mark unread, archive, delete, keyboard shortcuts and right-click menus
@@ -64,7 +66,7 @@ A free, open-source desktop productivity suite. Documents, spreadsheets, slides,
 - Safe reading: emails are cleaned (no scripts, forms or frames, `javascript:` links removed) and shown in a locked-down frame; pictures from the internet (often trackers) stay blocked until you choose **Show pictures**
 - Passwords and sign-in tokens are encrypted with the operating system's key store
 
-**Try it without a real mailbox:** `pnpm mail-server` starts Bear's own mail server on this computer. In Mail, add `bear@bear.com` (password `bear`) with server `127.0.0.1`, IMAP port 1143, SMTP port 1025, security "None". Use `pnpm mail-server you@bear.com` for a different address. Everything stays on this computer: any message you send arrives back in that inbox. Sending to and receiving from the wider internet as `@bear.com` would need the real bear.com domain and a hosted mail server.
+**For developers:** `pnpm mail-server` starts a throwaway test server that keeps mail in memory, so nothing is saved. In Mail, add `bear@bear.com` (password `bear`) with server `127.0.0.1`, IMAP port 1143, SMTP port 1025 and security "None". To use another address, run `pnpm mail-server you@bear.com`. The automated tests use this server.
 
 ### Notes, Tasks, Board and Sites
 

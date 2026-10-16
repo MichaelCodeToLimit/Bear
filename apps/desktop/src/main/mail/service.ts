@@ -9,6 +9,8 @@ import {
   type MessageHeader, type MessagePage, type OutgoingMessage, type ServerSettings, type SpecialUse
 } from '@bear/core'
 import type { AccountStore, Secret } from './accounts'
+import type { BearMail } from './bear-mail'
+import type { LocalMailbox } from './local-store'
 import { ENDPOINTS, refreshTokens, type OAuthProvider, type Tokens } from './oauth'
 
 const PAGE_SIZE = 50
@@ -134,7 +136,15 @@ export class MailService {
   /** Sign-ins completed in the setup dialog but not yet saved as an account. */
   readonly sessions = new Map<string, OAuthSession>()
 
-  constructor(private store: AccountStore) {}
+  constructor(private store: AccountStore, private bear?: BearMail) {}
+
+  /** A Bear Mail address's mailbox, or null for an IMAP account. */
+  private async local(accountId: string): Promise<LocalMailbox | null> {
+    const a = await this.store.get(accountId)
+    if (a?.auth !== 'bear') return null
+    if (!this.bear) throw new Error('Bear Mail is not available.')
+    return this.bear.mailbox(a.email)
+  }
 
   // ---------- Credentials ----------
 
@@ -185,6 +195,21 @@ export class MailService {
     return p
   }
 
+  /** A separate connection (the caller logs it out), for long jobs like imports that shouldn't hold up reading mail. */
+  async connect(accountId: string): Promise<ImapFlow> {
+    const account = await this.store.get(accountId)
+    if (!account) throw new Error('This account no longer exists.')
+    if (account.auth === 'bear') throw new Error('This is already a Bear Mail address.')
+    const c = new ImapFlow(imapOptions(account.imap, await this.authFor(account)))
+    c.on('error', () => {})
+    await c.connect()
+    return c
+  }
+
+  account(accountId: string) {
+    return this.store.get(accountId)
+  }
+
   /** Run with a mailbox selected; retries once on a dropped connection. */
   private async withMailbox<T>(accountId: string, folder: string, fn: (c: ImapFlow) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
@@ -208,13 +233,16 @@ export class MailService {
   }
 
   async closeAll() {
-    for (const p of this.clients.values()) p.then((c) => c.logout()).catch(() => {})
+    const clients = [...this.clients.values()]
     this.clients.clear()
+    // Bear Mail saves its mailboxes first thing, so it runs alongside the (possibly slow) remote logouts.
+    await Promise.all([...clients.map((p) => p.then((c) => c.logout()).catch(() => {})), this.bear?.close()])
   }
 
   // ---------- Accounts ----------
 
   async test(input: MailAccountInput, existingId?: string): Promise<MailResult<null>> {
+    if (input.auth === 'bear') return (await this.bear?.exists(input.email)) ? ok(null) : { ok: false, error: `${input.email} isn't a Bear Mail address on this computer.` }
     let auth: Auth
     try {
       const secret = this.secretFromInput(input) ?? (existingId ? await this.store.secret(existingId) : null)
@@ -255,10 +283,28 @@ export class MailService {
   }
 
   async removeAccount(id: string) {
+    const account = await this.store.get(id)
     const c = this.clients.get(id)
     this.clients.delete(id)
-    c?.then((x) => x.logout()).catch(() => {})
+    await c?.then((x) => x.logout()).catch(() => {})
     await this.store.remove(id)
+    // A Bear Mail address only exists in Bear, so removing it deletes the address and its mail.
+    if (account?.auth === 'bear') await this.bear?.remove(account.email)
+  }
+
+  async createBearAccount(input: { username: string; name: string }): Promise<MailResult<MailAccount>> {
+    if (!this.bear) return { ok: false, error: 'Bear Mail is not available.' }
+    let address: string
+    try {
+      address = await this.bear.create(input.username, input.name)
+    } catch (e) {
+      return fail(e)
+    }
+    // Bear Mail needs no servers or password: the mailbox is on this computer.
+    const none: ServerSettings = { host: '127.0.0.1', port: 0, security: 'none' }
+    const r = await this.save({ name: input.name.trim() || input.username.trim(), email: address, username: address, auth: 'bear', imap: none, smtp: none })
+    if (!r.ok) await this.bear.remove(address).catch(() => {})
+    return r
   }
 
   addSession(s: OAuthSession): string {
@@ -271,6 +317,8 @@ export class MailService {
 
   async folders(accountId: string): Promise<MailResult<MailFolder[]>> {
     try {
+      const box = await this.local(accountId)
+      if (box) return ok(box.folders())
       const c = await this.client(accountId)
       const list = await c.list({ statusQuery: { messages: true, unseen: true } })
       const visible = list.filter((f) => !f.flags.has('\\Noselect') && !f.flags.has('\\NonExistent'))
@@ -299,6 +347,8 @@ export class MailService {
 
   async messages(accountId: string, folder: string, before?: number | null): Promise<MailResult<MessagePage>> {
     try {
+      const box = await this.local(accountId)
+      if (box) return ok(box.page(folder, before))
       return ok(
         await this.withMailbox(accountId, folder, async (c) => {
           const all = ((await c.search({ all: true }, { uid: true })) || []).sort((a, b) => a - b)
@@ -321,6 +371,14 @@ export class MailService {
 
   async message(accountId: string, folder: string, uid: number): Promise<MailResult<MailMessage>> {
     try {
+      const box = await this.local(accountId)
+      if (box) {
+        const h = box.headerOf(folder, uid)
+        if (!h) throw new Error('This message no longer exists.')
+        const parsed = await simpleParser(await box.raw(folder, uid))
+        if (!h.seen) box.setFlags(folder, [uid], { seen: true })
+        return ok(this.toMessage(accountId, folder, { ...h, seen: true }, parsed))
+      }
       return ok(
         await this.withMailbox(accountId, folder, async (c) => {
           const m = await c.fetchOne(String(uid), { uid: true, envelope: true, flags: true, bodyStructure: true, size: true, source: true }, { uid: true })
@@ -330,7 +388,7 @@ export class MailService {
             await c.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true })
             m.flags?.add('\\Seen')
           }
-          return this.toMessage(accountId, folder, m, parsed)
+          return this.toMessage(accountId, folder, header(m), parsed)
         })
       )
     } catch (e) {
@@ -338,7 +396,7 @@ export class MailService {
     }
   }
 
-  private toMessage(accountId: string, folder: string, m: FetchMessageObject, p: ParsedMail): MailMessage {
+  private toMessage(accountId: string, folder: string, h: MessageHeader, p: ParsedMail): MailMessage {
     const items = p.attachments.map((a, i) => ({ id: String(i), filename: a.filename || `attachment-${i + 1}`, content: a.content, cid: a.cid, contentType: a.contentType, related: a.related }))
     // Inline images referenced as cid: become data URLs, so the body shows them without any network access.
     let html = p.html || null
@@ -353,17 +411,17 @@ export class MailService {
         }
       }
     }
-    const key = `${accountId}\u0000${folder}\u0000${m.uid}`
+    const key = `${accountId}\u0000${folder}\u0000${h.uid}`
     this.attachmentCache = [{ key, items }, ...this.attachmentCache.filter((x) => x.key !== key)].slice(0, 10)
     const refs = p.references ? (Array.isArray(p.references) ? p.references : [p.references]) : []
     return {
-      ...header(m),
-      subject: p.subject ?? header(m).subject,
-      from: parsedAddresses(p.from).length ? parsedAddresses(p.from) : header(m).from,
+      ...h,
+      subject: p.subject ?? h.subject,
+      from: parsedAddresses(p.from).length ? parsedAddresses(p.from) : h.from,
       to: parsedAddresses(p.to),
       cc: parsedAddresses(p.cc),
       replyTo: parsedAddresses(p.replyTo),
-      date: p.date?.getTime() ?? header(m).date,
+      date: p.date?.getTime() ?? h.date,
       messageId: p.messageId ?? null,
       references: refs,
       html,
@@ -386,6 +444,11 @@ export class MailService {
 
   async setFlags(accountId: string, folder: string, uids: number[], flags: { seen?: boolean; flagged?: boolean }): Promise<MailResult<null>> {
     try {
+      const box = await this.local(accountId)
+      if (box) {
+        box.setFlags(folder, uids, flags)
+        return ok(null)
+      }
       await this.withMailbox(accountId, folder, async (c) => {
         const set = uids.join(',')
         if (flags.seen !== undefined) await (flags.seen ? c.messageFlagsAdd(set, ['\\Seen'], { uid: true }) : c.messageFlagsRemove(set, ['\\Seen'], { uid: true }))
@@ -399,6 +462,11 @@ export class MailService {
 
   async move(accountId: string, folder: string, uids: number[], target: string): Promise<MailResult<null>> {
     try {
+      const box = await this.local(accountId)
+      if (box) {
+        await box.move(folder, uids, target)
+        return ok(null)
+      }
       await this.withMailbox(accountId, folder, (c) => c.messageMove(uids.join(','), target, { uid: true }).then(() => undefined))
       return ok(null)
     } catch (e) {
@@ -407,6 +475,8 @@ export class MailService {
   }
 
   private async specialFolder(accountId: string, use: SpecialUse, createAs?: string): Promise<string | null> {
+    const box = await this.local(accountId)
+    if (box) return box.pathFor(use) ?? (createAs ? box.createFolder(createAs, use) : null)
     const r = await this.folders(accountId)
     if (!r.ok) throw new Error(r.error)
     const found = r.value.find((f) => f.specialUse === use)
@@ -421,6 +491,11 @@ export class MailService {
     try {
       const trash = await this.specialFolder(accountId, 'trash', 'Trash')
       if (trash && trash !== folder) return this.move(accountId, folder, uids, trash)
+      const box = await this.local(accountId)
+      if (box) {
+        await box.expunge(folder, uids)
+        return ok(null)
+      }
       await this.withMailbox(accountId, folder, (c) => c.messageDelete(uids.join(','), { uid: true }).then(() => undefined))
       return ok(null)
     } catch (e) {
@@ -442,6 +517,8 @@ export class MailService {
     const q = query.trim()
     if (!q) return ok([])
     try {
+      const box = await this.local(accountId)
+      if (box) return ok(box.search(folder, q))
       return ok(
         await this.withMailbox(accountId, folder, async (c) => {
           const uids = ((await c.search({ or: [{ subject: q }, { from: q }, { to: q }, { body: q }] }, { uid: true })) || []).sort((a, b) => b - a).slice(0, SEARCH_LIMIT)
@@ -483,13 +560,16 @@ export class MailService {
     } catch (e) {
       return fail(e)
     }
+    const recipients = [...msg.to, ...msg.cc, ...msg.bcc].map((a) => a.address)
     try {
-      const transport = nodemailer.createTransport(smtpOptions(account.smtp, await this.authFor(account)))
-      await transport.sendMail({
-        envelope: { from: account.email, to: [...msg.to, ...msg.cc, ...msg.bcc].map((a) => a.address) },
-        // The Bcc header is stripped from what recipients receive.
-        raw: stripBcc(raw)
-      })
+      // The Bcc header is stripped from what recipients receive.
+      if (account.auth === 'bear') {
+        if (!this.bear) throw new Error('Bear Mail is not available.')
+        await this.bear.deliver(recipients, stripBcc(raw))
+      } else {
+        const transport = nodemailer.createTransport(smtpOptions(account.smtp, await this.authFor(account)))
+        await transport.sendMail({ envelope: { from: account.email, to: recipients }, raw: stripBcc(raw) })
+      }
     } catch (e) {
       return fail(e, account.smtp.host)
     }
@@ -497,7 +577,9 @@ export class MailService {
     if (!providerSavesSent(account)) {
       try {
         const sent = await this.specialFolder(accountId, 'sent', 'Sent')
-        if (sent) await (await this.client(accountId)).append(sent, raw, ['\\Seen'])
+        const box = await this.local(accountId)
+        if (sent && box) await box.append(sent, raw, ['\\Seen'])
+        else if (sent) await (await this.client(accountId)).append(sent, raw, ['\\Seen'])
       } catch {
         /* the message was sent; failing to file a copy shouldn't report a send failure */
       }

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { ACCOUNT_COLORS, type MailAccount, type MailAccountInput, type OAuthClients } from '@bear/core'
 import type { Tokens } from './oauth'
+import { writeFileAtomic } from './atomic'
 
 export type Secret = { kind: 'password'; password: string } | { kind: 'oauth'; tokens: Tokens }
 
@@ -41,10 +42,7 @@ export class AccountStore {
   }
 
   private async persist() {
-    await fs.mkdir(this.dir, { recursive: true })
-    const tmp = `${this.file}.tmp`
-    await fs.writeFile(tmp, JSON.stringify(this.data, null, 2), 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, JSON.stringify(this.data, null, 2))
   }
 
   async list(): Promise<MailAccount[]> {

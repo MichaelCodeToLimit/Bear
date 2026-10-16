@@ -6,6 +6,7 @@ import {
   type AppId, type FileFilter, type RecentFile
 } from '@bear/core'
 import { registerMailIpc } from './mail'
+import { writeFileAtomic } from './mail/atomic'
 
 const recentPath = () => join(app.getPath('userData'), 'recent.json')
 
@@ -179,14 +180,8 @@ function registerIpc(): void {
     }
   })
 
-  // Write to a temp file and rename, so a crash mid-write can't leave a half-written file.
-  ipcMain.handle('data:write', async (_e, name: string, value: unknown) => {
-    const file = dataFile(name)
-    await fs.mkdir(join(app.getPath('userData'), 'data'), { recursive: true })
-    const tmp = `${file}.${process.pid}.tmp`
-    await fs.writeFile(tmp, JSON.stringify(value), 'utf8')
-    await fs.rename(tmp, file)
-  })
+  // Atomic, and retried while Windows has the file briefly locked (see writeFileAtomic).
+  ipcMain.handle('data:write', (_e, name: string, value: unknown) => writeFileAtomic(dataFile(name), JSON.stringify(value)))
 
   ipcMain.handle('data:delete', async (_e, name: string) => {
     await fs.rm(dataFile(name), { force: true })

@@ -1,4 +1,4 @@
-import type { Editor } from '@tiptap/core'
+import type { Editor, JSONContent } from '@tiptap/core'
 import { extensionOf, type FileFilter } from '@bear/core'
 import { exportDocx } from './docx-export'
 import { importDocx } from './docx-import'
@@ -28,16 +28,27 @@ export function plainTextToHtml(text: string): string {
     .join('')
 }
 
-/** Turn file bytes into editor HTML, based on the file extension. */
-export async function fileToHtml(path: string, data: Uint8Array): Promise<{ html: string; warnings: string[] }> {
+export interface LoadedFile {
+  /** Editor content: exact JSON (a .docx Bear saved) or HTML. */
+  content: JSONContent | string
+  /** Page setup saved with the file, if any. */
+  layout?: PageLayout
+  warnings: string[]
+}
+
+/** Turn file bytes into editor content, based on the file extension. */
+export async function readFile(path: string, data: Uint8Array): Promise<LoadedFile> {
   const ext = extensionOf(path)
-  if (ext === 'docx') return importDocx(data)
+  if (ext === 'docx') {
+    const r = await importDocx(data)
+    return { content: r.json ?? r.html, layout: r.layout, warnings: r.warnings }
+  }
   const text = new TextDecoder().decode(data)
   if (ext === 'html' || ext === 'htm') {
     const body = /<body[^>]*>([\s\S]*)<\/body>/i.exec(text)
-    return { html: body ? body[1] : text, warnings: [] }
+    return { content: body ? body[1] : text, warnings: [] }
   }
-  return { html: plainTextToHtml(text), warnings: [] }
+  return { content: plainTextToHtml(text), warnings: [] }
 }
 
 /** Serialise the editor into the format implied by the target path. */

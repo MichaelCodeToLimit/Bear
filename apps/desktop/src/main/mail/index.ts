@@ -3,16 +3,22 @@ import { join } from 'node:path'
 import type { MailAccountInput, MailBridge, OAuthClients, OutgoingMessage } from '@bear/core'
 import { AccountStore } from './accounts'
 import { MailService } from './service'
+import { BearMail } from './bear-mail'
+import { MailImporter } from './import'
 import { ENDPOINTS, interactiveSignIn } from './oauth'
 
 /** Wire every MailBridge method to an IPC handler named mail:<method>. */
 export function registerMailIpc(): MailService {
-  const store = new AccountStore(join(app.getPath('userData'), 'mail'), {
+  const box = {
     available: () => safeStorage.isEncryptionAvailable(),
-    encrypt: (s) => safeStorage.encryptString(s).toString('base64'),
-    decrypt: (s) => safeStorage.decryptString(Buffer.from(s, 'base64'))
-  })
-  const mail = new MailService(store)
+    encrypt: (s: string) => safeStorage.encryptString(s).toString('base64'),
+    decrypt: (s: string) => safeStorage.decryptString(Buffer.from(s, 'base64'))
+  }
+  const store = new AccountStore(join(app.getPath('userData'), 'mail'), box)
+  const bear = new BearMail(join(app.getPath('userData'), 'mail', 'bear'))
+  const mail = new MailService(store, bear)
+  const importer = new MailImporter(mail, bear, join(app.getPath('userData'), 'mail', 'imports.json'))
+  void importer.startSyncing()
 
   const handlers: { [K in keyof MailBridge]: (...args: Parameters<MailBridge[K]>) => ReturnType<MailBridge[K]> } = {
     listAccounts: () => store.list(),
@@ -40,12 +46,27 @@ export function registerMailIpc(): MailService {
     remove: (id, folder, uids) => mail.remove(id, folder, uids),
     archive: (id, folder, uids) => mail.archive(id, folder, uids),
     search: (id, folder, q) => mail.search(id, folder, q),
-    send: (id, msg: OutgoingMessage) => mail.send(id, msg)
+    send: (id, msg: OutgoingMessage) => mail.send(id, msg),
+    createBearAccount: (input) => mail.createBearAccount(input),
+    startImport: (o) => importer.start(o),
+    listImports: () => importer.list(),
+    cancelImport: (id) => importer.cancel(id),
+    resumeImport: (id) => importer.resume(id)
   }
 
   for (const [name, fn] of Object.entries(handlers)) {
     ipcMain.handle(`mail:${name}`, (_e, ...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(...args))
   }
-  app.on('before-quit', () => void mail.closeAll())
+  // Hold the quit until Bear Mail has written its mailboxes to disk.
+  let closed = false
+  app.on('before-quit', (e) => {
+    if (closed) return
+    e.preventDefault()
+    importer.stop()
+    void Promise.race([mail.closeAll(), new Promise((r) => setTimeout(r, 4000))]).finally(() => {
+      closed = true
+      app.quit()
+    })
+  })
   return mail
 }

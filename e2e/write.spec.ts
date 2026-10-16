@@ -42,6 +42,11 @@ test('formats text, inserts a table, and saves a .docx that reopens', async () =
   await page.keyboard.type('bold')
   await page.keyboard.press('Control+b')
   await page.keyboard.type(' and plain text.')
+  // Font, size and colour (lost on reopen before Bear kept its own copy inside the .docx).
+  await page.getByTitle('Font', { exact: true }).selectOption('Georgia')
+  await page.getByTitle('Font size').selectOption('18')
+  await page.keyboard.press('Control+i')
+  await page.keyboard.type(' Big words')
   await expect(editor.locator('h1')).toHaveText('Project Plan')
   await expect(editor.locator('strong')).toHaveText('bold')
 
@@ -53,6 +58,10 @@ test('formats text, inserts a table, and saves a .docx that reopens', async () =
   await expect(editor.locator('table')).toContainText('Owner')
   // The contextual Table tab appears while the cursor is in a table.
   await expect(page.getByRole('navigation').getByRole('button', { name: 'Table' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Layout', exact: true }).click()
+  await page.getByRole('button', { name: 'Landscape' }).click()
+  await page.getByRole('button', { name: 'Home', exact: true }).click()
 
   await expect(page.getByText('· Edited')).toBeVisible()
   await page.screenshot({ path: join(__dirname, 'shots/02-editing.png') })
@@ -73,6 +82,11 @@ test('formats text, inserts a table, and saves a .docx that reopens', async () =
   await expect(editor.locator('h1')).toHaveText('Project Plan')
   await expect(editor.locator('strong')).toHaveText('bold')
   await expect(editor.locator('table')).toContainText('Owner')
+  await expect(editor.locator('span[style*="Georgia"][style*="18pt"] em')).toHaveText(' Big words')
+  await page.getByRole('button', { name: 'Layout', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Landscape' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Portrait' }).click() // later tests expect a portrait page
+  await page.getByRole('button', { name: 'Home', exact: true }).click()
 })
 
 test('find and replace', async () => {
@@ -235,8 +249,8 @@ test('autosave writes edits to disk', async () => {
   await page.keyboard.type(' Autosaved!')
   await expect(page.getByText('· Saved')).toBeVisible({ timeout: 10_000 })
   const { importDocx } = await import('../packages/app-write/src/docx-import')
-  const { html } = await importDocx(new Uint8Array(readFileSync(join(dir, 'plan.docx'))))
-  expect(html).toContain('Autosaved!')
+  const { json, html } = await importDocx(new Uint8Array(readFileSync(join(dir, 'plan.docx'))))
+  expect(JSON.stringify(json) + html).toContain('Autosaved!')
 })
 
 test('exports a PDF', async () => {
