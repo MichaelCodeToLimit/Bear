@@ -83,6 +83,9 @@ jobs:
         shell: bash
         run: |
           set +e
+          # Without signing secrets GitHub passes these as EMPTY strings; electron-builder then reads an empty
+          # CSC_LINK as a file path ("<project dir> not a file") and the macOS build dies. Unset them instead.
+          if [ -z "${CSC_LINK}" ]; then unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; fi
           pnpm --filter @bear/desktop ${{ matrix.script }} --publish never > build.log 2>&1
           code=$?
           tail -n 60 build.log

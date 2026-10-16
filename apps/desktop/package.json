@@ -4,6 +4,7 @@
   "private": true,
   "description": "Bear: a free, open-source desktop productivity suite",
   "author": "Bear contributors",
+  "homepage": "https://github.com/MichaelCodeToLimit/Bear",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
