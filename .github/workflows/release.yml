@@ -86,7 +86,7 @@ jobs:
           pnpm --filter @bear/desktop ${{ matrix.script }} --publish never > build.log 2>&1
           code=$?
           tail -n 60 build.log
-          if [ $code -ne 0 ]; then echo "::error title=installer build failed (exit $code)::$(grep -iE 'error|failed|cannot|not found|ENOENT|exit' build.log | tail -n 12 | head -c 1800 | tr '\r\n' '  ')"; fi
+          if [ $code -ne 0 ]; then echo "::error title=installer build failed (exit $code)::$(grep -vE '^[[:space:]]*$' build.log | tail -n 30 | cut -c1-240 | head -c 3500 | tr '\r\n' '  ')"; fi
           exit $code
         env:
           # Optional code signing. Without these secrets the installers are built unsigned.
