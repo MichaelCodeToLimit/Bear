@@ -91,7 +91,8 @@ html[data-theme='light'] {
 
 /* Print: browsers drop backgrounds, so always use the daylight ink, and hide chrome that makes no sense on paper. */
 @media print {
-  html[data-theme] {
+  /* html:root outranks the dark :root tokens and needs no JS-set data-theme. */
+  html:root {
     color-scheme: light;
     --cream-from: #ffffff;
     --cream-to: #ffffff;
@@ -110,6 +111,17 @@ html[data-theme='light'] {
   body {
     background: #fff !important;
     color: #2a1c10 !important;
+  }
+  /* Browsers drop background images when printing, so gradient text would vanish. */
+  html .grad {
+    background: none !important;
+    -webkit-text-fill-color: currentColor !important;
+    color: var(--accent) !important;
+  }
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
   canvas.starfield,
   .topbar,

@@ -195,3 +195,48 @@ test('footer carries the independence note', async ({ page }) => {
     'Bear is an independent project. It is not affiliated with or endorsed by Microsoft.'
   )
 })
+
+const lumOf = (rgb: string): number => {
+  const [r, g, b] = rgb.match(/[\d.]+/g)!.slice(0, 3).map(Number)
+  const f = (v: number): number => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+
+test('print: gradient headline words are solid, legible text', async ({ page }) => {
+  await page.goto('./')
+  await page.emulateMedia({ media: 'print' })
+  const fills = await page.evaluate(() =>
+    [...document.querySelectorAll('.grad')].map((el) => {
+      const cs = getComputedStyle(el)
+      return { fill: cs.getPropertyValue('-webkit-text-fill-color'), image: cs.backgroundImage }
+    })
+  )
+  expect(fills.length).toBeGreaterThan(0)
+  for (const { fill, image } of fills) {
+    expect(fill).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/)
+    expect(image).toBe('none')
+    expect(1.05 / (lumOf(fill) + 0.05)).toBeGreaterThanOrEqual(4.5)
+  }
+})
+
+test('print: scroll-reveal sections are fully opaque', async ({ page }) => {
+  for (const path of ['./', 'download/', 'docs/get-started/install/']) {
+    await page.goto(path)
+    await page.emulateMedia({ media: 'print' })
+    const opacities = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-reveal]')].map((el) => getComputedStyle(el).opacity)
+    )
+    if (path === './') expect(opacities.length).toBeGreaterThan(0)
+    for (const o of opacities) expect(o).toBe('1')
+  }
+})
+
+test.describe('print without JavaScript', () => {
+  test.use({ javaScriptEnabled: false })
+  test('body text is dark on white', async ({ page }) => {
+    await page.goto('./')
+    await page.emulateMedia({ media: 'print' })
+    const color = await page.locator('body').evaluate((el) => getComputedStyle(el).color)
+    expect(1.05 / (lumOf(color) + 0.05)).toBeGreaterThanOrEqual(4.5)
+  })
+})
