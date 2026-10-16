@@ -1,14 +1,23 @@
-# Builds Bear's installers on each OS. Every run uploads them as workflow artifacts; pushing a
-# tag like v0.2.0 also attaches them to a draft GitHub release for you to review and publish.
+# Builds every Bear download and, for v* tags, drafts a GitHub release with all of them.
+#
+# Files produced (the website's Download page classifies them by name, so keep these stable):
+#   Windows  Bear-Setup-<v>.exe, Bear-<v>.msi
+#   macOS    Bear-<v>-arm64.dmg, Bear-<v>-x64.dmg, Bear-<v>-arm64-mac.zip, Bear-<v>-x64-mac.zip
+#   Linux    Bear-<v>-x64.AppImage, bear_<v>_amd64.deb, Bear-<v>-x64.rpm, Bear-<v>-x64.tar.gz,
+#            Bear-<v>-x64.flatpak (own job; a failure there never blocks the release)
+#
+# Triggers: a v* tag (builds, then drafts the release), a manual run, or a push to the
+# ci/release-dry-run branch (builds everything and uploads workflow artifacts, but creates no release).
 name: Release
 
 on:
   push:
     tags: ['v*']
+    branches: ['ci/release-dry-run']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -18,19 +27,25 @@ jobs:
         include:
           - os: windows-latest
             target: win
+            script: build:win
             files: |
               apps/desktop/release/*.exe
               apps/desktop/release/*.msi
           - os: macos-latest
             target: mac
+            script: build:mac
             files: |
               apps/desktop/release/*.dmg
               apps/desktop/release/*.zip
           - os: ubuntu-latest
             target: linux
+            # AppImage, deb, rpm and tar.gz. Flatpak is built by the separate "flatpak" job.
+            script: build:linux:main
             files: |
               apps/desktop/release/*.AppImage
               apps/desktop/release/*.deb
+              apps/desktop/release/*.rpm
+              apps/desktop/release/*.tar.gz
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -42,8 +57,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Install rpm tooling
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
       - name: Build installers
-        run: pnpm --filter @bear/desktop build:${{ matrix.target }} --publish never
+        run: pnpm --filter @bear/desktop ${{ matrix.script }} --publish never
         env:
           # Optional code signing. Without these secrets the installers are built unsigned.
           # Windows: a .pfx (base64) and its password. macOS: a Developer ID .p12 plus Apple ID
@@ -59,8 +79,51 @@ jobs:
           name: bear-${{ matrix.target }}
           path: ${{ matrix.files }}
           if-no-files-found: error
-      - if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+
+  # Flatpak needs flatpak-builder and the Freedesktop runtime from Flathub, which is the part most
+  # likely to break, so it runs on its own and never blocks the release.
+  flatpak:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Flatpak tooling and runtimes
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08 org.electronjs.Electron2.BaseApp//24.08
+      - name: Build flatpak
+        run: pnpm --filter @bear/desktop build:linux:flatpak --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bear-flatpak
+          path: apps/desktop/release/*.flatpak
+          if-no-files-found: error
+
+  # One draft release, assembled after every build has finished (no parallel-upload race).
+  release:
+    needs: [build, flatpak]
+    if: ${{ always() && needs.build.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # The flatpak artifact is simply missing when that job failed; the pattern match tolerates that.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bear-*
+          path: dist
+          merge-multiple: true
+      - run: ls -l dist
+      - uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: ${{ matrix.files }}
+          generate_release_notes: true
+          files: dist/*

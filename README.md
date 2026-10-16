@@ -91,13 +91,14 @@ pnpm typecheck
 
 ## Installers
 
-Each command builds the installers for one OS into `apps/desktop/release/`. Run it on that OS; `.github/workflows/release.yml` builds all three on GitHub Actions.
+Each command builds the installers for one OS into `apps/desktop/release/`. Run it on that OS; `.github/workflows/release.yml` builds all of them on GitHub Actions.
 
 | Command | Output |
 |---|---|
 | `pnpm build:win` | `Bear-Setup-<version>.exe` (installs per user, no admin needed) and `Bear-<version>.msi` (installs machine-wide, for IT deployment) |
-| `pnpm build:mac` | `Bear-<version>-x64.dmg` / `-arm64.dmg`, plus `.zip` files |
-| `pnpm build:linux` | `Bear-<version>-x86_64.AppImage` and `bear_<version>_amd64.deb` |
+| `pnpm build:mac` | `Bear-<version>-arm64.dmg` / `-x64.dmg`, plus `Bear-<version>-arm64-mac.zip` / `-x64-mac.zip` |
+| `pnpm build:linux:main` | `Bear-<version>-x64.AppImage`, `bear_<version>_amd64.deb`, `Bear-<version>-x64.rpm` and `Bear-<version>-x64.tar.gz` (the rpm needs `rpmbuild`) |
+| `pnpm build:linux:flatpak` | `Bear-<version>-x64.flatpak` (needs `flatpak-builder` plus the 24.08 Freedesktop runtime, SDK and Electron BaseApp from Flathub) |
 
 The installers register Bear for .docx, .xlsx and .pptx files. Opening one of those files starts Bear on it, and if Bear is already running the file opens in a new Bear window. The MSI's `upgradeCode` in `apps/desktop/electron-builder.yml` must never change, because Windows uses it to upgrade older installs in place. To release a new version, bump `version` in `apps/desktop/package.json`.
 
@@ -119,8 +120,8 @@ The Bear website lives in `apps/site` (Astro and React) and is published at <htt
 To publish installers:
 
 1. Bump `version` in `apps/desktop/package.json`, then push a tag such as `v0.2.0`.
-2. `release.yml` builds the installers on each OS and drafts a GitHub release.
-3. Review the draft and publish it.
+2. `release.yml` builds the installers on each OS (Flatpak in its own job, which can fail without blocking the release) and drafts one GitHub release with every file.
+3. Review the draft and publish it. To test the whole pipeline without releasing anything, push to the `ci/release-dry-run` branch: it builds everything and keeps the files as workflow artifacts, but creates no release.
 4. Publishing starts the site workflow, which rebuilds the site so the Download page lists the new files.
 
 ## Layout

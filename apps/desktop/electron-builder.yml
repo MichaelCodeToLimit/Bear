@@ -71,22 +71,56 @@ mac:
   # Signs automatically when a Developer ID certificate is available (CSC_LINK / keychain); otherwise unsigned.
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # Applies to the zip targets, which have no config section of their own: Bear-x.y.z-x64-mac.zip and
+  # Bear-x.y.z-arm64-mac.zip. The dmg overrides it below. The website's Download page tells Apple silicon
+  # from Intel by "arm64" / "x64" in these names.
+  artifactName: Bear-${version}-${arch}-mac.${ext}
 dmg:
   artifactName: Bear-${version}-${arch}.${ext}
 
 # ---------- Linux ----------
+# File names are fixed (version plus x64/amd64) because the website's Download page classifies files by
+# extension and name.
 linux:
   target:
     - target: AppImage
       arch: [x64]
     - target: deb
       arch: [x64]
+    - target: rpm
+      arch: [x64]
+    - target: tar.gz
+      arch: [x64]
+    # Built by a separate, non-blocking CI job (see .github/workflows/release.yml); the main Linux build
+    # passes its targets explicitly and leaves this one out.
+    - target: flatpak
+      arch: [x64]
   icon: build/icon.png
   category: Office
   executableName: bear
   maintainer: Bear contributors
   synopsis: Free, open-source productivity suite
+  # Used by tar.gz, which has no config section of its own: Bear-x.y.z-x64.tar.gz
+  artifactName: Bear-${version}-x64.${ext}
 appImage:
-  artifactName: Bear-${version}-${arch}.${ext}
+  artifactName: Bear-${version}-x64.${ext}
 deb:
-  artifactName: bear_${version}_${arch}.${ext}
+  artifactName: bear_${version}_amd64.${ext}
+rpm:
+  artifactName: Bear-${version}-x64.${ext}
+flatpak:
+  artifactName: Bear-${version}-x64.${ext}
+  runtime: org.freedesktop.Platform
+  runtimeVersion: "24.08"
+  sdk: org.freedesktop.Sdk
+  base: org.electronjs.Electron2.BaseApp
+  baseVersion: "24.08"
+  finishArgs:
+    - --share=ipc
+    - --socket=x11
+    - --socket=wayland
+    - --socket=pulseaudio
+    - --share=network
+    - --device=dri
+    - --filesystem=home
+    - --talk-name=org.freedesktop.Notifications
