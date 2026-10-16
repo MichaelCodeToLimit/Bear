@@ -174,25 +174,16 @@ Home still has **no React islands**. Its only scripts are reveal, starfield, mot
 - The physics canvas uses a transparent or dark background, and its tiles get a soft glow in their app colour.
 
 **Download**
-- Header: "Get Bear. <span class=grad>Keep it.</span>", with the bear carrying its box.
+- Header: "Get Bear. <span class=grad>Keep it.</span>", with the bear logo alone (the owner asked on 2026-10-16 to remove the box it used to carry).
 - Installer cards become `.glass` cards with an OS glyph, label, file name, size and a primary download button.
 - "Best for you" gets an `--accent` ring.
 - The fallback state uses the same styling.
 
-**Windows download buttons (added 2026-10-15 at the owner's request)**
-- A `<WindowsDownload />` component (`src/components/WindowsDownload.astro`) is fed by the build-time `fetchLatestRelease()` result.
-- **When a release has Windows files:**
-  - A big primary button, **"Download for Windows"**, links straight to the `.exe` asset (the per-user installer, no admin needed). It shows the version and size, e.g. "Bear 0.1.1 · .exe · 113 MB".
-  - Next to it, a ghost button, **".msi for IT / whole computer"**, links to the `.msi` asset.
-  - A small "Other systems →" link points to the Download page's full list.
-- **When there's no release, or no Windows files:** the primary button reads "Download for Windows" and links to the GitHub Releases page, with a muted note: "First release coming soon".
-- It appears in three places:
-  - in the Home hero, replacing the plain Download button; "See every app" stays as the ghost button
-  - at the top of the Download page, above the per-system groups
-  - in the Home final call to action
-- Tests:
-  - unit: a helper `windowsDownloads(release)` returns `{ exe, msi }` from `ReleaseInfo` (either may be null), including the no-release case
-  - e2e: the Home hero shows "Download for Windows" with an `href` of either a GitHub release asset ending in `.exe` or the Releases page
+**Download buttons (revised 2026-10-16 at the owner's request)**
+- Home has no platform-specific download buttons. The hero and the final call to action each have ONE plain primary **Download** button that links to the full Download page (`download/`); "See every app →" and "Take the tour" stay as the ghost buttons. Home does not read the GitHub release at all.
+- The real `.exe`, `.msi`, Mac (Apple silicon and Intel) and Linux downloads live only on the Download page, in the platform cards above (`PlatformCards.astro`).
+- The earlier `WindowsDownload` component and its `windowsDownloads` helper were removed.
+- Test: each of `.hero` and `.cta` has exactly one `a.btn--primary` with the text "Download" and `href="/Bear/download/"`, and "Download for Windows", ".msi for IT" and "Other systems" do not appear on Home.
 
 **404**
 - The lost bear on the starfield, with a primary button home.

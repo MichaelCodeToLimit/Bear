@@ -7,17 +7,14 @@ import HowItWorks from '../components/home/HowItWorks.astro'
 import FeatureBento from '../components/home/FeatureBento.astro'
 import SuiteDiagram from '../components/home/SuiteDiagram.astro'
 import FinalCta from '../components/home/FinalCta.astro'
-import { fetchLatestRelease } from '../lib/releases'
-
-const release = await fetchLatestRelease()
 ---
 
 <BaseLayout title="Bear">
-  <Hero release={release} />
+  <Hero />
   <ProductWindow />
   <Marquee />
   <HowItWorks />
   <FeatureBento />
   <SuiteDiagram />
-  <FinalCta release={release} />
+  <FinalCta />
 </BaseLayout>

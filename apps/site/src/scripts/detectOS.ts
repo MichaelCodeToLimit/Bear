@@ -9,15 +9,3 @@ export function initYourDevice(): void {
   card.setAttribute('data-yours', '')
   card.querySelector<HTMLElement>('[data-your-device]')?.removeAttribute('hidden')
 }
-
-/** The bear does a little catch when a download button is pressed. */
-export function initCatch(): void {
-  const bear = document.querySelector<HTMLElement>('[data-catch]')
-  if (!bear) return
-  document.addEventListener('click', (e) => {
-    if (!(e.target as Element).closest('a[data-download]')) return
-    bear.classList.remove('is-catching')
-    void bear.offsetWidth
-    bear.classList.add('is-catching')
-  })
-}

@@ -1,13 +1,6 @@
 ---
 import Bear from '../Bear.astro'
-import WindowsDownload from '../WindowsDownload.astro'
-import type { ReleaseInfo } from '../../lib/releases'
 import { url } from '../../site.config'
-
-interface Props {
-  release: ReleaseInfo | null
-}
-const { release } = Astro.props
 ---
 
 <section class="cta section" aria-labelledby="cta-title" data-reveal>
@@ -16,7 +9,7 @@ const { release } = Astro.props
     Bring your files. <span class="grad">Leave the subscription.</span>
   </h2>
   <div class="cta__actions">
-    <WindowsDownload release={release} />
+    <a class="btn btn--primary" href={url('download/')}>Download</a>
     <a class="btn btn--ghost" href={url('tour/')}>Take the tour</a>
   </div>
 </section>

@@ -69,33 +69,29 @@ test('suite diagram links all 12 apps and marks the 4 not ready as soon', async 
   await expect(page.locator('.suite-diagram a[data-soon]')).toHaveCount(4)
 })
 
-test('Windows download buttons: hero and final CTA point at the .exe or the Releases page', async ({ page }) => {
+test('the hero and final CTA each have one plain Download button linking to the full download page', async ({ page }) => {
   await page.goto('./')
-  const buttons = page.locator('[data-windows-download="exe"], [data-windows-download="releases"]')
-  expect(await buttons.count()).toBeGreaterThanOrEqual(2)
-  for (const b of await buttons.all()) {
-    await expect(b).toContainText('Download for Windows')
-    const href = (await b.getAttribute('href')) ?? ''
-    expect(/\/releases\/download\/.+\.exe$/.test(href) || href === 'https://github.com/MichaelCodeToLimit/Bear/releases').toBe(true)
+  for (const section of ['.hero', '.cta']) {
+    const download = page.locator(`${section} a.btn--primary`)
+    await expect(download, `${section} has exactly one primary button`).toHaveCount(1)
+    await expect(download).toHaveText('Download')
+    await expect(download).toHaveAttribute('href', '/Bear/download/')
   }
-  await expect(page.locator('.hero [data-windows-download]').first()).toBeVisible()
-})
-
-test('"Other systems" links and the top-bar Download go to the download page', async ({ page }) => {
-  await page.goto('./')
-  const other = page.getByRole('link', { name: /Other systems/ })
-  expect(await other.count()).toBeGreaterThanOrEqual(2)
-  for (const l of await other.all()) await expect(l).toHaveAttribute('href', '/Bear/download/')
+  // The platform-specific buttons live on the Download page only.
+  await expect(page.getByText('Download for Windows')).toHaveCount(0)
+  await expect(page.getByText('.msi for IT')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /Other systems/ })).toHaveCount(0)
   await expect(page.locator('header.topbar').getByRole('link', { name: /^Download/ }).first()).toHaveAttribute('href', '/Bear/download/')
 })
 
-test('ghost buttons beside the Windows button are not stretched at 1280px', async ({ page }) => {
+test('the hero buttons sit side by side at the same height at 1280px', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('./')
-  const primary = await page.locator('.hero a.windl__main').boundingBox()
+  const primary = await page.locator('.hero a.btn--primary').boundingBox()
   const ghost = await page.locator('.hero__actions a.btn--ghost').first().boundingBox()
   expect(primary && ghost).toBeTruthy()
   expect(ghost!.height).toBeLessThanOrEqual(primary!.height * 1.3)
+  expect(Math.abs(ghost!.y - primary!.y)).toBeLessThan(primary!.height)
 })
 
 test('with JavaScript off and reduced motion, the marquee is paused', async ({ browser }) => {
@@ -104,11 +100,6 @@ test('with JavaScript off and reduced motion, the marquee is paused', async ({ b
   await page.goto('http://127.0.0.1:4321/Bear/')
   await expect(page.locator('.marquee__track')).toHaveCSS('animation-play-state', 'paused')
   await context.close()
-})
-
-test('the Download page omits "Other systems"', async ({ page }) => {
-  await page.goto('download/')
-  await expect(page.getByRole('link', { name: /Other systems/ })).toHaveCount(0)
 })
 
 test('home has no horizontal scroll at 375px', async ({ page }) => {

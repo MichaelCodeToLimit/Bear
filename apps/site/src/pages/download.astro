@@ -22,14 +22,7 @@ const steps = [
   <section class="dl">
     <header class="dl-hero">
       <div class="dl-bear">
-        {release ? (
-          <div class="dl-carry" data-catch>
-            <Bear size={96} mood="bob" />
-            <span class="dl-box" aria-hidden="true"></span>
-          </div>
-        ) : (
-          <Bear size={96} mood="nap" />
-        )}
+        <Bear size={96} mood={release ? 'bob' : 'nap'} />
       </div>
       {release ? (
         <>
@@ -62,9 +55,8 @@ const steps = [
 </BaseLayout>
 
 <script>
-  import { initYourDevice, initCatch } from '../scripts/detectOS'
+  import { initYourDevice } from '../scripts/detectOS'
   initYourDevice()
-  initCatch()
 </script>
 
 <style is:global>
@@ -83,45 +75,6 @@ const steps = [
   }
   .dl-version {
     color: var(--ink-muted);
-  }
-  .dl-carry {
-    position: relative;
-    display: inline-block;
-  }
-  .dl-box {
-    position: absolute;
-    left: 50%;
-    bottom: -6px;
-    width: 52px;
-    height: 34px;
-    transform: translateX(-50%);
-    background: #c89a62;
-    border: 2px solid #8a5f33;
-    border-radius: 4px;
-  }
-  .dl-box::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 0;
-    bottom: 0;
-    width: 8px;
-    transform: translateX(-50%);
-    background: #e9d3a8;
-  }
-  .dl-carry.is-catching {
-    animation: dl-catch 0.5s var(--ease-bounce);
-  }
-  @keyframes dl-catch {
-    30% {
-      transform: translateY(-14px) rotate(-4deg);
-    }
-    60% {
-      transform: translateY(2px);
-    }
-  }
-  [data-motion='off'] .dl-carry.is-catching {
-    animation: none;
   }
   .dl-source h2 {
     font-size: 1.3rem;

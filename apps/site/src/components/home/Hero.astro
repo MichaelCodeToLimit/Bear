@@ -1,12 +1,5 @@
 ---
-import WindowsDownload from '../WindowsDownload.astro'
-import type { ReleaseInfo } from '../../lib/releases'
 import { url } from '../../site.config'
-
-interface Props {
-  release: ReleaseInfo | null
-}
-const { release } = Astro.props
 ---
 
 <section class="hero" aria-labelledby="hero-title">
@@ -21,7 +14,7 @@ const { release } = Astro.props
     Write, Sheets, Slides, Notes, Mail and more. Free, open source, and your files stay yours.
   </p>
   <div class="hero__actions">
-    <WindowsDownload release={release} />
+    <a class="btn btn--primary" href={url('download/')}>Download</a>
     <a class="btn btn--ghost" href={url('tour/')}>See every app →</a>
   </div>
   <p class="hero__note">Windows, Mac and Linux · Opens .docx, .xlsx and .pptx</p>
