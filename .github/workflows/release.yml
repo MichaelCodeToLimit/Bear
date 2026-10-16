@@ -80,7 +80,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm
       - name: Build installers
-        run: pnpm --filter @bear/desktop ${{ matrix.script }} --publish never
+        shell: bash
+        run: |
+          set +e
+          pnpm --filter @bear/desktop ${{ matrix.script }} --publish never > build.log 2>&1
+          code=$?
+          tail -n 60 build.log
+          if [ $code -ne 0 ]; then echo "::error title=installer build failed (exit $code)::$(grep -iE 'error|failed|cannot|not found|ENOENT|exit' build.log | tail -n 12 | head -c 1800 | tr '\r\n' '  ')"; fi
+          exit $code
         env:
           # Optional code signing. Without these secrets the installers are built unsigned.
           # Windows: a .pfx (base64) and its password. macOS: a Developer ID .p12 plus Apple ID
