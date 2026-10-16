@@ -242,3 +242,5 @@ Accepted differences between this spec and what shipped:
 - Docs pages do not dim the grid and glow.
 - The top bar has no ghost "Take the tour" button; it is in the hero.
 - The playground desktop grid order is demos + buddy, then physics + mixer, so the existing tests can act without scrolling.
+- The Download page is three platform cards (Windows, macOS, Linux; `PlatformCards.astro`) above "Build from source", replacing the per-file groups and the "Best for you" slot. Each card shows status, a "Your device" badge on the visitor's platform, buttons per file, sizes, SHA-256 and install hints.
+- Buttons are real links when the asset exists, links to the Releases page (`data-state="pending"`) when there is no release, and disabled spans when a release lacks that asset. Release-present markup is tested with Astro's container API in the `site-render` Vitest project.

@@ -1,26 +1,13 @@
-import { detectOS, pickBest, formatSize, type DownloadFile } from '../lib/releases'
+import { detectOS } from '../lib/releases'
 
-/** Fill the "Best for you" slot with the file that matches the visitor's system. Leaves it hidden if nothing matches. */
-export function initBestForYou(): void {
-  const slot = document.querySelector<HTMLElement>('[data-best]')
-  const data = document.getElementById('downloads')
-  if (!slot || !data?.textContent) return
-  try {
-    const files = JSON.parse(data.textContent) as DownloadFile[]
-    const best = pickBest(files, detectOS(navigator.userAgent))
-    if (!best) return
-    const link = slot.querySelector<HTMLAnchorElement>('[data-best-link]')
-    const name = slot.querySelector<HTMLElement>('[data-best-name]')
-    const meta = slot.querySelector<HTMLElement>('[data-best-meta]')
-    if (!link || !name || !meta) return
-    link.href = best.url
-    name.textContent = best.name
-    meta.textContent = `${best.label} · ${formatSize(best.size)}`
-    slot.hidden = false
-    document.querySelectorAll(`[data-file="${CSS.escape(best.name)}"]`).forEach((el) => el.classList.add('is-best'))
-  } catch {
-    // Malformed data: leave the slot hidden; every file is still listed below.
-  }
+/** Mark the card that matches the visitor's system: reveal its "Your device" badge and give it the accent ring. */
+export function initYourDevice(): void {
+  const os = detectOS(navigator.userAgent)
+  if (!os) return
+  const card = document.querySelector<HTMLElement>(`[data-os-group="${os}"]`)
+  if (!card) return
+  card.setAttribute('data-yours', '')
+  card.querySelector<HTMLElement>('[data-your-device]')?.removeAttribute('hidden')
 }
 
 /** The bear does a little catch when a download button is pressed. */

@@ -76,3 +76,24 @@ describe('Windows download button sub-line', () => {
     expect(contrastRatio(t.btnInk, t.btnBg)).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+describe('Download cards (PlatformCards.astro)', () => {
+  const css = readFileSync(new URL('../components/PlatformCards.astro', import.meta.url), 'utf8').toLowerCase()
+  it('the "Your device" badge (white on blue) meets 4.5:1', () => {
+    expect(css).toContain('background: #1d4ed8')
+    expect(contrastRatio('#ffffff', '#1d4ed8')).toBeGreaterThanOrEqual(4.5)
+  })
+  it('the SHA-256 and install-command boxes stay dark in both themes: main and muted text meet 4.5:1', () => {
+    expect(css).toContain('background: #0f0a07')
+    expect(css).toContain('color: #f6ead9')
+    expect(css).toContain('color: #b8a48e')
+    expect(contrastRatio('#f6ead9', '#0f0a07')).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio('#b8a48e', '#0f0a07')).toBeGreaterThanOrEqual(4.5)
+  })
+  it.each([
+    ['light', LIGHT],
+    ['dark', DARK]
+  ])('footnotes, hints and the pill text (muted/ink on the page and card surfaces) are readable in the %s theme', (_n, t) => {
+    for (const fg of [t.ink, t.muted]) for (const bg of [t.bg, t.bgTo, t.surface]) expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+})

@@ -2,6 +2,9 @@ import { SITE } from '../site.config'
 
 export type OS = 'windows' | 'mac' | 'linux'
 
+export type FileKind = 'exe' | 'msi' | 'dmg' | 'zip' | 'deb' | 'appimage' | 'flatpak' | 'rpm' | 'targz'
+export type Arch = 'arm64' | 'x64'
+
 export interface DownloadFile {
   name: string
   url: string
@@ -9,6 +12,11 @@ export interface DownloadFile {
   os: OS
   label: string
   recommended: boolean
+  kind: FileKind
+  /** Mac only: the chip the file is built for. A mac file with no arch in its name is Intel. */
+  arch: Arch | null
+  /** Lowercase hex SHA-256 from the GitHub asset digest, or null when it is missing or malformed. */
+  sha256: string | null
 }
 
 export interface ReleaseInfo {
@@ -34,19 +42,29 @@ export function windowsDownloads(release: ReleaseInfo | null): {
 }
 
 /** Map an asset file name to a system and label. Returns null for files that should not be shown. */
-export function classifyAsset(name: string): { os: OS; label: string; recommended: boolean } | null {
+export function classifyAsset(name: string): Pick<DownloadFile, 'os' | 'label' | 'recommended' | 'kind' | 'arch'> | null {
   const n = name.toLowerCase()
-  // electron-builder puts the architecture in the file name; only mac needs it in the label.
+  // electron-builder puts the architecture in the file name; only mac needs it.
+  const arch: Arch = /arm64/.test(n) ? 'arm64' : 'x64'
   const macArch = /arm64/.test(n) ? ' (Apple silicon)' : /x64|x86_64|amd64/.test(n) ? ' (Intel)' : ''
-  if (n.endsWith('.exe')) return { os: 'windows', label: 'Installer (just for you, no admin needed)', recommended: true }
-  if (n.endsWith('.msi')) return { os: 'windows', label: 'MSI package (whole computer, for IT)', recommended: false }
-  if (n.endsWith('.dmg')) return { os: 'mac', label: `Disk image${macArch}`, recommended: true }
+  if (n.endsWith('.exe')) return { os: 'windows', kind: 'exe', arch: null, label: 'Installer (just for you, no admin needed)', recommended: true }
+  if (n.endsWith('.msi')) return { os: 'windows', kind: 'msi', arch: null, label: 'MSI package (whole computer, for IT)', recommended: false }
+  if (n.endsWith('.dmg')) return { os: 'mac', kind: 'dmg', arch, label: `Disk image${macArch}`, recommended: true }
   if (n.endsWith('.zip') && (n.endsWith('-mac.zip') || n.includes('-darwin'))) {
-    return { os: 'mac', label: `Zip${macArch}`, recommended: false }
+    return { os: 'mac', kind: 'zip', arch, label: `Zip${macArch}`, recommended: false }
   }
-  if (n.endsWith('.appimage')) return { os: 'linux', label: 'AppImage (any distro)', recommended: true }
-  if (n.endsWith('.deb')) return { os: 'linux', label: '.deb (Debian, Ubuntu)', recommended: false }
+  if (n.endsWith('.appimage')) return { os: 'linux', kind: 'appimage', arch: null, label: 'AppImage (any distro)', recommended: true }
+  if (n.endsWith('.deb')) return { os: 'linux', kind: 'deb', arch: null, label: '.deb (Debian, Ubuntu)', recommended: false }
+  if (n.endsWith('.flatpak')) return { os: 'linux', kind: 'flatpak', arch: null, label: 'Flatpak', recommended: false }
+  if (n.endsWith('.rpm')) return { os: 'linux', kind: 'rpm', arch: null, label: '.rpm (Fedora, openSUSE)', recommended: false }
+  if (n.endsWith('.tar.gz')) return { os: 'linux', kind: 'targz', arch: null, label: '.tar.gz (any distro)', recommended: false }
   return null
+}
+
+const SHA256 = /^sha256:([0-9a-f]{64})$/
+function parseDigest(d: unknown): string | null {
+  if (typeof d !== 'string') return null
+  return SHA256.exec(d)?.[1] ?? null
 }
 
 export function formatSize(bytes: number): string {
@@ -75,6 +93,7 @@ export function toRelease(json: unknown): ReleaseInfo | null {
       name: asset.name,
       url: asset.browser_download_url,
       size: typeof asset.size === 'number' ? asset.size : 0,
+      sha256: parseDigest(asset.digest),
       ...kind
     })
   }
@@ -106,14 +125,80 @@ export function detectOS(userAgent: string): OS | null {
   return null
 }
 
-export function pickBest(files: DownloadFile[], os: OS | null): DownloadFile | null {
-  if (!os) return null
-  const mine = files.filter((f) => f.os === os)
-  if (os === 'mac') {
-    // A browser cannot tell Apple silicon from Intel, so do not guess between the two disk images.
-    const rec = mine.filter((f) => f.recommended)
-    if (rec.length > 1) return null
-    return rec[0] ?? mine[0] ?? null
+export interface CardSlot {
+  id: 'exe' | 'msi' | 'arm64' | 'x64' | 'deb' | 'appimage' | 'flatpak'
+  /** Visible button text. */
+  label: string
+  /** Short name used in the size line. */
+  short: string
+  file: DownloadFile | null
+}
+
+export interface PlatformCard {
+  os: OS
+  title: string
+  description: string
+  /** True when the release has at least one file for this system. */
+  available: boolean
+  version: string | null
+  slots: CardSlot[]
+  /** Mac .zip variants. */
+  extras: DownloadFile[]
+  /** Linux .rpm and .tar.gz files. */
+  other: DownloadFile[]
+  /** "v0.1.1 · .exe 113 MB · .msi 114 MB", or null when nothing is available. */
+  meta: string | null
+}
+
+/** The three download cards in order: windows, mac, linux. Pure; a null release gives empty, unavailable cards. */
+export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
+  const files = release?.files ?? []
+  const pick = (os: OS, kind: FileKind, arch?: Arch): DownloadFile | null =>
+    files.find((f) => f.os === os && f.kind === kind && (arch === undefined || f.arch === arch)) ?? null
+  const all = (os: OS, kind: FileKind): DownloadFile[] => files.filter((f) => f.os === os && f.kind === kind)
+  const build = (
+    os: OS,
+    title: string,
+    description: string,
+    slots: CardSlot[],
+    extras: DownloadFile[] = [],
+    other: DownloadFile[] = []
+  ): PlatformCard => {
+    const available = files.some((f) => f.os === os)
+    let meta: string | null = null
+    if (available && release) {
+      const filled = slots.filter((s) => s.file)
+      const parts = filled.length === 1 ? [formatSize(filled[0].file!.size)] : filled.map((s) => `${s.short} ${formatSize(s.file!.size)}`)
+      meta = [`v${release.version}`, ...parts].join(' · ')
+    }
+    return { os, title, description, available, version: available && release ? release.version : null, slots, extras, other, meta }
   }
-  return mine.find((f) => f.recommended) ?? mine[0] ?? null
+  return [
+    build('windows', 'Windows', 'Windows 10 and 11, 64-bit. The installer sets Bear up for your account in seconds, without admin rights.', [
+      { id: 'exe', label: 'Download .exe', short: '.exe', file: pick('windows', 'exe') },
+      { id: 'msi', label: '.msi for IT', short: '.msi', file: pick('windows', 'msi') }
+    ]),
+    build(
+      'mac',
+      'macOS',
+      'macOS 12 or later. Choose the download for your Mac’s chip.',
+      [
+        { id: 'arm64', label: 'Apple silicon', short: 'Apple silicon', file: pick('mac', 'dmg', 'arm64') },
+        { id: 'x64', label: 'Intel', short: 'Intel', file: pick('mac', 'dmg', 'x64') }
+      ],
+      all('mac', 'zip')
+    ),
+    build(
+      'linux',
+      'Linux',
+      'Ubuntu, Debian, Fedora and most 64-bit distributions.',
+      [
+        { id: 'deb', label: '.deb', short: '.deb', file: pick('linux', 'deb') },
+        { id: 'appimage', label: 'AppImage', short: 'AppImage', file: pick('linux', 'appimage') },
+        { id: 'flatpak', label: 'Flatpak', short: 'Flatpak', file: pick('linux', 'flatpak') }
+      ],
+      [],
+      [...all('linux', 'rpm'), ...all('linux', 'targz')]
+    )
+  ]
 }

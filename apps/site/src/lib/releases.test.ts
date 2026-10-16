@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { classifyAsset, formatSize, toRelease, fetchLatestRelease, pickBest, detectOS, windowsDownloads, type DownloadFile } from './releases'
+import { classifyAsset, formatSize, toRelease, fetchLatestRelease, detectOS, windowsDownloads, platformCards, type DownloadFile, type ReleaseInfo } from './releases'
 
 const file = (name: string, os: DownloadFile['os'], recommended: boolean): DownloadFile => ({
   name,
@@ -7,7 +7,10 @@ const file = (name: string, os: DownloadFile['os'], recommended: boolean): Downl
   size: 1,
   os,
   label: name,
-  recommended
+  recommended,
+  kind: 'exe',
+  arch: null,
+  sha256: null
 })
 
 const fixture = {
@@ -146,19 +149,6 @@ describe('fetchLatestRelease', () => {
   })
 })
 
-describe('pickBest', () => {
-  it('returns null when no file matches the os', () => {
-    expect(pickBest([file('a.exe', 'windows', true)], 'mac')).toBeNull()
-    expect(pickBest([file('a.exe', 'windows', true)], null)).toBeNull()
-  })
-  it('prefers the recommended file', () => {
-    expect(pickBest([file('a.msi', 'windows', false), file('a.exe', 'windows', true)], 'windows')?.name).toBe('a.exe')
-  })
-  it('falls back to the first file for the os', () => {
-    expect(pickBest([file('a.zip', 'mac', false)], 'mac')?.name).toBe('a.zip')
-  })
-})
-
 describe('detectOS', () => {
   it('detects desktop systems', () => {
     expect(detectOS('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36')).toBe('windows')
@@ -195,13 +185,107 @@ describe('windowsDownloads', () => {
   })
 })
 
-describe('pickBest on mac', () => {
-  it('does not guess when both architectures are offered', () => {
-    const files = [file('Bear-0.1.0-arm64.dmg', 'mac', true), file('Bear-0.1.0-x64.dmg', 'mac', true), file('Bear-0.1.0-mac.zip', 'mac', false)]
-    expect(pickBest(files, 'mac')).toBeNull()
+describe('classifyAsset kinds, arch and new Linux formats', () => {
+  it('gives every file a kind', () => {
+    expect(classifyAsset('Bear-Setup-0.1.1.exe')).toMatchObject({ kind: 'exe', arch: null })
+    expect(classifyAsset('Bear-0.1.1.msi')).toMatchObject({ kind: 'msi' })
+    expect(classifyAsset('Bear-0.1.1-arm64.dmg')).toMatchObject({ kind: 'dmg', arch: 'arm64' })
+    expect(classifyAsset('Bear-0.1.1-x64-mac.zip')).toMatchObject({ kind: 'zip', arch: 'x64' })
+    expect(classifyAsset('bear_0.1.1_amd64.deb')).toMatchObject({ kind: 'deb' })
+    expect(classifyAsset('Bear-0.1.1-x64.AppImage')).toMatchObject({ kind: 'appimage' })
   })
-  it('returns the single recommended mac file', () => {
-    const files = [file('Bear-0.1.0.dmg', 'mac', true), file('Bear-0.1.0-mac.zip', 'mac', false)]
-    expect(pickBest(files, 'mac')?.name).toBe('Bear-0.1.0.dmg')
+  it('treats a mac file with no arch in its name as Intel', () => {
+    expect(classifyAsset('Bear-0.1.1.dmg')).toMatchObject({ arch: 'x64' })
+    expect(classifyAsset('Bear-0.1.1-mac.zip')).toMatchObject({ arch: 'x64' })
+  })
+  it('recognises flatpak, rpm and tar.gz with their labels', () => {
+    expect(classifyAsset('Bear-0.1.1-x64.flatpak')).toMatchObject({ os: 'linux', kind: 'flatpak', label: 'Flatpak' })
+    expect(classifyAsset('Bear-0.1.1-x64.rpm')).toMatchObject({ os: 'linux', kind: 'rpm', label: '.rpm (Fedora, openSUSE)' })
+    expect(classifyAsset('Bear-0.1.1-x64.tar.gz')).toMatchObject({ os: 'linux', kind: 'targz', label: '.tar.gz (any distro)' })
+    expect(classifyAsset('bear_0.1.1_amd64.deb')?.label).toBe('.deb (Debian, Ubuntu)')
+  })
+  it('keeps metadata hidden', () => {
+    for (const n of ['Bear-0.1.1-x64.rpm.blockmap', 'latest-linux.yml', 'builder-debug.yml', 'Bear-0.1.1-arm64.dmg.blockmap']) expect(classifyAsset(n)).toBeNull()
+  })
+})
+
+const BASE = 'https://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.1/'
+const HASH = 'a'.repeat(64)
+const names = [
+  'Bear-Setup-0.1.1.exe',
+  'Bear-0.1.1.msi',
+  'Bear-0.1.1-arm64.dmg',
+  'Bear-0.1.1-x64.dmg',
+  'Bear-0.1.1-arm64-mac.zip',
+  'Bear-0.1.1-x64-mac.zip',
+  'bear_0.1.1_amd64.deb',
+  'Bear-0.1.1-x64.AppImage',
+  'Bear-0.1.1-x64.flatpak',
+  'Bear-0.1.1-x64.rpm',
+  'Bear-0.1.1-x64.tar.gz'
+]
+const payload = (list: string[], extra: Record<string, unknown> = {}) => ({
+  tag_name: 'v0.1.1',
+  published_at: '2026-10-14T10:00:00Z',
+  html_url: 'https://github.com/MichaelCodeToLimit/Bear/releases/tag/v0.1.1',
+  assets: list.map((n) => ({ name: n, browser_download_url: BASE + n, size: 2_000_000, ...extra }))
+})
+const rel = (list: string[], extra: Record<string, unknown> = {}): ReleaseInfo => toRelease(payload(list, extra)) as ReleaseInfo
+
+describe('toRelease digest', () => {
+  it('parses a valid sha256 digest', () => {
+    expect(rel(['Bear-Setup-0.1.1.exe'], { digest: `sha256:${HASH}` }).files[0].sha256).toBe(HASH)
+  })
+  it.each([[`sha256:${'A'.repeat(64)}`], ['sha256:abc'], [`sha1:${HASH}`], [HASH], [42], [null]])('rejects %s', (d) => {
+    expect(rel(['Bear-Setup-0.1.1.exe'], { digest: d }).files[0].sha256).toBeNull()
+  })
+  it('is null when absent', () => {
+    expect(rel(['Bear-Setup-0.1.1.exe']).files[0].sha256).toBeNull()
+  })
+})
+
+describe('platformCards', () => {
+  it('returns three unavailable cards for a null release', () => {
+    const cards = platformCards(null)
+    expect(cards.map((c) => c.os)).toEqual(['windows', 'mac', 'linux'])
+    expect(cards.every((c) => !c.available && c.version === null && c.meta === null)).toBe(true)
+    expect(cards[0].slots.map((s) => [s.id, s.label, s.file])).toEqual([['exe', 'Download .exe', null], ['msi', '.msi for IT', null]])
+    expect(cards[1].slots.map((s) => [s.id, s.label])).toEqual([['arm64', 'Apple silicon'], ['x64', 'Intel']])
+    expect(cards[2].slots.map((s) => [s.id, s.label])).toEqual([['deb', '.deb'], ['appimage', 'AppImage'], ['flatpak', 'Flatpak']])
+    expect(cards[2].other).toEqual([])
+  })
+  it('fills every slot for a full release', () => {
+    const [win, mac, linux] = platformCards(rel(names, { digest: `sha256:${HASH}` }))
+    expect([win, mac, linux].every((c) => c.available && c.version === '0.1.1')).toBe(true)
+    expect(win.slots.map((s) => s.file?.name)).toEqual(['Bear-Setup-0.1.1.exe', 'Bear-0.1.1.msi'])
+    expect(mac.slots.map((s) => s.file?.name)).toEqual(['Bear-0.1.1-arm64.dmg', 'Bear-0.1.1-x64.dmg'])
+    expect(mac.extras.map((f) => f.name)).toEqual(['Bear-0.1.1-arm64-mac.zip', 'Bear-0.1.1-x64-mac.zip'])
+    expect(linux.slots.map((s) => s.file?.name)).toEqual(['bear_0.1.1_amd64.deb', 'Bear-0.1.1-x64.AppImage', 'Bear-0.1.1-x64.flatpak'])
+    expect(linux.other.map((f) => f.name)).toEqual(['Bear-0.1.1-x64.rpm', 'Bear-0.1.1-x64.tar.gz'])
+    expect(win.slots[0].file?.sha256).toBe(HASH)
+    expect(win.meta).toBe('v0.1.1 · .exe 2 MB · .msi 2 MB')
+    expect(mac.meta).toBe('v0.1.1 · Apple silicon 2 MB · Intel 2 MB')
+  })
+  it('handles a partial release: no flatpak, windows only', () => {
+    const cards = platformCards(rel(names.filter((n) => !n.endsWith('.flatpak'))))
+    expect(cards[2].slots.map((s) => s.file?.name ?? null)).toEqual(['bear_0.1.1_amd64.deb', 'Bear-0.1.1-x64.AppImage', null])
+    const winOnly = platformCards(rel(['Bear-Setup-0.1.1.exe']))
+    expect(winOnly.map((c) => c.available)).toEqual([true, false, false])
+    expect(winOnly[0].slots[1].file).toBeNull()
+    expect(winOnly[0].meta).toBe('v0.1.1 · 2 MB')
+    expect(winOnly[1].meta).toBeNull()
+  })
+  it('puts an arch-less mac dmg in the Intel slot and a zip without arch in extras', () => {
+    const mac = platformCards(rel(['Bear-0.1.1.dmg', 'Bear-0.1.1-mac.zip']))[1]
+    expect(mac.slots[0].file).toBeNull()
+    expect(mac.slots[1].file?.name).toBe('Bear-0.1.1.dmg')
+    expect(mac.extras.map((f) => f.name)).toEqual(['Bear-0.1.1-mac.zip'])
+  })
+  it('never offers a hostile url', () => {
+    const p = payload(['Bear-Setup-0.1.1.exe', 'Bear-0.1.1.msi'])
+    p.assets[1].browser_download_url = 'https://evil.test/Bear-0.1.1.msi'
+    const win = platformCards(toRelease(p))[0]
+    expect(win.slots[1].file).toBeNull()
+    expect(win.slots[0].file?.url.startsWith(BASE)).toBe(true)
   })
 })

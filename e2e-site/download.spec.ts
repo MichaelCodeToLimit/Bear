@@ -1,6 +1,15 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
-test('download page renders a release or the fallback with no console errors', async ({ page }) => {
+const RELEASES = 'https://github.com/MichaelCodeToLimit/Bear/releases'
+const WINDOWS_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+
+// These tests describe the no-release state (no release exists yet). Once a real release is built into the site,
+// the state-specific assertions skip themselves; the release-present markup is covered by PlatformCards.render.test.ts.
+async function noRelease(page: Page): Promise<boolean> {
+  return (await page.locator('[data-os-group] [data-status="soon"]').count()) === 3
+}
+
+test('download page renders the three platform cards with no console errors', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text())
@@ -9,19 +18,84 @@ test('download page renders a release or the fallback with no console errors', a
 
   const response = await page.goto('download/')
   expect(response?.status()).toBe(200)
-
-  const groups = page.locator('[data-os-group]')
-  const fallback = page.getByText('The first release is on its way')
-  await expect(groups.first().or(fallback.first())).toBeVisible()
+  await expect(page.locator('h1')).toHaveCount(1)
+  await expect(page.locator('[data-os-group]')).toHaveCount(3)
+  expect(await page.locator('[data-os-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-os-group')))).toEqual(['windows', 'mac', 'linux'])
   await expect(page.getByText('pnpm install').first()).toBeVisible()
   expect(errors).toEqual([])
 })
 
-test('download page has the Windows download button', async ({ page }) => {
+test('no release: every card says Coming soon with the right buttons, all pointing at the Releases page', async ({ page }) => {
   await page.goto('download/')
-  const btn = page.locator('[data-windows-download="exe"], [data-windows-download="releases"]').first()
-  await expect(btn).toBeVisible()
-  await expect(btn).toContainText('Download for Windows')
-  const href = (await btn.getAttribute('href')) ?? ''
-  expect(/\/releases\/download\/.+\.exe$/.test(href) || href === 'https://github.com/MichaelCodeToLimit/Bear/releases').toBe(true)
+  test.skip(!(await noRelease(page)), 'a release is built into the site')
+
+  const card = (os: string) => page.locator(`[data-os-group="${os}"]`)
+  for (const os of ['windows', 'mac', 'linux']) {
+    await expect(card(os)).toContainText('Coming soon')
+    await expect(card(os)).toContainText('First release coming soon')
+  }
+  await expect(card('windows').getByRole('link', { name: /^Download \.exe/ })).toBeVisible()
+  await expect(card('windows').getByRole('link', { name: /^\.msi for IT/ })).toBeVisible()
+  await expect(card('mac').getByRole('link', { name: /^Apple silicon/ })).toBeVisible()
+  await expect(card('mac').getByRole('link', { name: /^Intel/ })).toBeVisible()
+  await expect(card('linux').getByRole('link', { name: /^\.deb for/ })).toBeVisible()
+  await expect(card('linux').getByRole('link', { name: /^AppImage for/ })).toBeVisible()
+  await expect(card('linux').getByRole('link', { name: /^Flatpak for/ })).toBeVisible()
+  await expect(card('linux').locator('details summary')).toContainText('Other')
+
+  // The "Other" list works without script: open it and its links go to Releases too.
+  await card('linux').locator('details summary').click()
+  const links = page.locator('[data-os-group] a[data-download]')
+  expect(await links.count()).toBe(2 + 2 + 3 + 2)
+  for (const a of await links.all()) {
+    expect(await a.getAttribute('href')).toBe(RELEASES)
+    expect(await a.getAttribute('data-state')).toBe('pending')
+  }
+  // No dead or hash links anywhere in the cards.
+  for (const a of await page.locator('[data-os-group] a').all()) {
+    const href = await a.getAttribute('href')
+    expect(href && href !== '#').toBeTruthy()
+  }
+})
+
+test('the cards come before the Build from source block', async ({ page }) => {
+  await page.goto('download/')
+  const cardsFirst = await page.evaluate(() => {
+    const card = document.querySelector('[data-os-group]')!
+    const source = document.getElementById('dl-source-title')!
+    return !!(card.compareDocumentPosition(source) & Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+  expect(cardsFirst).toBe(true)
+})
+
+test.describe('on Windows', () => {
+  test.use({ userAgent: WINDOWS_UA })
+  test('"Your device" shows on exactly the Windows card', async ({ page }) => {
+    await page.goto('download/')
+    const badges = page.locator('[data-your-device]:visible')
+    await expect(badges).toHaveCount(1)
+    await expect(page.locator('[data-os-group="windows"] [data-your-device]')).toBeVisible()
+    await expect(page.locator('[data-os-group="windows"]')).toHaveAttribute('data-yours', '')
+    await expect(page.locator('[data-yours]')).toHaveCount(1)
+  })
+})
+
+test('the cards stack on a phone without horizontal scroll, in dark and light', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 })
+  for (const theme of ['dark', 'light']) {
+    await page.goto('download/')
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    await page.locator('[data-os-group="linux"] details summary').click()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+    const boxes = await page.locator('[data-os-group]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()))
+    expect(boxes[1].top).toBeGreaterThan(boxes[0].bottom - 1)
+    for (const b of boxes) expect(b.right).toBeLessThanOrEqual(375)
+  }
+})
+
+test('three columns on a wide screen', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('download/')
+  const tops = await page.locator('[data-os-group]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
+  expect(new Set(tops).size).toBe(1)
 })

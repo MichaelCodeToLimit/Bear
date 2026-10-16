@@ -1,14 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// No release exists yet, so the release-state markup is not renderable in e2e; assert on the page source.
+// The release-state markup of the cards is covered by PlatformCards.render.test.ts; this checks the page wiring.
 const source = readFileSync(new URL('../pages/download.astro', import.meta.url), 'utf8')
 
 describe('download page source', () => {
   it('uses the spec headline for the release state', () => {
     expect(source).toContain('Get Bear. <span class="grad">Keep it.</span>')
   })
-  it('gives every installer card an OS glyph', () => {
-    expect(source).toMatch(/<li class="card dl-card"[\s\S]*<OsGlyph os=\{os\} \/>/)
+  it('puts the platform cards before the build-from-source block', () => {
+    expect(source.indexOf('<PlatformCards')).toBeGreaterThan(-1)
+    expect(source.indexOf('<PlatformCards')).toBeLessThan(source.indexOf('Build from source</h2>'))
+  })
+  it('no longer has the per-file groups or the Best-for-you slot', () => {
+    expect(source).not.toMatch(/data-best|initBestForYou|id="downloads"/)
   })
 })
