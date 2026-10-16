@@ -55,8 +55,25 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm test
+      # Failures are copied into an error annotation: run logs need a GitHub sign-in, annotations don't.
+      - name: Typecheck
+        shell: bash
+        run: |
+          set +e
+          pnpm typecheck > typecheck.log 2>&1
+          code=$?
+          cat typecheck.log
+          if [ $code -ne 0 ]; then echo "::error title=typecheck failed (exit $code)::$(head -c 1800 typecheck.log | tr '\r\n' '  ')"; fi
+          exit $code
+      - name: Unit tests
+        shell: bash
+        run: |
+          set +e
+          pnpm test > unit.log 2>&1
+          code=$?
+          tail -n 30 unit.log
+          if [ $code -ne 0 ]; then echo "::error title=unit tests failed (exit $code)::$(grep -E 'FAIL|Error|expected|received|✗|×' unit.log | head -c 1800 | tr '\r\n' '  ')"; fi
+          exit $code
       - name: Install rpm tooling
         if: matrix.target == 'linux'
         run: |
