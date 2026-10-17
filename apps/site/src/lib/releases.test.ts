@@ -143,8 +143,10 @@ describe('detectOS', () => {
     expect(detectOS('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15')).toBe('mac')
     expect(detectOS('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36')).toBe('linux')
   })
-  it('returns null for Android and iOS', () => {
-    expect(detectOS('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36')).toBeNull()
+  it('detects Android before Linux, and returns null for iOS', () => {
+    expect(detectOS('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36')).toBe('android')
+    expect(detectOS('Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36 Chrome/120.0 Safari/537.36')).toBe('android')
+    expect(detectOS('Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15')).toBeNull()
     expect(detectOS('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15')).toBeNull()
   })
 })
@@ -168,6 +170,12 @@ describe('classifyAsset kinds, arch and new Linux formats', () => {
     expect(classifyAsset('Bear-0.1.1-x64.tar.gz')).toMatchObject({ os: 'linux', kind: 'targz', label: '.tar.gz (any distro)' })
     expect(classifyAsset('bear_0.1.1_amd64.deb')?.label).toBe('.deb (Debian, Ubuntu)')
   })
+  it('classifies an apk as the recommended Android file, whatever the case', () => {
+    const want = { os: 'android', kind: 'apk', arch: null, label: 'APK (Android 7 or later)', recommended: true }
+    expect(classifyAsset('Bear-0.1.1-debug.apk')).toEqual(want)
+    expect(classifyAsset('BEAR-0.1.1-DEBUG.APK')).toEqual(want)
+    expect(classifyAsset('Bear-0.1.1-debug.apk.sha256')).toBeNull()
+  })
   it('keeps metadata hidden', () => {
     for (const n of ['Bear-0.1.1-x64.rpm.blockmap', 'latest-linux.yml', 'builder-debug.yml', 'Bear-0.1.1-arm64.dmg.blockmap']) expect(classifyAsset(n)).toBeNull()
   })
@@ -186,7 +194,8 @@ const names = [
   'Bear-0.1.1-x64.AppImage',
   'Bear-0.1.1-x64.flatpak',
   'Bear-0.1.1-x64.rpm',
-  'Bear-0.1.1-x64.tar.gz'
+  'Bear-0.1.1-x64.tar.gz',
+  'Bear-0.1.1-debug.apk'
 ]
 const payload = (list: string[], extra: Record<string, unknown> = {}) => ({
   tag_name: 'v0.1.1',
@@ -209,23 +218,28 @@ describe('toRelease digest', () => {
 })
 
 describe('platformCards', () => {
-  it('returns three unavailable cards for a null release', () => {
+  it('returns four unavailable cards for a null release', () => {
     const cards = platformCards(null)
-    expect(cards.map((c) => c.os)).toEqual(['windows', 'mac', 'linux'])
+    expect(cards.map((c) => c.os)).toEqual(['windows', 'mac', 'linux', 'android'])
     expect(cards.every((c) => !c.available && c.version === null && c.meta === null)).toBe(true)
     expect(cards[0].slots.map((s) => [s.id, s.label, s.file])).toEqual([['exe', 'Download .exe', null], ['msi', '.msi for IT', null]])
     expect(cards[1].slots.map((s) => [s.id, s.label])).toEqual([['arm64', 'Apple silicon'], ['x64', 'Intel']])
     expect(cards[2].slots.map((s) => [s.id, s.label])).toEqual([['deb', '.deb'], ['appimage', 'AppImage'], ['flatpak', 'Flatpak']])
     expect(cards[2].other).toEqual([])
+    expect(cards[3]).toMatchObject({ title: 'Android', description: 'Android 7.0 or later. Install the APK file straight onto your phone or tablet.', extras: [], other: [] })
+    expect(cards[3].slots.map((s) => [s.id, s.label, s.file])).toEqual([['apk', 'Download .apk', null]])
   })
   it('fills every slot for a full release', () => {
-    const [win, mac, linux] = platformCards(rel(names, { digest: `sha256:${HASH}` }))
-    expect([win, mac, linux].every((c) => c.available && c.version === '0.1.1')).toBe(true)
+    const [win, mac, linux, android] = platformCards(rel(names, { digest: `sha256:${HASH}` }))
+    expect([win, mac, linux, android].every((c) => c.available && c.version === '0.1.1')).toBe(true)
     expect(win.slots.map((s) => s.file?.name)).toEqual(['Bear-Setup-0.1.1.exe', 'Bear-0.1.1.msi'])
     expect(mac.slots.map((s) => s.file?.name)).toEqual(['Bear-0.1.1-arm64.dmg', 'Bear-0.1.1-x64.dmg'])
     expect(mac.extras.map((f) => f.name)).toEqual(['Bear-0.1.1-arm64-mac.zip', 'Bear-0.1.1-x64-mac.zip'])
     expect(linux.slots.map((s) => s.file?.name)).toEqual(['bear_0.1.1_amd64.deb', 'Bear-0.1.1-x64.AppImage', 'Bear-0.1.1-x64.flatpak'])
     expect(linux.other.map((f) => f.name)).toEqual(['Bear-0.1.1-x64.rpm', 'Bear-0.1.1-x64.tar.gz'])
+    expect(android.slots.map((s) => s.file?.name)).toEqual(['Bear-0.1.1-debug.apk'])
+    expect(android.slots[0].file?.sha256).toBe(HASH)
+    expect(android.meta).toBe('v0.1.1 · 2 MB')
     expect(win.slots[0].file?.sha256).toBe(HASH)
     expect(win.meta).toBe('v0.1.1 · .exe 2 MB · .msi 2 MB')
     expect(mac.meta).toBe('v0.1.1 · Apple silicon 2 MB · Intel 2 MB')
@@ -234,10 +248,29 @@ describe('platformCards', () => {
     const cards = platformCards(rel(names.filter((n) => !n.endsWith('.flatpak'))))
     expect(cards[2].slots.map((s) => s.file?.name ?? null)).toEqual(['bear_0.1.1_amd64.deb', 'Bear-0.1.1-x64.AppImage', null])
     const winOnly = platformCards(rel(['Bear-Setup-0.1.1.exe']))
-    expect(winOnly.map((c) => c.available)).toEqual([true, false, false])
+    expect(winOnly.map((c) => c.available)).toEqual([true, false, false, false])
     expect(winOnly[0].slots[1].file).toBeNull()
     expect(winOnly[0].meta).toBe('v0.1.1 · 2 MB')
     expect(winOnly[1].meta).toBeNull()
+  })
+  it('a release without an apk leaves the Android card unavailable with an empty slot', () => {
+    const android = platformCards(rel(names.filter((n) => !n.endsWith('.apk'))))[3]
+    expect(android.available).toBe(false)
+    expect(android.version).toBeNull()
+    expect(android.meta).toBeNull()
+    expect(android.slots[0].file).toBeNull()
+  })
+  it('an apk-only release makes only the Android card available', () => {
+    const cards = platformCards(rel(['Bear-0.1.1-debug.apk']))
+    expect(cards.map((c) => c.available)).toEqual([false, false, false, true])
+    expect(cards[3].slots[0].file?.url).toBe(BASE + 'Bear-0.1.1-debug.apk')
+  })
+  it('drops an apk with a hostile url', () => {
+    const p = payload(['Bear-Setup-0.1.1.exe', 'Bear-0.1.1-debug.apk'])
+    p.assets[1].browser_download_url = 'https://evil.test/Bear-0.1.1-debug.apk'
+    const android = platformCards(toRelease(p))[3]
+    expect(android.available).toBe(false)
+    expect(android.slots[0].file).toBeNull()
   })
   it('puts an arch-less mac dmg in the Intel slot and a zip without arch in extras', () => {
     const mac = platformCards(rel(['Bear-0.1.1.dmg', 'Bear-0.1.1-mac.zip']))[1]

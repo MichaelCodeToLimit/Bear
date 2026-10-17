@@ -22,7 +22,7 @@ test('product window shows the Bear apps panel with five Open links', async ({ p
 test('marquee lists formats and pauses with the motion toggle', async ({ page }) => {
   await page.goto('./')
   const marquee = page.locator('.marquee')
-  for (const t of ['.docx', '.xlsx', '.pptx', 'IMAP', 'Linux']) await expect(marquee).toContainText(t)
+  for (const t of ['.docx', '.xlsx', '.pptx', 'IMAP', 'Linux', 'Android']) await expect(marquee).toContainText(t)
   const track = page.locator('.marquee__track')
   await expect(track).toHaveCSS('animation-play-state', 'running')
   await page.locator('[data-motion-toggle]').first().click()

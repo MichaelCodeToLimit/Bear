@@ -47,8 +47,26 @@ chmod +x Bear-*.AppImage
 sudo apt install ./bear_*.deb
 ```
 
+## Android
+
+On Android, Bear comes as an `.apk` file, the standard install file for Android apps. It needs Android 7.0 or later and works on phones and tablets.
+
+This is a test build. It is signed with a debug key and is not on Google Play, so Android treats it as an app from outside the store. To install it:
+
+1. Download the `.apk` on your device, or copy it over from a computer.
+2. Open the downloaded file.
+3. When Android asks, allow installs from this source (your browser or file manager). You can switch this off again afterwards.
+4. If Play Protect offers to scan the app, let it, then choose **Install**.
+
+If you have Android's developer tools on a computer, you can install it over USB instead:
+
+```bash
+adb install Bear-*-debug.apk
+```
+
+A later release will be signed with a different key. Android will not install it over this test build, so you may need to uninstall the old one first.
 ## Open your files with Bear
 
-The installers register Bear for `.docx`, `.xlsx` and `.pptx` files. Double-click one and Bear opens it in the right app. If Bear is already running, the file opens in a new Bear window.
+On computers, the installers register Bear for `.docx`, `.xlsx` and `.pptx` files. Double-click one and Bear opens it in the right app. If Bear is already running, the file opens in a new Bear window.
 
 Ready to try it? Head to [your first document](../first-document/).

@@ -10,7 +10,7 @@ const { release } = Astro.props
 const cards = platformCards(release)
 const pending = release === null
 const version = release?.version ?? null
-const osName: Record<string, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux' }
+const osName: Record<string, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux', android: 'Android' }
 
 // Real file names when the release has them, otherwise the pattern electron-builder will produce.
 const v = version ?? '<version>'
@@ -27,6 +27,8 @@ const otherItems = [
   { label: '.rpm (Fedora, openSUSE)', file: linux.other.find((f) => f.kind === 'rpm') ?? null },
   { label: '.tar.gz (any distro)', file: linux.other.find((f) => f.kind === 'targz') ?? null }
 ]
+const apkFile = cards[3].slots[0].file
+const adbCmd = `adb install ${apkFile?.name ?? `Bear-${v}-debug.apk`}`
 const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip' : 'Intel .zip')
 ---
 
@@ -112,6 +114,17 @@ const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip'
               </div>
             )}
 
+            {card.os === 'android' && (
+              <>
+                <p class="pc-help">Open the .apk on your device (or run it from a computer):</p>
+                <ul class="pc-cmds" aria-label="Install command">
+                  <li>
+                    <code>{adbCmd}</code>
+                  </li>
+                </ul>
+              </>
+            )}
+
             {card.os === 'linux' && (
               <ul class="pc-cmds" aria-label="Install commands">
                 {hints.map((h) => (
@@ -126,6 +139,8 @@ const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip'
               {card.os === 'windows' && 'Not code-signed yet. If SmartScreen warns you, choose More info → Run anyway.'}
               {card.os === 'mac' && 'Not notarized yet. The first time, open System Settings → Privacy & Security and choose Open Anyway.'}
               {card.os === 'linux' && 'Run the command for the file you downloaded. AppImage needs no install.'}
+              {card.os === 'android' &&
+                'Test build signed with a debug key, so it isn’t on Google Play. Open the downloaded file and allow installs from this source when Android asks; Play Protect may ask to scan it.'}
             </p>
           </article>
         )
@@ -145,7 +160,7 @@ const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip'
   }
   @media (min-width: 900px) {
     .pc-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
   .pc-card {

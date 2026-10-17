@@ -1,8 +1,8 @@
 import { SITE } from '../site.config'
 
-export type OS = 'windows' | 'mac' | 'linux'
+export type OS = 'windows' | 'mac' | 'linux' | 'android'
 
-export type FileKind = 'exe' | 'msi' | 'dmg' | 'zip' | 'deb' | 'appimage' | 'flatpak' | 'rpm' | 'targz'
+export type FileKind = 'exe' | 'msi' | 'dmg' | 'zip' | 'deb' | 'appimage' | 'flatpak' | 'rpm' | 'targz' | 'apk'
 export type Arch = 'arm64' | 'x64'
 
 export interface DownloadFile {
@@ -42,6 +42,7 @@ export function classifyAsset(name: string): Pick<DownloadFile, 'os' | 'label' |
   if (n.endsWith('.deb')) return { os: 'linux', kind: 'deb', arch: null, label: '.deb (Debian, Ubuntu)', recommended: false }
   if (n.endsWith('.flatpak')) return { os: 'linux', kind: 'flatpak', arch: null, label: 'Flatpak', recommended: false }
   if (n.endsWith('.rpm')) return { os: 'linux', kind: 'rpm', arch: null, label: '.rpm (Fedora, openSUSE)', recommended: false }
+  if (n.endsWith('.apk')) return { os: 'android', kind: 'apk', arch: null, label: 'APK (Android 7 or later)', recommended: true }
   if (n.endsWith('.tar.gz')) return { os: 'linux', kind: 'targz', arch: null, label: '.tar.gz (any distro)', recommended: false }
   return null
 }
@@ -103,7 +104,8 @@ export async function fetchLatestRelease(
 }
 
 export function detectOS(userAgent: string): OS | null {
-  if (/android|iphone|ipad|ipod/i.test(userAgent)) return null
+  if (/iphone|ipad|ipod/i.test(userAgent)) return null
+  if (/android/i.test(userAgent)) return 'android'
   if (/windows/i.test(userAgent)) return 'windows'
   if (/macintosh|mac os x/i.test(userAgent)) return 'mac'
   if (/linux|x11/i.test(userAgent)) return 'linux'
@@ -111,7 +113,7 @@ export function detectOS(userAgent: string): OS | null {
 }
 
 export interface CardSlot {
-  id: 'exe' | 'msi' | 'arm64' | 'x64' | 'deb' | 'appimage' | 'flatpak'
+  id: 'exe' | 'msi' | 'arm64' | 'x64' | 'deb' | 'appimage' | 'flatpak' | 'apk'
   /** Visible button text. */
   label: string
   /** Short name used in the size line. */
@@ -135,7 +137,7 @@ export interface PlatformCard {
   meta: string | null
 }
 
-/** The three download cards in order: windows, mac, linux. Pure; a null release gives empty, unavailable cards. */
+/** The four download cards in order: windows, mac, linux, android. Pure; a null release gives empty, unavailable cards. */
 export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
   const files = release?.files ?? []
   const pick = (os: OS, kind: FileKind, arch?: Arch): DownloadFile | null =>
@@ -184,6 +186,7 @@ export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
       ],
       [],
       [...all('linux', 'rpm'), ...all('linux', 'targz')]
-    )
+    ),
+    build('android', 'Android', 'Android 7.0 or later. Install the APK file straight onto your phone or tablet.', [{ id: 'apk', label: 'Download .apk', short: '.apk', file: pick('android', 'apk') }])
   ]
 }
