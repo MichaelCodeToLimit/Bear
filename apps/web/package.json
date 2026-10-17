@@ -1,0 +1,34 @@
+{
+  "name": "@bear/web",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Bear on the web: the desktop suite's UI running in a browser",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@bear/app-board": "workspace:*",
+    "@bear/app-mail": "workspace:*",
+    "@bear/app-notes": "workspace:*",
+    "@bear/app-sheets": "workspace:*",
+    "@bear/app-sites": "workspace:*",
+    "@bear/app-slides": "workspace:*",
+    "@bear/app-tasks": "workspace:*",
+    "@bear/app-write": "workspace:*",
+    "@bear/core": "workspace:*",
+    "@bear/ui": "workspace:*",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^4.0.0",
+    "vite": "^6.0.0"
+  }
+}
