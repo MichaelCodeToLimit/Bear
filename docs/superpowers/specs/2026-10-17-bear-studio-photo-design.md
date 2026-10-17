@@ -39,7 +39,7 @@ Layer masks, adjustment layers, pen/vector paths, healing and clone tools, layer
 
 - New package `packages/app-photo` (`@bear/app-photo`), laid out like `@bear/app-slides`. Depends on `@bear/core`, `@bear/ui`, `ag-psd`, `jszip`, `lucide-react`.
 - `packages/core/src/apps.ts`: `AppInfo` gains `suite: 'office' | 'studio'`. All existing apps get `suite: 'office'`. Add:
-  `{ id: 'photo', name: 'Photo', tagline: 'Photo editing', suite: 'studio', color: <new Studio colour>, extensions: ['bearphoto', 'psd', 'png', 'jpg', 'jpeg', 'webp'], ready: true }`
+  `{ id: 'photo', name: 'Photo', tagline: 'Photo editing', suite: 'studio', color: <new Studio colour>, extensions: ['bearphoto', 'psd', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'], ready: true }`
 - Future Studio apps (Vector, PDF, Video, Motion, Audio, Layout) are added with `ready: false` and show as "coming soon".
 - `apps/desktop/src/renderer/App.tsx` routes `photo` to `<PhotoApp>`, the same way it routes Slides.
 - Launcher: a second row titled **Bear Studio** below the office apps.
@@ -93,9 +93,11 @@ interface Layer {
 
 `Mask` is a single-channel 8-bit image (`Uint8Array` + size) the size of the document.
 
-### Painting (Canvas 2D)
+### Painting
 
-- Each raster layer's pixels live in its own `OffscreenCanvas`.
+*Changed during planning:* layer pixels are plain RGBA byte buffers (`Bitmap`), not `OffscreenCanvas`, so painting, undo, filters and file round trips can all be unit-tested in Node. Brush, eraser, fill, gradient and shapes are written in TypeScript over those buffers. Canvas 2D is still used for text, for decoding and encoding JPG/WebP/GIF/BMP/AVIF, and for the fallback view.
+
+- Each raster layer's pixels live in its own RGBA buffer.
 - Brush and eraser strokes are stamps of a round brush placed along the smoothed pointer path, spaced by the spacing setting. Pen pressure changes size/opacity when the device reports it.
 - A stroke paints onto a temporary stroke canvas, then is merged into the layer on pointer-up at the stroke's opacity, so overlapping stamps don't build up beyond that opacity.
 - Fill, gradient, magic wand and eyedropper read and write the layer's `ImageData` directly.
@@ -232,9 +234,9 @@ Tools change the document only through the model's edit functions, which record 
 | WebGL2 unavailable or GPU context lost | Switch to the Canvas 2D compositor; re-upload textures if the context comes back; show a notice once. No work lost |
 | Image too large or not enough memory | Checked before opening. Above 30,000 px or the memory estimate, offer to open it scaled down |
 | Unsupported .psd parts | Open what is possible; list what didn't carry over |
-| Save fails (disk full, file locked) | Atomic save leaves the original untouched; the error names the cause |
+| Save fails (disk full, file locked) | Atomic save leaves the original untouched; the error names the cause. *Found in planning:* Bear's `file:save` used a plain `fs.writeFile`, so it is switched to `writeFileAtomic` for every app |
 | Filter worker crashes | Cancel the preview, keep the image unchanged, say so |
-| Unexpected crash | AutoSave's recovery copy is offered on next launch, as in other Bear apps |
+| Unexpected crash | *Found in planning:* Bear has no crash recovery yet, so Photo adds its own. While there are unsaved changes, a recovery copy is written to `userData/recovery/` every 60 seconds and offered on the next launch |
 
 ## Done means
 
