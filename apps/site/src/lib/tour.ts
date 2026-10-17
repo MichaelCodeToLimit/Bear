@@ -1,4 +1,5 @@
-import { APPS, type AppId, type AppInfo } from '@bear/core'
+import type { AppId, AppInfo } from '@bear/core'
+import { OFFICE_APPS as APPS } from './officeApps'
 
 export interface TourApp extends AppInfo {
   features: string[]

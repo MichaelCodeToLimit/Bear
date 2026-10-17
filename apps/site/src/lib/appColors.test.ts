@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { APPS } from '@bear/core'
+import { OFFICE_APPS as APPS } from './officeApps'
 import { appColorCss } from './appColors'
 
 describe('appColorCss', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { APPS } from '@bear/core'
+import { OFFICE_APPS as APPS } from './officeApps'
 import { contrastRatio, LIGHT, DARK } from './themeMixer'
 
 // App colours render as text only on the light card surface; on dark they render in --ink.
