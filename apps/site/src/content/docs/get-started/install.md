@@ -61,10 +61,13 @@ This is a test build. It is signed with a debug key and is not on Google Play, s
 If you have Android's developer tools on a computer, you can install it over USB instead:
 
 ```bash
-adb install Bear-*-debug.apk
+adb install Bear-0.1.1-debug.apk
 ```
 
-A later release will be signed with a different key. Android will not install it over this test build, so you may need to uninstall the old one first.
+Use the file name you downloaded in place of `Bear-0.1.1-debug.apk`.
+
+A later release may be signed with a different key. Android will not install it over this test build, so you may need to uninstall the old one first.
+
 ## Open your files with Bear
 
 On computers, the installers register Bear for `.docx`, `.xlsx` and `.pptx` files. Double-click one and Bear opens it in the right app. If Bear is already running, the file opens in a new Bear window.

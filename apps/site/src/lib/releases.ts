@@ -103,6 +103,12 @@ export async function fetchLatestRelease(
   }
 }
 
+/**
+ * Guess the visitor's system from the user agent, for the "Your device" badge only (every download stays one click away).
+ * Limits: Android Chrome in "desktop site" mode and Chrome OS send a Linux user agent, so they match Linux; iPadOS 13+
+ * in desktop mode reports a Macintosh user agent and matches Mac. iPhone/iPad/iPod (old-style agents) get no badge.
+ * The Android check comes before Linux because Android user agents also contain "Linux".
+ */
 export function detectOS(userAgent: string): OS | null {
   if (/iphone|ipad|ipod/i.test(userAgent)) return null
   if (/android/i.test(userAgent)) return 'android'
