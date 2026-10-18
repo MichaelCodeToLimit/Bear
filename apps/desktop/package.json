@@ -21,6 +21,7 @@
     "@bear/app-board": "workspace:*",
     "@bear/app-mail": "workspace:*",
     "@bear/app-notes": "workspace:*",
+    "@bear/app-photo": "workspace:*",
     "@bear/app-sheets": "workspace:*",
     "@bear/app-sites": "workspace:*",
     "@bear/app-slides": "workspace:*",

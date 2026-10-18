@@ -1,0 +1,19 @@
+{
+  "name": "@bear/app-photo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@bear/core": "workspace:*",
+    "@bear/ui": "workspace:*",
+    "ag-psd": "^31.0.3",
+    "fast-png": "^8.0.0",
+    "jszip": "^3.10.2",
+    "lucide-react": "^0.460.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}
