@@ -102,7 +102,18 @@ const layerNames = (page: Page) => page.getByTestId('layer-row').evaluateAll((ro
 /** Wait until the compositor has drawn the latest state (it draws once per animation frame). */
 const settle = (page: Page) => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
 
-/** A checksum of every layer's bytes plus its geometry, read through the test hook. */
+/** A checksum of every layer's bytes plus its geometry (for a document decoded in Node). */
+function checksumOf(doc: Pick<PhotoDoc, 'width' | 'height' | 'layers'>): string {
+  let sum = 0
+  for (const l of doc.layers) {
+    const d = l.pixels.data
+    for (let i = 0; i < d.length; i++) sum = (sum * 31 + d[i]) >>> 0
+    sum = (sum * 31 + l.x * 7 + l.y * 13 + l.pixels.width) >>> 0
+  }
+  return `${doc.width}x${doc.height}:${doc.layers.length}:${sum}`
+}
+
+/** The same checksum of the open document, computed in the page through the test hook. */
 const docChecksum = (page: Page) =>
   page.evaluate(() => {
     const doc = window.__bearPhotoTest!.editor!().doc
@@ -243,21 +254,31 @@ test.describe('Photo', () => {
     await page.getByRole('button', { name: 'New layer' }).click()
     await expect(page.getByTestId('layer-row')).toHaveCount(2)
 
+    await page.keyboard.press('Control+1')
+    await expect(page.getByTestId('photo-zoom')).toHaveText('100%')
+    const before = await readCanvas(page)
+    // The comparisons are only worth something if the stroke is in the part read back.
+    expect(darkPixels(before)).toBeGreaterThan(100)
+
+    // Blur the layer with the stroke (the new layer above it is empty).
+    const background = page.locator('[data-testid=layer-row][data-name="Background"]')
+    await background.getByText('Background', { exact: true }).click()
+    await expect(background).toHaveAttribute('aria-selected', 'true')
     const dlg = await openGaussian(page)
     await page.getByTestId('dialog-slider-radius').fill('4')
     await dlg.getByRole('button', { name: 'Apply', exact: true }).click()
     await expect(dlg).toBeHidden()
     await expect(currentRow(page)).toHaveText('Gaussian Blur')
     expect(await historyRows(page)).toEqual(['New', 'Brush', 'New Layer', 'Gaussian Blur'])
+    const blurred = await readCanvas(page)
+    expect(blurred.rect).toEqual(before.rect)
+    expect(readbackDiff(blurred, before)).toBeGreaterThan(20)
 
     await page.keyboard.press('Control+z')
     await expect(currentRow(page)).toHaveText('New Layer')
-
-    await page.keyboard.press('Control+1')
-    await expect(page.getByTestId('photo-zoom')).toHaveText('100%')
-    const before = await readCanvas(page)
-    // The comparison is only worth something if the stroke is in the part read back.
-    expect(darkPixels(before)).toBeGreaterThan(100)
+    const undone = await readCanvas(page)
+    expect(undone.rect).toEqual(before.rect)
+    expect(readbackDiff(undone, before)).toBeLessThanOrEqual(TOLERANCE)
 
     const out = join(dir, 'workflow.bearphoto')
     await stubSaveDialog(app, out)
@@ -477,7 +498,19 @@ test('recovery: a killed app offers its work back', async () => {
 
     const recoveryDir = join(dir, 'userdata', 'recovery')
     const copies = () => (existsSync(recoveryDir) ? readdirSync(recoveryDir).filter((f) => /^photo-[a-z0-9-]+\.bearphoto$/.test(f)) : [])
-    await expect.poll(copies, { timeout: 10_000 }).toHaveLength(1)
+    // Wait for a copy that holds the stroke, not just any copy: decode it and compare with the open document.
+    const copyChecksums = async () => {
+      const out: string[] = []
+      for (const f of copies()) {
+        try {
+          out.push(checksumOf(await readBearPhoto(new Uint8Array(readFileSync(join(recoveryDir, f))))))
+        } catch {
+          out.push('unreadable')
+        }
+      }
+      return out
+    }
+    await expect.poll(copyChecksums, { timeout: 10_000 }).toEqual([sum])
 
     await killHard(first.app)
     killed = true
