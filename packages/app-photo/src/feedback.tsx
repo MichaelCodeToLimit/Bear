@@ -2,22 +2,27 @@ import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Button, Modal } from '@bear/ui'
 
 export interface Notices {
-  items: { id: number; text: string }[]
+  items: { id: number; text: string; sticky?: boolean }[]
   /** Show a message in the notice bar (the same text is shown only once at a time). */
   notify: (text: string) => void
+  /** Like notify, but `clear` keeps it: for messages about Photo itself, not the document (slower drawing mode). */
+  notifySticky: (text: string) => void
   dismiss: (id: number) => void
+  /** Remove the document's notices (on New, Open, Restore). Sticky ones stay until dismissed. */
   clear: () => void
 }
 
 export function useNotices(): Notices {
-  const [items, setItems] = useState<{ id: number; text: string }[]>([])
+  const [items, setItems] = useState<{ id: number; text: string; sticky?: boolean }[]>([])
   const next = useRef(1)
-  const notify = useCallback((text: string) => {
-    setItems((list) => (list.some((n) => n.text === text) ? list : [...list, { id: next.current++, text }]))
+  const add = useCallback((text: string, sticky: boolean) => {
+    setItems((list) => (list.some((n) => n.text === text) ? list : [...list, { id: next.current++, text, sticky }]))
   }, [])
+  const notify = useCallback((text: string) => add(text, false), [add])
+  const notifySticky = useCallback((text: string) => add(text, true), [add])
   const dismiss = useCallback((id: number) => setItems((list) => list.filter((n) => n.id !== id)), [])
-  const clear = useCallback(() => setItems([]), [])
-  return { items, notify, dismiss, clear }
+  const clear = useCallback(() => setItems((list) => (list.some((n) => n.sticky) ? list.filter((n) => n.sticky) : [])), [])
+  return { items, notify, notifySticky, dismiss, clear }
 }
 
 /** Dismissible notices (PSD parts that didn't carry over, slower drawing mode…). */

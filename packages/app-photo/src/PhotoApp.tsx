@@ -55,7 +55,9 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
   const dialogs = useImageDialogs({ state, tools, accent: APP.color, notify: notices.notify })
   const dialogsRef = useRef(dialogs)
   dialogsRef.current = dialogs
-  useTestHook(editorRef)
+  const viewRef = useRef(state.view)
+  viewRef.current = state.view
+  useTestHook(editorRef, viewRef)
 
   /** Ask before opening something too large; resolves to the scale to use, or throws AbortError. */
   const askScale = useCallback(async (name: string, scale: number, reason: string) => {
@@ -247,7 +249,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
         }}
       >
         <Toolbox tool={state.tool} setTool={state.setTool} />
-        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notify} onToolPointer={tools.onPointer} cursor={tools.cursor} preview={dialogs.preview}>
+        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notifySticky} onToolPointer={tools.onPointer} cursor={tools.cursor} preview={dialogs.preview}>
           {hasDoc && <ToolOverlay selection={doc.selection} overlay={tools.overlay} view={state.view} hover={cursor !== null && (state.tool === 'brush' || state.tool === 'eraser')} />}
           {hasDoc && grid && <GridOverlay docW={doc.width} docH={doc.height} view={state.view} />}
           {hasDoc && tools.overlay?.kind === 'text' && <TextEditBox box={tools.overlay} view={state.view} options={tools.options.text} {...textBoxHandlers(tools)} />}
