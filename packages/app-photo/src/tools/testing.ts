@@ -14,11 +14,15 @@ export interface FakeContext extends ToolContext {
 /**
  * A ToolContext for Node tests: a real PhotoEditor over `doc` (default 20×20 transparent), a 1:1 view
  * (screen = doc coordinates), and recorders for status messages, overlays and refreshes.
+ * `setOption` updates `options`; `rasterizeText` returns a 4×2 block of the text colour.
  */
 export function fakeContext(doc: PhotoDoc = createDoc(20, 20, 'transparent'), tool?: Tool, options: Record<string, unknown> = {}): FakeContext {
   const ctx: FakeContext = {
     editor: new PhotoEditor(doc),
     options: { ...(tool ? defaultOptions(tool) : {}), ...options },
+    setOption(id, value) {
+      ctx.options = { ...ctx.options, [id]: value }
+    },
     colors: { fg: [0, 0, 0, 255], bg: [255, 255, 255, 255] },
     setColors(c: ToolColors) {
       ctx.colors = c
@@ -40,7 +44,8 @@ export function fakeContext(doc: PhotoDoc = createDoc(20, 20, 'transparent'), to
     refresh() {
       ctx.refreshes++
     },
-    rasterizeText: () => createBitmap(1, 1)
+    // A small solid block in the text colour stands in for real glyphs.
+    rasterizeText: (t) => createBitmap(4, 2, t.color)
   }
   return ctx
 }

@@ -22,6 +22,7 @@ import { PhotoBackstage, type BackstagePage } from './PhotoBackstage'
 import { formatZoom, zoomCommand, type ZoomCommand } from './zoom'
 import { useTools } from './useTools'
 import { ToolOverlay } from './ToolOverlay'
+import { TextEditBox, textBoxHandlers } from './TextEditBox'
 
 const APP = getApp('photo')
 
@@ -213,7 +214,8 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
       >
         <Toolbox tool={state.tool} setTool={state.setTool} />
         <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notify} onToolPointer={tools.onPointer} cursor={tools.cursor}>
-          {hasDoc && <ToolOverlay selection={doc.selection} overlay={tools.overlay} view={state.view} />}
+          {hasDoc && <ToolOverlay selection={doc.selection} overlay={tools.overlay} view={state.view} hover={cursor !== null && (state.tool === 'brush' || state.tool === 'eraser')} />}
+          {hasDoc && tools.overlay?.kind === 'text' && <TextEditBox box={tools.overlay} view={state.view} options={tools.options.text} {...textBoxHandlers(tools)} />}
           {!hasDoc && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted">
               <ImagePlus size={40} strokeWidth={1.2} />

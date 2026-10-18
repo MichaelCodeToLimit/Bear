@@ -33,11 +33,17 @@ export type Overlay =
   | { kind: 'path'; points: [number, number][] }
   | { kind: 'crop'; rect: Rect }
   | { kind: 'move'; dx: number; dy: number }
+  /** The brush outline under the pointer; `size` is the diameter in document px. */
+  | { kind: 'brush'; x: number; y: number; size: number }
+  /** An open text box: its top-left in the document and the text it starts with. `session` changes for each new box. */
+  | { kind: 'text'; x: number; y: number; text: string; color: RGBA; session: number }
 
 export interface ToolContext {
   editor: PhotoEditor
   /** The active tool's option values, keyed by `OptionSpec.id`. */
   options: Record<string, unknown>
+  /** Change one of the active tool's options (`[`/`]` brush size, a reopened text layer's font). */
+  setOption(id: string, value: unknown): void
   colors: ToolColors
   setColors(c: ToolColors): void
   view: ViewState

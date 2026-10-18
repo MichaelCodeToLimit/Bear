@@ -27,8 +27,9 @@ function Ants({ d, transform }: { d: string; transform?: string }) {
  * Drawn over the canvas: the selection's marching ants and whatever the active tool is drawing.
  * The viewBox is the canvas's device-pixel size, so the view maps straight onto it. The outline is
  * traced only when the selection object changes; panning and zooming just change the transform.
+ * The brush outline is drawn only while `hover` (the pointer is over the canvas with a brush tool).
  */
-export function ToolOverlay({ selection, overlay, view }: { selection: Mask | null; overlay: Overlay | null; view: ViewState }) {
+export function ToolOverlay({ selection, overlay, view, hover = true }: { selection: Mask | null; overlay: Overlay | null; view: ViewState; hover?: boolean }) {
   const outline = useMemo(() => (selection ? outlinePath(selection) : ''), [selection])
   const { zoom, panX, panY, viewW, viewH } = view
   const toView = `matrix(${zoom} 0 0 ${zoom} ${panX} ${panY})`
@@ -64,6 +65,13 @@ export function ToolOverlay({ selection, overlay, view }: { selection: Mask | nu
         <Ants transform={toView} d={`M${overlay.points.map((p) => `${p[0]} ${p[1]}`).join('L')}`} />
       )}
       {overlay?.kind === 'crop' && <CropBox rect={overlay.rect} view={view} dpr={dpr} />}
+      {overlay?.kind === 'brush' && hover && (
+        <g data-testid="photo-brush-cursor" transform={toView}>
+          {['#fff', '#000'].map((stroke, i) => (
+            <circle key={stroke} cx={overlay.x} cy={overlay.y} r={Math.max(0.5, overlay.size / 2)} fill="none" stroke={stroke} strokeWidth={i ? 1 : 3} vectorEffect="non-scaling-stroke" />
+          ))}
+        </g>
+      )}
     </svg>
   )
 }

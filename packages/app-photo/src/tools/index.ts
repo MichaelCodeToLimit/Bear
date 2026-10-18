@@ -1,32 +1,33 @@
+import { brush } from './brush'
 import { crop } from './crop'
+import { eraser } from './eraser'
 import { eyedropper } from './eyedropper'
+import { fill } from './fill'
+import { gradient } from './gradient'
 import { hand } from './hand'
 import { lasso } from './lasso'
 import { marquee } from './marquee'
 import { move } from './move'
+import { shape } from './shape'
+import { text } from './text'
 import { wand } from './wand'
 import { zoom } from './zoom'
 import type { Tool, ToolId } from './types'
 
-/** A tool whose behaviour arrives in a later task: it can be selected, but the canvas ignores it. */
-function pending(id: ToolId, label: string, key: string, cursor = 'crosshair'): Tool {
-  return { id, label, key, cursor, options: [], down() {}, move() {}, up() {} }
-}
-
-/** Toolbox order (spec §3). Brush, eraser, fill, gradient, text and shape are filled in by Task 13. */
+/** Toolbox order (spec §3). */
 export const TOOLS: Tool[] = [
   move,
   marquee,
   lasso,
   wand,
   crop,
-  pending('brush', 'Brush', 'B'),
-  pending('eraser', 'Eraser', 'E'),
-  pending('fill', 'Fill', 'G'),
-  pending('gradient', 'Gradient', 'G'),
+  brush,
+  eraser,
+  fill,
+  gradient,
   eyedropper,
-  pending('text', 'Text', 'T', 'text'),
-  pending('shape', 'Shape', 'U'),
+  text,
+  shape,
   hand,
   zoom
 ]

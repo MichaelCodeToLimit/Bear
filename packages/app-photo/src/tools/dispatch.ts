@@ -42,6 +42,11 @@ export class ToolDispatcher {
     return toolById(this.active()).onKey?.(this.ctx(), e) ?? false
   }
 
+  /** Run `fn` with a fresh context for the active tool. */
+  withContext(fn: (ctx: ToolContext) => void): void {
+    fn(this.ctx())
+  }
+
   /** A new document: the active tool drops everything it had pending. */
   reset(): void {
     this.pressed = false

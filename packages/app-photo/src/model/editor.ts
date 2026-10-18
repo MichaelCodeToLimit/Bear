@@ -104,13 +104,20 @@ export class PhotoEditor {
    * Run a pixel change limited to `rect` (layer-local coordinates) as one undoable step.
    * `fn` must only write inside `rect`; anything outside is not captured by undo.
    * If `rect` misses the layer entirely, `fn` is not called and no step is recorded.
+   *
+   * `opts.before` is for edits already shown live (a brush stroke paints the layer as it goes): it
+   * is the rect's pixels as they were before the edit, used instead of reading the layer now. It
+   * must be exactly the size of `rect` clipped to the layer, and `fn` may then be a no-op.
    */
-  editPixels(label: string, layerId: string, rect: Rect, fn: (pixels: Bitmap) => void): void {
+  editPixels(label: string, layerId: string, rect: Rect, fn: (pixels: Bitmap) => void, opts: { before?: Bitmap } = {}): void {
     const layer = getLayer(this.doc, layerId)
     if (!layer) throw new Error('Layer not found')
     const r = intersectRect(rect, { x: 0, y: 0, width: layer.pixels.width, height: layer.pixels.height })
     if (!r) return // nothing in range: fn is not called, so nothing can be written un-undoably
-    const before = readRect(layer.pixels, r)
+    if (opts.before && (opts.before.width !== r.width || opts.before.height !== r.height)) {
+      throw new Error('editPixels: `before` does not match the edited rect')
+    }
+    const before = opts.before ?? readRect(layer.pixels, r)
     fn(layer.pixels)
     const after = readRect(layer.pixels, r)
     const dirty = (): Rect => {
@@ -159,14 +166,14 @@ export class PhotoEditor {
     )
   }
 
-  addLayer(opts: { name?: string; above?: string; pixels?: Bitmap; x?: number; y?: number; kind?: 'raster' | 'text'; text?: TextData } = {}): Layer {
+  addLayer(opts: { name?: string; above?: string; pixels?: Bitmap; x?: number; y?: number; kind?: 'raster' | 'text'; text?: TextData; label?: string } = {}): Layer {
     const layer = createLayer(opts.name ?? `Layer ${this.doc.layers.length + 1}`, opts.pixels ?? createBitmap(this.doc.width, this.doc.height), {
       x: opts.x ?? 0,
       y: opts.y ?? 0,
       kind: opts.kind ?? 'raster',
       text: opts.text
     })
-    this.editStructure('New Layer', (doc) => {
+    this.editStructure(opts.label ?? 'New Layer', (doc) => {
       const at = doc.layers.findIndex((l) => l.id === (opts.above ?? doc.activeLayerId))
       doc.layers.splice(at < 0 ? doc.layers.length : at + 1, 0, layer)
       doc.activeLayerId = layer.id

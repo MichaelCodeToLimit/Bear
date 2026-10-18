@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { defaultOptions, toolById, toolForKey, TOOLS } from './tools'
+import { rasterizeText } from './render/rasterizeText'
 import { ToolDispatcher, type PointerPhase } from './tools/dispatch'
 import type { Overlay, ToolContext, ToolId, ToolPointer } from './tools/types'
 import type { PhotoEditorState } from './usePhotoEditor'
@@ -25,6 +26,8 @@ export interface ToolsState {
   /** Tool shortcuts, Space for Hand and the active tool's own keys. True when handled. */
   onKeyDown: (e: KeyboardEvent) => boolean
   onKeyUp: (e: KeyboardEvent) => void
+  /** Run `fn` with a fresh ToolContext (UI outside the canvas, such as the text box, talking to its tool). */
+  withContext: (fn: (ctx: ToolContext) => void) => void
 }
 
 /** Wires the tools in `tools/` to the editor state: one ToolContext per event, built from the latest state. */
@@ -43,6 +46,10 @@ export function useTools(state: PhotoEditorState): ToolsState {
   }, [])
   useEffect(() => () => clearTimeout(statusTimer.current), [])
 
+  const setOption = useCallback((tool: ToolId, id: string, value: unknown) => {
+    setOptions((o) => ({ ...o, [tool]: { ...o[tool], [id]: value } }))
+  }, [])
+
   const [dispatcher] = useState(
     () =>
       new ToolDispatcher(
@@ -51,6 +58,7 @@ export function useTools(state: PhotoEditorState): ToolsState {
           return {
             editor: s.editor,
             options: o[s.tool],
+            setOption: (id, v) => setOption(s.tool, id, v),
             colors: s.colors,
             setColors: s.setColors,
             view: s.view,
@@ -59,9 +67,7 @@ export function useTools(state: PhotoEditorState): ToolsState {
             setOverlay,
             status: showStatus,
             refresh: s.refresh,
-            rasterizeText: () => {
-              throw new Error('Text tool not available yet')
-            }
+            rasterizeText
           }
         },
         () => latest.current.state.tool,
@@ -126,10 +132,6 @@ export function useTools(state: PhotoEditorState): ToolsState {
     return () => window.removeEventListener('blur', release)
   }, [dispatcher])
 
-  const setOption = useCallback((tool: ToolId, id: string, value: unknown) => {
-    setOptions((o) => ({ ...o, [tool]: { ...o[tool], [id]: value } }))
-  }, [])
-
   return {
     options,
     setOption,
@@ -140,6 +142,7 @@ export function useTools(state: PhotoEditorState): ToolsState {
     cancelGesture: () => dispatcher.cancelGesture(),
     onPointer,
     onKeyDown,
-    onKeyUp
+    onKeyUp,
+    withContext: (fn) => dispatcher.withContext(fn)
   }
 }
