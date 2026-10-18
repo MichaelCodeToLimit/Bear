@@ -5,6 +5,7 @@ import {
   applyLut,
   blackAndWhite,
   brightnessContrast,
+  brightnessContrastLut,
   curvesLut,
   hueSaturation,
   invert,
@@ -72,6 +73,14 @@ describe('simple adjustments', () => {
     const c = solid(1, 1, [100, 50, 200, 255])
     brightnessContrast(c, { brightness: 0, contrast: 0 })
     expect(px(c)).toEqual([100, 50, 200, 255])
+  })
+  it('brightnessContrastLut is the table brightnessContrast applies', () => {
+    const p = { brightness: 13, contrast: -27 }
+    const ramp = createBitmap(256, 1)
+    for (let v = 0; v < 256; v++) ramp.data.set([v, v, v, 255], v * 4)
+    brightnessContrast(ramp, p)
+    const lut = brightnessContrastLut(p)
+    expect(Array.from({ length: 256 }, (_, v) => ramp.data[v * 4])).toEqual(Array.from(lut))
   })
   it('hue +180 on red -> cyan', () => {
     const b = solid(1, 1, [255, 0, 0, 255])

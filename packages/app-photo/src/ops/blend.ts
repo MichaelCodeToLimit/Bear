@@ -2,7 +2,8 @@ import type { BlendMode } from '../model/doc'
 
 /**
  * The 16 blend modes in one fixed order, identical to the `BlendMode` union.
- * Task 10's GLSL `u_mode` indices MUST follow this order (index = position in this list).
+ * The GLSL `u_mode` indices in render/gl/shaders.ts follow this order (index = position in this list):
+ * that shader's switch is generated from this array, so the two stay in step.
  */
 export const BLEND_MODES: readonly BlendMode[] = [
   'normal',

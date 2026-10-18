@@ -8,7 +8,7 @@ import { forEachMasked, type Offset } from './maskIter'
  * pixel (lx + offset.x, ly + offset.y), which is where the (document-sized) mask is sampled.
  * Masked result: out = in + (adjusted - in) * m / 255.
  *
- * The formulas below are mirrored by the WebGL preview shaders; keep them in sync.
+ * The formulas below are mirrored by the WebGL preview shader (render/gl/shaders.ts); keep them in sync.
  */
 
 /**
@@ -140,12 +140,17 @@ export function brightnessContrast(
   mask?: Mask | null,
   offset?: Offset,
 ): void {
+  applyLut(b, brightnessContrastLut(p), mask, offset)
+}
+
+/** The 256-entry LUT brightnessContrast applies (the WebGL preview uploads exactly this table). */
+export function brightnessContrastLut(p: { brightness: number; contrast: number }): Uint8Array {
   const B = p.brightness * 2.55
   const C = p.contrast * 2.55
   const f = (259 * (C + 255)) / (255 * (259 - C))
   const lut = new Uint8Array(256)
   for (let v = 0; v < 256; v++) lut[v] = Math.round(Math.min(255, Math.max(0, f * (v - 128) + 128 + B)))
-  applyLut(b, lut, mask, offset)
+  return lut
 }
 
 /** out = 255 - v. */
