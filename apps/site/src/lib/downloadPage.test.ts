@@ -12,6 +12,10 @@ describe('download page source', () => {
     expect(source.indexOf('<PlatformCards')).toBeGreaterThan(-1)
     expect(source.indexOf('<PlatformCards')).toBeLessThan(source.indexOf('Build from source</h2>'))
   })
+  it('starts the edition switcher and the Your device badge', () => {
+    expect(source).toContain('initEditionSwitch()')
+    expect(source).toContain('initYourDevice()')
+  })
   it('no longer has the per-file groups or the Best-for-you slot', () => {
     expect(source).not.toMatch(/data-best|initBestForYou|id="downloads"/)
   })

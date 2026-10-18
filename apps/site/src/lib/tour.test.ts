@@ -1,11 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { OFFICE_APPS as APPS } from './officeApps'
+import { SITE_APPS as APPS } from './officeApps'
 import { tourApps } from './tour'
 
 describe('tourApps', () => {
   it('lists every app in registry order', () => {
     expect(tourApps().map((a) => a.id)).toEqual(APPS.map((a) => a.id))
-    expect(tourApps()).toHaveLength(12)
+    expect(tourApps()).toHaveLength(13)
+  })
+
+  it('adds Photo after the office apps and keeps the unfinished Studio apps off', () => {
+    const ids = tourApps().map((a) => a.id)
+    expect(ids.at(-1)).toBe('photo')
+    for (const id of ['vector', 'pdf', 'video', 'motion', 'audio', 'layout']) expect(ids).not.toContain(id)
+    const photo = tourApps().find((a) => a.id === 'photo')!
+    expect(photo.ready).toBe(true)
+    expect(photo.docsSlug).toBe('apps/photo')
   })
 
   it('gives each ready app 4 to 6 features and a docs slug', () => {
@@ -21,7 +30,7 @@ describe('tourApps', () => {
   })
 
   it('keeps product names out of the feature copy', () => {
-    const banned = /\b(Microsoft|Office|Outlook|Word|Excel|PowerPoint|Teams|OneNote)\b/
+    const banned = /\b(Microsoft|Office|Outlook|Word|Excel|PowerPoint|Teams|OneNote|Adobe|Photoshop|Lightroom|Illustrator)\b/
     for (const a of tourApps()) {
       // A tagline fallback comes from @bear/core, not from the site copy.
       for (const f of a.features.filter((x) => x !== a.tagline)) expect(f, a.id).not.toMatch(banned)

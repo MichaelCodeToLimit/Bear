@@ -1,5 +1,5 @@
 import type { AppId, AppInfo } from '@bear/core'
-import { OFFICE_APPS as APPS } from './officeApps'
+import { SITE_APPS as APPS } from './officeApps'
 
 export interface TourApp extends AppInfo {
   features: string[]
@@ -62,6 +62,13 @@ export const FEATURES: Partial<Record<AppId, string[]>> = {
     'Steps, due dates, notes and importance',
     'Board view with drag-and-drop columns',
     'Undo after delete'
+  ],
+  photo: [
+    'Layers with blend modes and opacity',
+    'Marquee, lasso and magic wand selections',
+    'Brush, eraser, fill, gradient, shapes and text',
+    'Levels, curves, hue/saturation, blurs and sharpen',
+    'Opens .psd, PNG, JPG and WebP; saves .bearphoto and .psd'
   ]
 }
 

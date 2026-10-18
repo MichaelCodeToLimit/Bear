@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { OFFICE_APPS as APPS } from './officeApps'
+import { SITE_APPS as APPS } from './officeApps'
 import { contrastRatio, LIGHT, DARK } from './themeMixer'
 
 // App colours render as text only on the light card surface; on dark they render in --ink.
 describe('app colours as text', () => {
-  it('has 12 apps to check', () => {
-    expect(APPS).toHaveLength(12)
+  it('has 13 apps to check, Photo among them', () => {
+    expect(APPS).toHaveLength(13)
+    expect(APPS.map((a) => a.id)).toContain('photo')
   })
   it.each(APPS.map((a) => [a.id, a.color]))('%s (%s) meets 4.5:1 as text on the light card surface', (_id, color) => {
     expect(contrastRatio(color, LIGHT.surface)).toBeGreaterThanOrEqual(4.5)

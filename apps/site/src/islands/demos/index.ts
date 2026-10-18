@@ -8,6 +8,7 @@ import MailDemo from './MailDemo'
 import SitesDemo from './SitesDemo'
 import BoardDemo from './BoardDemo'
 import TasksDemo from './TasksDemo'
+import PhotoDemo from './PhotoDemo'
 
 /** One demo per finished app. `playing === false` renders the final frame. */
 export const DEMOS: Partial<Record<AppId, ComponentType<{ playing: boolean }>>> = {
@@ -18,7 +19,8 @@ export const DEMOS: Partial<Record<AppId, ComponentType<{ playing: boolean }>>> 
   mail: MailDemo,
   sites: SitesDemo,
   board: BoardDemo,
-  tasks: TasksDemo
+  tasks: TasksDemo,
+  photo: PhotoDemo
 }
 
 export { default as SleepingBear } from './SleepingBear'

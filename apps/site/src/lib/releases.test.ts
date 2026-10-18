@@ -253,3 +253,55 @@ describe('platformCards', () => {
     expect(win.slots[0].file?.url.startsWith(BASE)).toBe(true)
   })
 })
+
+describe('editions', () => {
+  it('detects the edition from the file name and still classifies kind and arch', () => {
+    expect(classifyAsset('Bear-Studio-Setup-0.2.0.exe')).toMatchObject({ kind: 'exe', os: 'windows', edition: 'studio' })
+    expect(classifyAsset('bear-office_0.2.0_amd64.deb')).toMatchObject({ kind: 'deb', os: 'linux', edition: 'office' })
+    expect(classifyAsset('Bear-0.2.0-arm64.dmg')).toMatchObject({ kind: 'dmg', arch: 'arm64', edition: 'all' })
+    expect(classifyAsset('Bear-Office-0.2.0-arm64-mac.zip')).toMatchObject({ kind: 'zip', arch: 'arm64', edition: 'office' })
+    expect(classifyAsset('BEAR-STUDIO-0.2.0-x64.AppImage')).toMatchObject({ kind: 'appimage', edition: 'studio' })
+    expect(classifyAsset('bear-studio_0.2.0_amd64.deb')).toMatchObject({ kind: 'deb', edition: 'studio' })
+    expect(classifyAsset('Bear-Setup-0.2.0.exe')).toMatchObject({ edition: 'all' })
+    expect(classifyAsset('bear_0.2.0_amd64.deb')).toMatchObject({ edition: 'all' })
+  })
+  it('keeps edition metadata files hidden', () => {
+    for (const n of ['Bear-Studio-Setup-0.2.0.exe.blockmap', 'latest.yml', 'Bear-Office-0.2.0-x64.rpm.blockmap']) expect(classifyAsset(n)).toBeNull()
+  })
+
+  const ed = (prefix: string, deb: string) => [
+    `${prefix}-Setup-0.2.0.exe`,
+    `${prefix}-0.2.0.msi`,
+    `${prefix}-0.2.0-arm64.dmg`,
+    `${prefix}-0.2.0-x64.dmg`,
+    `${prefix}-0.2.0-arm64-mac.zip`,
+    `${prefix}-0.2.0-x64-mac.zip`,
+    `${deb}_0.2.0_amd64.deb`,
+    `${prefix}-0.2.0-x64.AppImage`,
+    `${prefix}-0.2.0-x64.flatpak`,
+    `${prefix}-0.2.0-x64.rpm`,
+    `${prefix}-0.2.0-x64.tar.gz`
+  ]
+  const three = [...ed('Bear', 'bear'), ...ed('Bear-Office', 'bear-office'), ...ed('Bear-Studio', 'bear-studio')]
+
+  it.each([
+    ['all', 'Bear', 'bear'],
+    ['office', 'Bear-Office', 'bear-office'],
+    ['studio', 'Bear-Studio', 'bear-studio']
+  ] as const)('platformCards(release, %s) only uses that edition', (edition, prefix, deb) => {
+    const cards = platformCards(rel(three), edition)
+    const used = cards.flatMap((c) => [...c.slots.map((s) => s.file), ...c.extras, ...c.other]).filter((f) => f !== null)
+    expect(used).toHaveLength(11)
+    expect(used.every((f) => f!.edition === edition)).toBe(true)
+    expect(cards[0].slots[0].file?.name).toBe(`${prefix}-Setup-0.2.0.exe`)
+    expect(cards[2].slots[0].file?.name).toBe(`${deb}_0.2.0_amd64.deb`)
+  })
+  it('defaults to the full suite', () => {
+    expect(platformCards(rel(three))[0].slots[0].file?.name).toBe('Bear-Setup-0.2.0.exe')
+  })
+  it('an edition with no files gives unavailable cards even when the release has others', () => {
+    const cards = platformCards(rel(names), 'studio')
+    expect(cards.every((c) => !c.available && c.meta === null && c.version === null)).toBe(true)
+    expect(cards.flatMap((c) => c.slots).every((s) => s.file === null)).toBe(true)
+  })
+})

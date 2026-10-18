@@ -1,8 +1,8 @@
 # Bear
 
-A free, open-source desktop productivity suite. Documents, spreadsheets, slides, notes, mail, chat and dashboards, all in one app, with no subscription.
+A free, open-source desktop productivity suite. Documents, spreadsheets, slides, notes, mail, chat and dashboards, all in one app, with no subscription. Bear Studio adds creative apps, starting with Photo.
 
-> Bear is an independent project. It is not affiliated with or endorsed by Microsoft. It reads and writes common Office file formats (.docx, .xlsx and .pptx) for compatibility.
+> Bear is an independent project. It is not affiliated with or endorsed by Microsoft or Adobe. It reads and writes common Office file formats (.docx, .xlsx and .pptx) and layered .psd images for compatibility.
 
 ## Status
 
@@ -20,6 +20,20 @@ A free, open-source desktop productivity suite. Documents, spreadsheets, slides,
 | **Tasks** | To-dos & plans | ✅ MVP |
 | **Board** | Whiteboard | ✅ MVP |
 | Forms | Surveys & quizzes | Planned |
+
+### Bear Studio
+
+Creative apps, free forever.
+
+| App | What it does | Status |
+|---|---|---|
+| **Photo** | Photo editing | ✅ MVP |
+| Vector | Vector graphics | Planned |
+| PDF | PDF documents | Planned |
+| Video | Video editing | Planned |
+| Motion | Motion graphics | Planned |
+| Audio | Audio editing | Planned |
+| Layout | Page layout | Planned |
 
 ### Write features
 
@@ -76,6 +90,27 @@ These keep their data in Bear's data folder and save automatically (atomic write
 - **Tasks**: My Day, Important, Planned, All tasks and your own lists; steps, due dates, notes, importance; a board view with drag-and-drop columns (moving a card to Done completes it); undo after delete
 - **Board**: a gallery of whiteboards built on [Excalidraw](https://github.com/excalidraw/excalidraw) (MIT) — pens, shapes, arrows, text, sticky-note style shapes, PNG/SVG export; fonts ship inside the app
 - **Sites**: team sites with a home page (welcome text, news, quick links, recent documents, a linked Tasks list), pages and news posts, a document library connected to any folder (Bear files open in Bear), and settings
+
+### Photo features
+
+- Layers with blend modes and opacity
+- Selections: marquee, lasso and magic wand
+- Brush, eraser, fill, gradient, shape and text tools
+- Adjustments: brightness/contrast, levels, curves, hue/saturation, invert, black & white
+- Filters: blurs, sharpen, unsharp mask, noise, pixelate
+- Crop, rotate, flip, resize and trim
+- Open **.psd**, PNG, JPG, WebP, GIF, BMP and AVIF. Save as **.bearphoto** (keeps every layer) or **.psd**. Export PNG, JPG or WebP
+- Crash recovery: a recovery copy is kept as you work and offered back after a crash
+
+## Downloads
+
+Every release comes in three editions. Pick one on the [Download page](https://michaelcodetolimit.github.io/Bear/download/):
+
+- **Bear**: everything, the office apps and Bear Studio in one install (`Bear-…`, `bear_…` files)
+- **Bear Office**: only the office apps (`Bear-Office-…`, `bear-office_…`)
+- **Bear Studio**: only the creative apps (`Bear-Studio-…`, `bear-studio_…`)
+
+The editions install side by side. `.github/workflows/release.yml` lists every file name.
 
 ## Development
 
@@ -137,6 +172,7 @@ packages/app-notes/   Notebooks (uses Write's PageEditor)
 packages/app-tasks/   To-dos and boards
 packages/app-board/   Whiteboards (Excalidraw)
 packages/app-sites/   Team sites
+packages/app-photo/   Photo editor (Bear Studio)
 e2e/                  Playwright end-to-end tests
 ```
 

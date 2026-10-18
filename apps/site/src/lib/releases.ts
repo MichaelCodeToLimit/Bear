@@ -1,3 +1,4 @@
+import type { Edition } from '@bear/core'
 import { SITE } from '../site.config'
 
 export type OS = 'windows' | 'mac' | 'linux'
@@ -15,6 +16,8 @@ export interface DownloadFile {
   kind: FileKind
   /** Mac only: the chip the file is built for. A mac file with no arch in its name is Intel. */
   arch: Arch | null
+  /** Which build of Bear the file is: the full suite, Bear Office or Bear Studio. */
+  edition: Edition
   /** Lowercase hex SHA-256 from the GitHub asset digest, or null when it is missing or malformed. */
   sha256: string | null
 }
@@ -26,9 +29,23 @@ export interface ReleaseInfo {
   files: DownloadFile[]
 }
 
-/** Map an asset file name to a system and label. Returns null for files that should not be shown. */
-export function classifyAsset(name: string): Pick<DownloadFile, 'os' | 'label' | 'recommended' | 'kind' | 'arch'> | null {
+type Classified = Pick<DownloadFile, 'os' | 'label' | 'recommended' | 'kind' | 'arch' | 'edition'>
+
+/** The edition is in the name: Bear-Office-… or bear-office_…, Bear-Studio-… or bear-studio_… (any case); anything else is the full suite. */
+function editionOf(n: string): Edition {
+  if (n.includes('bear-office')) return 'office'
+  if (n.includes('bear-studio')) return 'studio'
+  return 'all'
+}
+
+/** Map an asset file name to a system, label and edition. Returns null for files that should not be shown. */
+export function classifyAsset(name: string): Classified | null {
   const n = name.toLowerCase()
+  const kind = classifyKind(n)
+  return kind ? { ...kind, edition: editionOf(n) } : null
+}
+
+function classifyKind(n: string): Omit<Classified, 'edition'> | null {
   // electron-builder puts the architecture in the file name; only mac needs it.
   const arch: Arch = /arm64/.test(n) ? 'arm64' : 'x64'
   const macArch = /arm64/.test(n) ? ' (Apple silicon)' : /x64|x86_64|amd64/.test(n) ? ' (Intel)' : ''
@@ -135,9 +152,12 @@ export interface PlatformCard {
   meta: string | null
 }
 
-/** The three download cards in order: windows, mac, linux. Pure; a null release gives empty, unavailable cards. */
-export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
-  const files = release?.files ?? []
+/**
+ * The three download cards in order: windows, mac, linux, for one edition. Pure; a null release, or a release without
+ * that edition, gives empty, unavailable cards.
+ */
+export function platformCards(release: ReleaseInfo | null, edition: Edition = 'all'): PlatformCard[] {
+  const files = (release?.files ?? []).filter((f) => f.edition === edition)
   const pick = (os: OS, kind: FileKind, arch?: Arch): DownloadFile | null =>
     files.find((f) => f.os === os && f.kind === kind && (arch === undefined || f.arch === arch)) ?? null
   const all = (os: OS, kind: FileKind): DownloadFile[] => files.filter((f) => f.os === os && f.kind === kind)

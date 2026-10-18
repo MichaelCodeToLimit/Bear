@@ -1,4 +1,5 @@
 ---
+import type { Edition } from '@bear/core'
 import OsGlyph from './OsGlyph.astro'
 import PlatformButton from './PlatformButton.astro'
 import { platformCards, type DownloadFile, type ReleaseInfo } from '../lib/releases'
@@ -7,136 +8,230 @@ interface Props {
   release: ReleaseInfo | null
 }
 const { release } = Astro.props
-const cards = platformCards(release)
 const pending = release === null
 const version = release?.version ?? null
 const osName: Record<string, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux' }
+const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip' : 'Intel .zip')
+
+// One panel per edition, all rendered here; the switcher script shows one. Without script only Everything shows.
+// `stem`/`deb` are the file-name prefixes from release.yml, used for the install hints when a file is missing.
+const EDITIONS: { id: Edition; choice: string; product: string; blurb: string; stem: string; deb: string }[] = [
+  { id: 'all', choice: 'Everything', product: 'Bear', blurb: 'Bear: every app, office and creative, in one install.', stem: 'Bear', deb: 'bear' },
+  {
+    id: 'office',
+    choice: 'Office only',
+    product: 'Bear Office',
+    blurb: 'Bear Office: Write, Sheets, Slides, Notes, Mail and the other office apps.',
+    stem: 'Bear-Office',
+    deb: 'bear-office'
+  },
+  { id: 'studio', choice: 'Studio only', product: 'Bear Studio', blurb: 'Bear Studio: the creative apps. First up: Photo.', stem: 'Bear-Studio', deb: 'bear-studio' }
+]
 
 // Real file names when the release has them, otherwise the pattern electron-builder will produce.
 const v = version ?? '<version>'
-const linux = cards[2]
-const nameOf = (id: string, fallback: string): string => linux.slots.find((s) => s.id === id)?.file?.name ?? fallback
-const rpmFile = linux.other.find((f) => f.kind === 'rpm')
-const hints = [
-  `sudo apt install ./${nameOf('deb', `bear_${v}_amd64.deb`)}`,
-  `chmod +x ${nameOf('appimage', `Bear-${v}-x64.AppImage`)} && ./${nameOf('appimage', `Bear-${v}-x64.AppImage`)}`,
-  `flatpak install --user ./${nameOf('flatpak', `Bear-${v}-x64.flatpak`)}`,
-  `sudo dnf install ./${rpmFile?.name ?? `Bear-${v}-x64.rpm`}`
-]
-const otherItems = [
-  { label: '.rpm (Fedora, openSUSE)', file: linux.other.find((f) => f.kind === 'rpm') ?? null },
-  { label: '.tar.gz (any distro)', file: linux.other.find((f) => f.kind === 'targz') ?? null }
-]
-const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip' : 'Intel .zip')
+const panels = EDITIONS.map((ed) => {
+  const cards = platformCards(release, ed.id)
+  const linux = cards[2]
+  const nameOf = (id: string, fallback: string): string => linux.slots.find((s) => s.id === id)?.file?.name ?? fallback
+  const rpmFile = linux.other.find((f) => f.kind === 'rpm')
+  const appImage = nameOf('appimage', `${ed.stem}-${v}-x64.AppImage`)
+  const hints = [
+    `sudo apt install ./${nameOf('deb', `${ed.deb}_${v}_amd64.deb`)}`,
+    `chmod +x ${appImage} && ./${appImage}`,
+    `flatpak install --user ./${nameOf('flatpak', `${ed.stem}-${v}-x64.flatpak`)}`,
+    `sudo dnf install ./${rpmFile?.name ?? `${ed.stem}-${v}-x64.rpm`}`
+  ]
+  const otherItems = [
+    { label: '.rpm (Fedora, openSUSE)', file: rpmFile ?? null },
+    { label: '.tar.gz (any distro)', file: linux.other.find((f) => f.kind === 'targz') ?? null }
+  ]
+  // A release exists but has no files for this edition: its cards show Coming soon and this line says why.
+  const absent = release !== null && cards.every((c) => !c.available)
+  return { ...ed, cards, hints, otherItems, absent }
+})
 ---
 
 <section class="pc" aria-label="Download Bear">
-  <div class="pc-grid">
+  <div class="pc-switch" role="radiogroup" aria-label="Edition" data-edition-switch>
     {
-      cards.map((card) => {
-        const sums = card.slots.filter((s) => s.file?.sha256)
-        return (
-          <article class="glass pc-card" data-os-group={card.os} aria-labelledby={`pc-${card.os}`}>
-            <div class="pc-top">
-              <span class="pc-tile" aria-hidden="true">
-                <OsGlyph os={card.os} size={26} />
-              </span>
-              <div class="pc-flags">
-                <span class="pc-badge" data-your-device hidden>
-                  Your device
-                </span>
-                <span class="pill pc-status" data-status={card.available ? 'available' : 'soon'}>
-                  <span class="pc-dot" aria-hidden="true" />
-                  {card.available ? 'Available' : 'Coming soon'}
-                </span>
-              </div>
-            </div>
-
-            <h2 class="pc-name" id={`pc-${card.os}`}>{card.title}</h2>
-            <p class="pc-desc">{card.description}</p>
-
-            <div class="pc-actions">
-              {card.slots.map((s, i) => (
-                <PlatformButton
-                  label={s.label}
-                  osName={osName[card.os]}
-                  file={s.file}
-                  pending={pending}
-                  version={version}
-                  primary={card.os === 'mac' || i === 0}
-                />
-              ))}
-            </div>
-
-            {card.os === 'linux' && (
-              <details class="pc-more">
-                <summary class="btn btn--ghost pc-more__summary">
-                  Other <span aria-hidden="true">▾</span>
-                </summary>
-                <ul class="pc-more__list">
-                  {otherItems.map((o) => (
-                    <li>
-                      <PlatformButton label={o.label} osName="Linux" file={o.file} pending={pending} version={version} link />
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-
-            {card.os === 'mac' && card.extras.length > 0 && (
-              <p class="pc-zips">
-                Or a zip:{' '}
-                {card.extras.map((f, i) => (
-                  <>
-                    {i > 0 && ', '}
-                    <PlatformButton label={zipLabel(f)} osName="macOS" file={f} pending={false} version={version} link />
-                  </>
-                ))}
-              </p>
-            )}
-            {card.os === 'mac' && (
-              <p class="pc-help">Not sure which? Apple menu → About This Mac shows Chip (Apple silicon) or Processor (Intel).</p>
-            )}
-
-            {card.meta && <p class="pc-meta">{card.meta}</p>}
-            {pending && <p class="pc-note">First release coming soon</p>}
-
-            {sums.length > 0 && (
-              <div class="pc-sha">
-                {sums.map((s) => (
-                  <div class="pc-sha__row">
-                    <span class="pc-sha__label">SHA-256 · {s.file!.name}</span>
-                    <code class="pc-sha__hash">{s.file!.sha256}</code>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {card.os === 'linux' && (
-              <ul class="pc-cmds" aria-label="Install commands">
-                {hints.map((h) => (
-                  <li>
-                    <code>{h}</code>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <p class="pc-foot">
-              {card.os === 'windows' && 'Not code-signed yet. If SmartScreen warns you, choose More info → Run anyway.'}
-              {card.os === 'mac' && 'Not notarized yet. The first time, open System Settings → Privacy & Security and choose Open Anyway.'}
-              {card.os === 'linux' && 'Run the command for the file you downloaded. AppImage needs no install.'}
-            </p>
-          </article>
-        )
-      })
+      EDITIONS.map((ed) => (
+        <button type="button" role="radio" class="pc-switch__opt" aria-checked={ed.id === 'all' ? 'true' : 'false'} tabindex={ed.id === 'all' ? 0 : -1} data-edition-choice={ed.id}>
+          {ed.choice}
+        </button>
+      ))
     }
   </div>
+
+  {
+    panels.map((ed) => (
+      <div class="pc-panel" data-edition-panel={ed.id} hidden={ed.id !== 'all'}>
+        <p class="pc-blurb">{ed.blurb}</p>
+        {ed.absent && <p class="pc-absent">{ed.product} is not in Bear {version} yet. It comes in a later release.</p>}
+        <div class="pc-grid">
+          {ed.cards.map((card) => {
+            const sums = card.slots.filter((s) => s.file?.sha256)
+            const hid = `pc-${ed.id}-${card.os}`
+            return (
+              <article class="glass pc-card" data-os-group={card.os} aria-labelledby={hid}>
+                <div class="pc-top">
+                  <span class="pc-tile" aria-hidden="true">
+                    <OsGlyph os={card.os} size={26} />
+                  </span>
+                  <div class="pc-flags">
+                    <span class="pc-badge" data-your-device hidden>
+                      Your device
+                    </span>
+                    <span class="pill pc-status" data-status={card.available ? 'available' : 'soon'}>
+                      <span class="pc-dot" aria-hidden="true" />
+                      {card.available ? 'Available' : 'Coming soon'}
+                    </span>
+                  </div>
+                </div>
+
+                <h2 class="pc-name" id={hid}>{card.title}</h2>
+                <p class="pc-desc">{card.description}</p>
+
+                <div class="pc-actions">
+                  {card.slots.map((s, i) => (
+                    <PlatformButton
+                      product={ed.product}
+                      label={s.label}
+                      osName={osName[card.os]}
+                      file={s.file}
+                      pending={pending}
+                      version={version}
+                      primary={card.os === 'mac' || i === 0}
+                    />
+                  ))}
+                </div>
+
+                {card.os === 'linux' && (
+                  <details class="pc-more">
+                    <summary class="btn btn--ghost pc-more__summary">
+                      Other <span aria-hidden="true">▾</span>
+                    </summary>
+                    <ul class="pc-more__list">
+                      {ed.otherItems.map((o) => (
+                        <li>
+                          <PlatformButton product={ed.product} label={o.label} osName="Linux" file={o.file} pending={pending} version={version} link />
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                {card.os === 'mac' && card.extras.length > 0 && (
+                  <p class="pc-zips">
+                    Or a zip:{' '}
+                    {card.extras.map((f, i) => (
+                      <>
+                        {i > 0 && ', '}
+                        <PlatformButton product={ed.product} label={zipLabel(f)} osName="macOS" file={f} pending={false} version={version} link />
+                      </>
+                    ))}
+                  </p>
+                )}
+                {card.os === 'mac' && (
+                  <p class="pc-help">Not sure which? Apple menu → About This Mac shows Chip (Apple silicon) or Processor (Intel).</p>
+                )}
+
+                {card.meta && <p class="pc-meta">{card.meta}</p>}
+                {pending && <p class="pc-note">First release coming soon</p>}
+
+                {sums.length > 0 && (
+                  <div class="pc-sha">
+                    {sums.map((s) => (
+                      <div class="pc-sha__row">
+                        <span class="pc-sha__label">SHA-256 · {s.file!.name}</span>
+                        <code class="pc-sha__hash">{s.file!.sha256}</code>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {card.os === 'linux' && (
+                  <ul class="pc-cmds" aria-label="Install commands">
+                    {ed.hints.map((h) => (
+                      <li>
+                        <code>{h}</code>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <p class="pc-foot">
+                  {card.os === 'windows' && 'Not code-signed yet. If SmartScreen warns you, choose More info → Run anyway.'}
+                  {card.os === 'mac' && 'Not notarized yet. The first time, open System Settings → Privacy & Security and choose Open Anyway.'}
+                  {card.os === 'linux' && 'Run the command for the file you downloaded. AppImage needs no install.'}
+                </p>
+              </article>
+            )
+          })}
+        </div>
+      </div>
+    ))
+  }
 </section>
 
 <style is:global>
   .pc {
     margin: 0 0 2.5rem;
+  }
+  /* Edition switcher: a segmented control. It needs script, so it only shows once html.js is set. */
+  .pc-switch {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto 1rem;
+    padding: 0.25rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    background: var(--glass);
+  }
+  html:not(.js) .pc-switch {
+    display: none;
+  }
+  .pc-switch__opt {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.5rem clamp(0.7rem, 3vw, 1.2rem);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--dur-fast),
+      color var(--dur-fast);
+  }
+  .pc-switch__opt:hover {
+    color: var(--ink);
+  }
+  .pc-switch__opt[aria-checked=true] {
+    background: var(--btn-bg);
+    color: var(--btn-ink);
+  }
+  [data-motion=off] .pc-switch__opt {
+    transition: none;
+  }
+  .pc-panel[hidden] {
+    display: none;
+  }
+  .pc-blurb,
+  .pc-absent {
+    margin: 0 auto 1rem;
+    max-width: 40rem;
+    color: var(--ink-muted);
+    text-align: center;
+  }
+  .pc-absent {
+    color: var(--ink);
+    font-weight: 600;
   }
   .pc-grid {
     display: grid;
