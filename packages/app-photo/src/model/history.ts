@@ -42,7 +42,14 @@ export class History {
     }
   }
 
+  /**
+   * Called before every undo, redo and goTo. The tool layer uses it to cancel a drag in progress,
+   * whose live preview would otherwise be committed on top of the restored state.
+   */
+  beforeNavigate?: () => void
+
   undo(): boolean {
+    this.beforeNavigate?.()
     if (!this.canUndo) return false
     this.index--
     this.steps[this.index].undo()
@@ -50,6 +57,7 @@ export class History {
   }
 
   redo(): boolean {
+    this.beforeNavigate?.()
     if (!this.canRedo) return false
     this.steps[this.index].redo()
     this.index++
@@ -58,6 +66,7 @@ export class History {
 
   /** Move to the state after `i` steps (0 = before the first step). */
   goTo(i: number): void {
+    this.beforeNavigate?.()
     const target = Math.max(0, Math.min(this.steps.length, i))
     while (this.index > target) this.undo()
     while (this.index < target) this.redo()

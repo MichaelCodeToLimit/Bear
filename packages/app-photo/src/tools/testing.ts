@@ -27,6 +27,7 @@ export function fakeContext(doc: PhotoDoc = createDoc(20, 20, 'transparent'), to
     setView(v: ViewState) {
       ctx.view = v
     },
+    dpr: 1,
     statuses: [],
     overlay: null,
     refreshes: 0,

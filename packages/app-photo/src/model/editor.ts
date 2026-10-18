@@ -52,8 +52,11 @@ function structureBytes(before: Snapshot, after: Snapshot): number {
   let n = STRUCTURE_BYTES
   for (const p of a) if (!b.has(p)) n += p.data.byteLength
   for (const p of b) if (!a.has(p)) n += p.data.byteLength
+  if (before.selection !== after.selection) n += maskBytes(before.selection) + maskBytes(after.selection)
   return n
 }
+
+const maskBytes = (m: Mask | null): number => (m ? m.data.byteLength : 0)
 
 export class PhotoEditor {
   history = new History()
@@ -121,6 +124,36 @@ export class PhotoEditor {
         // Look the layer up by id so this still works if structure steps replaced the record.
         const target = getLayer(this.doc, layerId)
         if (target) writeRect(target.pixels, r, undo ? before : after)
+      },
+      dirty
+    )
+  }
+
+  /**
+   * Like `editPixels`, but the same step also replaces the selection with `selection`
+   * (used by the Move tool, which moves selected pixels and the outline together).
+   * The step stores the rect's pixels before and after, plus the old and new masks.
+   */
+  editPixelsAndSelection(label: string, layerId: string, rect: Rect, fn: (pixels: Bitmap) => void, selection: Mask | null): void {
+    const layer = getLayer(this.doc, layerId)
+    if (!layer) throw new Error('Layer not found')
+    const r = intersectRect(rect, { x: 0, y: 0, width: layer.pixels.width, height: layer.pixels.height })
+    const oldSel = this.doc.selection
+    const before = r && readRect(layer.pixels, r)
+    if (r) fn(layer.pixels)
+    const after = r && readRect(layer.pixels, r)
+    this.doc.selection = selection
+    const dirty = (): Rect | null => {
+      const l = getLayer(this.doc, layerId)
+      return r ? { x: (l?.x ?? 0) + r.x, y: (l?.y ?? 0) + r.y, width: r.width, height: r.height } : null
+    }
+    this.record(
+      label,
+      (before?.data.length ?? 0) + (after?.data.length ?? 0) + maskBytes(oldSel) + maskBytes(selection),
+      (undo) => {
+        const target = getLayer(this.doc, layerId)
+        if (target && r) writeRect(target.pixels, r, undo ? before! : after!)
+        this.doc.selection = undo ? oldSel : selection
       },
       dirty
     )

@@ -42,6 +42,8 @@ export interface ToolContext {
   setColors(c: ToolColors): void
   view: ViewState
   setView(v: ViewState): void
+  /** Device pixels per CSS pixel: scale screen-space hit zones (sx/sy are device pixels) by it. */
+  dpr: number
   setOverlay(o: Overlay | null): void
   /** A short message in the status bar. */
   status(msg: string): void

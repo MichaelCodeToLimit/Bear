@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { defaultOptions, holdSpace, toolById, toolForKey, TOOLS } from './tools'
+import { defaultOptions, toolById, toolForKey, TOOLS } from './tools'
+import { ToolDispatcher, type PointerPhase } from './tools/dispatch'
 import type { Overlay, ToolContext, ToolId, ToolPointer } from './tools/types'
 import type { PhotoEditorState } from './usePhotoEditor'
 
-export type PointerPhase = 'down' | 'move' | 'up'
+export type { PointerPhase }
 
 const STATUS_MS = 4000
 
@@ -15,6 +16,10 @@ export interface ToolsState {
   /** The latest tool message for the status bar, cleared after a few seconds. */
   status: string | null
   cursor: string
+  /** True while a drag is in progress. */
+  busy: () => boolean
+  /** Abandon a drag in progress (its preview is undone). Undo/redo/History call this on their own. */
+  cancelGesture: () => void
   /** Pointer events from the canvas, already in document and canvas coordinates. */
   onPointer: (phase: PointerPhase, p: ToolPointer) => void
   /** Tool shortcuts, Space for Hand and the active tool's own keys. True when handled. */
@@ -29,7 +34,6 @@ export function useTools(state: PhotoEditorState): ToolsState {
   const [status, setStatus] = useState<string | null>(null)
   const latest = useRef({ state, options })
   latest.current = { state, options }
-  const held = useRef<ToolId | null>(null)
   const statusTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const showStatus = useCallback((msg: string) => {
@@ -39,41 +43,54 @@ export function useTools(state: PhotoEditorState): ToolsState {
   }, [])
   useEffect(() => () => clearTimeout(statusTimer.current), [])
 
-  const makeCtx = useCallback((): ToolContext => {
-    const { state: s, options: o } = latest.current
-    return {
-      editor: s.editor,
-      options: o[s.tool],
-      colors: s.colors,
-      setColors: s.setColors,
-      view: s.view,
-      setView: (v) => s.setView(v),
-      setOverlay,
-      status: showStatus,
-      refresh: s.refresh,
-      rasterizeText: () => {
-        throw new Error('Text tool not available yet')
-      }
-    }
-  }, [showStatus])
+  const [dispatcher] = useState(
+    () =>
+      new ToolDispatcher(
+        (): ToolContext => {
+          const { state: s, options: o } = latest.current
+          return {
+            editor: s.editor,
+            options: o[s.tool],
+            colors: s.colors,
+            setColors: s.setColors,
+            view: s.view,
+            setView: (v) => s.setView(v),
+            dpr: window.devicePixelRatio || 1,
+            setOverlay,
+            status: showStatus,
+            refresh: s.refresh,
+            rasterizeText: () => {
+              throw new Error('Text tool not available yet')
+            }
+          }
+        },
+        () => latest.current.state.tool,
+        (t) => latest.current.state.setTool(t)
+      )
+  )
 
-  // Leaving a tool, or replacing the document, drops the tool's work in progress.
+  // Undo, redo and History clicks cancel a drag first, whichever button or key started them.
+  useEffect(() => dispatcher.attach(state.editor), [dispatcher, state.editor])
+
+  // A real tool switch drops the old tool's work in progress; a Space hold keeps it.
   const prevTool = useRef(state.tool)
   useEffect(() => {
-    const prev = toolById(prevTool.current)
+    const prev = prevTool.current
     prevTool.current = state.tool
-    prev.cancel?.(makeCtx())
+    if (prev !== state.tool && dispatcher.toolChanged(prev)) setOverlay(null)
+  }, [state.tool, dispatcher])
+
+  // A new document: nothing pending carries over.
+  useEffect(() => {
+    dispatcher.reset()
     setOverlay(null)
-  }, [state.tool, state.loadId, makeCtx])
+  }, [state.loadId, dispatcher])
 
   const onPointer = useCallback(
     (phase: PointerPhase, p: ToolPointer) => {
-      const { state: s } = latest.current
-      if (!s.hasDoc) return
-      const tool = toolById(s.tool)
-      tool[phase](makeCtx(), p)
+      if (latest.current.state.hasDoc) dispatcher.pointer(phase, p)
     },
-    [makeCtx]
+    [dispatcher]
   )
 
   const onKeyDown = useCallback(
@@ -81,45 +98,48 @@ export function useTools(state: PhotoEditorState): ToolsState {
       const { state: s } = latest.current
       if (!s.hasDoc || e.ctrlKey || e.metaKey) return false
       if (e.code === 'Space' || e.key === ' ') {
-        const next = holdSpace({ tool: s.tool, held: held.current }, 'down')
-        held.current = next.held
-        if (next.tool !== s.tool) s.setTool(next.tool)
+        if (!e.repeat) dispatcher.space('down')
         return true
       }
-      if (toolById(s.tool).onKey?.(makeCtx(), e)) return true
+      if (dispatcher.busy) return false
+      if (dispatcher.onKey(e)) return true
       if (e.altKey || e.key.length !== 1) return false
       const id = toolForKey(e.key, { shift: e.shiftKey, current: s.tool })
       if (!id) return false
-      held.current = null // picking a tool while holding Space keeps the new one
-      s.setTool(id)
+      if (id !== s.tool) s.setTool(id)
       return true
     },
-    [makeCtx]
+    [dispatcher]
   )
-
-  const release = useCallback(() => {
-    const { state: s } = latest.current
-    const next = holdSpace({ tool: s.tool, held: held.current }, 'up')
-    held.current = null
-    if (next.tool !== s.tool) s.setTool(next.tool)
-  }, [])
 
   const onKeyUp = useCallback(
     (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.key === ' ') release()
+      if (e.code === 'Space' || e.key === ' ') dispatcher.space('up')
     },
-    [release]
+    [dispatcher]
   )
 
   // A Space release in another window never arrives; don't stay stuck on Hand.
   useEffect(() => {
+    const release = () => dispatcher.space('up')
     window.addEventListener('blur', release)
     return () => window.removeEventListener('blur', release)
-  }, [release])
+  }, [dispatcher])
 
   const setOption = useCallback((tool: ToolId, id: string, value: unknown) => {
     setOptions((o) => ({ ...o, [tool]: { ...o[tool], [id]: value } }))
   }, [])
 
-  return { options, setOption, overlay, status, cursor: toolById(state.tool).cursor, onPointer, onKeyDown, onKeyUp }
+  return {
+    options,
+    setOption,
+    overlay,
+    status,
+    cursor: toolById(state.tool).cursor,
+    busy: () => dispatcher.busy,
+    cancelGesture: () => dispatcher.cancelGesture(),
+    onPointer,
+    onKeyDown,
+    onKeyUp
+  }
 }

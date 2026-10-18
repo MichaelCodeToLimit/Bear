@@ -1,4 +1,4 @@
-import { createBitmap, intersectRect, unionRect, writeRect, type Bitmap, type Rect } from '../model/bitmap'
+import { createBitmap, intersectRect, readRect, unionRect, writeRect, type Bitmap, type Rect } from '../model/bitmap'
 import { activeLayer, layerBounds, type Layer } from '../model/doc'
 import { maskBounds, type Mask } from '../model/mask'
 import type { Tool, ToolContext, ToolKeyEvent } from './types'
@@ -23,20 +23,31 @@ export function shiftMask(m: Mask, dx: number, dy: number): Mask {
   return { width: m.width, height: m.height, data: out }
 }
 
+/** The selected part of the layer, in document coordinates, or null when the mask misses it. */
+function liftRect(layer: Layer, sel: Mask): Rect | null {
+  const sb = maskBounds(sel)
+  return sb && intersectRect(sb, layerBounds(layer))
+}
+
+/** `m` shifted, or null when nothing selected is left on the document. */
+function shiftSelection(m: Mask, dx: number, dy: number): Mask | null {
+  const s = shiftMask(m, dx, dy)
+  return s.data.some((v) => v > 0) ? s : null
+}
+
 /**
  * Lift the selected pixels of `layer` (weighted by the mask) and drop them `dx, dy` whole pixels
- * away, over what is left behind. The layer grows to hold pixels moved past its edge, as long as they
- * land on the document. Returns new objects; `layer` is not changed.
+ * away, over what is left behind. The layer grows to hold pixels moved past its edge, even off the
+ * canvas, so moving them back brings them back. The selection is clipped to the document.
+ * Returns new objects; `layer` is not changed.
  */
 export function moveSelected(layer: Layer, sel: Mask, dx: number, dy: number): Moved {
   const lb = layerBounds(layer)
-  const selection = shiftMask(sel, dx, dy)
-  const sb = maskBounds(sel)
-  const src = sb && intersectRect(sb, lb)
+  const selection = shiftSelection(sel, dx, dy)
+  const src = liftRect(layer, sel)
   if (!src) return { pixels: layer.pixels, x: layer.x, y: layer.y, selection }
-  const doc: Rect = { x: 0, y: 0, width: sel.width, height: sel.height }
-  const dst = intersectRect({ ...src, x: src.x + dx, y: src.y + dy }, doc)
-  const nb = dst ? unionRect(lb, dst) : lb
+  const dst: Rect = { ...src, x: src.x + dx, y: src.y + dy }
+  const nb = unionRect(lb, dst)
   const out = createBitmap(nb.width, nb.height)
   writeRect(out, { x: lb.x - nb.x, y: lb.y - nb.y, width: lb.width, height: lb.height }, layer.pixels)
 
@@ -60,22 +71,23 @@ export function moveSelected(layer: Layer, sel: Mask, dx: number, dy: number): M
     }
   }
   // Drop: composite the lifted pixels over the result (straight alpha, source-over).
-  if (dst) {
-    for (let y = dst.y; y < dst.y + dst.height; y++) {
-      for (let x = dst.x; x < dst.x + dst.width; x++) {
-        const li = ((y - dy - src.y) * src.width + x - dx - src.x) * 4
-        const sa = lifted[li + 3] / 255
-        if (!sa) continue
-        const oi = ((y - nb.y) * nb.width + x - nb.x) * 4
-        const da = O[oi + 3] / 255
-        const a = sa + da * (1 - sa)
-        for (let c = 0; c < 3; c++) O[oi + c] = Math.round((lifted[li + c] * sa + O[oi + c] * da * (1 - sa)) / a)
-        O[oi + 3] = Math.round(a * 255)
-      }
+  for (let y = dst.y; y < dst.y + dst.height; y++) {
+    for (let x = dst.x; x < dst.x + dst.width; x++) {
+      const li = ((y - dy - src.y) * src.width + x - dx - src.x) * 4
+      const sa = lifted[li + 3] / 255
+      if (!sa) continue
+      const oi = ((y - nb.y) * nb.width + x - nb.x) * 4
+      const da = O[oi + 3] / 255
+      const a = sa + da * (1 - sa)
+      for (let c = 0; c < 3; c++) O[oi + c] = Math.round((lifted[li + c] * sa + O[oi + c] * da * (1 - sa)) / a)
+      O[oi + 3] = Math.round(a * 255)
     }
   }
   return { pixels: out, x: nb.x, y: nb.y, selection }
 }
+
+const contains = (outer: Rect, r: Rect) =>
+  r.x >= outer.x && r.y >= outer.y && r.x + r.width <= outer.x + outer.width && r.y + r.height <= outer.y + outer.height
 
 /** What a drag (or nudge) moves: the selected pixels, or the whole layer when nothing is selected. */
 function target(layer: Layer, sel: Mask | null, dx: number, dy: number): Moved {
@@ -86,13 +98,27 @@ function target(layer: Layer, sel: Mask | null, dx: number, dy: number): Moved {
 
 function commit(ctx: ToolContext, layer: Layer, dx: number, dy: number): void {
   if (!dx && !dy) return
-  const moved = target(layer, ctx.editor.doc.selection, dx, dy)
-  ctx.editor.editStructure('Move', (doc) => {
-    layer.pixels = moved.pixels
-    layer.x = moved.x
-    layer.y = moved.y
-    doc.selection = moved.selection
-  })
+  const sel = ctx.editor.doc.selection
+  const src = sel && layer.kind !== 'text' ? liftRect(layer, sel) : null
+  const lb = layerBounds(layer)
+  if (sel && src && contains(lb, { ...src, x: src.x + dx, y: src.y + dy })) {
+    // Everything lands inside the layer: record only the touched area and the two masks.
+    const u = unionRect(src, { ...src, x: src.x + dx, y: src.y + dy })
+    const local: Rect = { x: u.x - layer.x, y: u.y - layer.y, width: u.width, height: u.height }
+    const part: Layer = { ...layer, pixels: readRect(layer.pixels, local), x: u.x, y: u.y }
+    const moved = moveSelected(part, sel, dx, dy)
+    ctx.editor.editPixelsAndSelection('Move', layer.id, local, (px) => writeRect(px, local, moved.pixels), moved.selection)
+  } else {
+    // The layer has to grow (or there are no pixels to lift): a structure step.
+    const moved = target(layer, sel, dx, dy)
+    ctx.editor.editStructure('Move', (doc) => {
+      layer.pixels = moved.pixels
+      layer.x = moved.x
+      layer.y = moved.y
+      doc.selection = moved.selection
+    })
+  }
+  if (sel && !ctx.editor.doc.selection) ctx.status('Nothing selected')
 }
 
 /** The active layer, unless it is locked (then the user is told and nothing moves). */

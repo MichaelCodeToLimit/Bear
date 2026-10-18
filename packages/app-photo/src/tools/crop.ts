@@ -86,7 +86,7 @@ function handleAt(ctx: ToolContext, r: Rect, p: ToolPointer): Handle | null {
   const T = r.y * zoom + panY
   const R = L + r.width * zoom
   const B = T + r.height * zoom
-  const H = Math.min(8, (R - L) / 4, (B - T) / 4)
+  const H = Math.min(8 * ctx.dpr, (R - L) / 4, (B - T) / 4)
   const inX = p.sx >= L - H && p.sx <= R + H
   const inY = p.sy >= T - H && p.sy <= B + H
   let v = ''

@@ -9,11 +9,12 @@ type Pt = [number, number]
 let path: { points: Pt[]; mode: SelectMode; polygonal: boolean; lastDown: number; editor: PhotoEditor } | null = null
 let pressed = false
 
-/** Screen distance (canvas pixels) under which a click closes the polygon on its first point. */
+/** Screen distance (CSS pixels) under which a click closes the polygon on its first point. */
 const CLOSE_DIST = 8
 const DOUBLE_CLICK_MS = 350
 
-const dist = (ctx: ToolContext, a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]) * ctx.view.zoom
+/** Distance between two document points on screen, in CSS pixels. */
+const dist = (ctx: ToolContext, a: Pt, b: Pt) => (Math.hypot(a[0] - b[0], a[1] - b[1]) * ctx.view.zoom) / ctx.dpr
 
 function finish(ctx: ToolContext): void {
   if (!path) return
