@@ -11,6 +11,28 @@ window.bear = webBridge
 const mail = APPS.find((a) => a.id === 'mail')
 if (mail) mail.ready = false
 
+// Notes, Tasks, Board and Sites save by themselves, so Ctrl+S there must not open the browser's
+// "Save page" dialog. Write, Sheets and Slides still see the key and save as usual.
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') e.preventDefault()
+})
+
+// After a new version is deployed, a tab that's been open a while can ask for an app's code by its
+// old name, which no longer exists. Reload once to pick up the new version. This only happens while
+// an app is being opened, so there's no unsaved work to lose.
+window.addEventListener('vite:preloadError', (e) => {
+  const last = Number(sessionStorage.getItem('bear-reloaded') ?? 0)
+  if (Date.now() - last < 30_000) return
+  sessionStorage.setItem('bear-reloaded', String(Date.now()))
+  e.preventDefault()
+  location.reload()
+})
+
+// Instant repeat visits, offline use and "Install app" (see sw.js).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js'))
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

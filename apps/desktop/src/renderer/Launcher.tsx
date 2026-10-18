@@ -1,11 +1,19 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { FolderOpen, Home, Monitor, Moon, Plus, Sun } from 'lucide-react'
 import { APPS, getApp, type AppInfo, type OpenedFile, type RecentFile } from '@bear/core'
 import { AppMark, RecentList, useTheme } from '@bear/ui'
-import { TemplateGrid } from '@bear/app-write'
-import { SheetTemplateGrid } from '@bear/app-sheets'
-import { DeckTemplateGrid } from '@bear/app-slides'
 import type { OpenApp } from './App'
+
+// The template pickers come from the apps' own packages; loading them lazily keeps those apps out of
+// the start-up bundle, so the home screen appears before Write, Sheets and Slides have loaded.
+const TemplateGrid = lazy(() => import('@bear/app-write').then((m) => ({ default: m.TemplateGrid })))
+const SheetTemplateGrid = lazy(() => import('@bear/app-sheets').then((m) => ({ default: m.SheetTemplateGrid })))
+const DeckTemplateGrid = lazy(() => import('@bear/app-slides').then((m) => ({ default: m.DeckTemplateGrid })))
+
+/** Holds the templates' space while they load, so the page doesn't jump. */
+function Templates({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="h-36" />}>{children}</Suspense>
+}
 import logoUrl from '../../build/icon-128.png'
 
 const OPEN_ALL = [
@@ -115,17 +123,17 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
 
           <section className="mb-10" style={{ ['--accent' as string]: getApp('write').color }}>
             <h2 className="mb-3 text-sm font-semibold text-muted">New document</h2>
-            <TemplateGrid onPick={(template) => open({ app: 'write', input: { kind: 'template', template }, key: Date.now() })} />
+            <Templates><TemplateGrid onPick={(template) => open({ app: 'write', input: { kind: 'template', template }, key: Date.now() })} /></Templates>
           </section>
 
           <section className="mb-10" style={{ ['--accent' as string]: getApp('sheets').color }}>
             <h2 className="mb-3 text-sm font-semibold text-muted">New spreadsheet</h2>
-            <SheetTemplateGrid onPick={(template) => open({ app: 'sheets', input: { kind: 'template', template }, key: Date.now() })} />
+            <Templates><SheetTemplateGrid onPick={(template) => open({ app: 'sheets', input: { kind: 'template', template }, key: Date.now() })} /></Templates>
           </section>
 
           <section className="mb-10" style={{ ['--accent' as string]: getApp('slides').color }}>
             <h2 className="mb-3 text-sm font-semibold text-muted">New presentation</h2>
-            <DeckTemplateGrid onPick={(template) => open({ app: 'slides', input: { kind: 'template', template }, key: Date.now() })} />
+            <Templates><DeckTemplateGrid onPick={(template) => open({ app: 'slides', input: { kind: 'template', template }, key: Date.now() })} /></Templates>
           </section>
 
           <section>

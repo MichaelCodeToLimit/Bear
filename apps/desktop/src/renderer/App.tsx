@@ -1,14 +1,26 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { appForFile, type OpenedFile } from '@bear/core'
-import { WriteApp, type WriteInput } from '@bear/app-write'
-import { SheetsApp, type SheetsInput } from '@bear/app-sheets'
-import { SlidesApp, type SlidesInput } from '@bear/app-slides'
-import { NotesApp } from '@bear/app-notes'
-import { TasksApp } from '@bear/app-tasks'
-import { BoardApp } from '@bear/app-board'
-import { SitesApp } from '@bear/app-sites'
-import { MailApp } from '@bear/app-mail'
+import type { WriteInput } from '@bear/app-write'
+import type { SheetsInput } from '@bear/app-sheets'
+import type { SlidesInput } from '@bear/app-slides'
 import { Launcher } from './Launcher'
+
+// Each app is loaded the first time it's opened, so starting Bear only loads the launcher. This
+// matters most on phones, where parsing every app's code (Excalidraw, the editors, the Office file
+// readers) up front took seconds.
+const WriteApp = lazy(() => import('@bear/app-write').then((m) => ({ default: m.WriteApp })))
+const SheetsApp = lazy(() => import('@bear/app-sheets').then((m) => ({ default: m.SheetsApp })))
+const SlidesApp = lazy(() => import('@bear/app-slides').then((m) => ({ default: m.SlidesApp })))
+const NotesApp = lazy(() => import('@bear/app-notes').then((m) => ({ default: m.NotesApp })))
+const TasksApp = lazy(() => import('@bear/app-tasks').then((m) => ({ default: m.TasksApp })))
+const BoardApp = lazy(() => import('@bear/app-board').then((m) => ({ default: m.BoardApp })))
+const SitesApp = lazy(() => import('@bear/app-sites').then((m) => ({ default: m.SitesApp })))
+const MailApp = lazy(() => import('@bear/app-mail').then((m) => ({ default: m.MailApp })))
+
+/** Shown for the moment an app's code takes to load. */
+function Loading(): ReactNode {
+  return <div className="flex h-screen items-center justify-center bg-[var(--canvas)] text-sm text-[var(--muted)]">Loading…</div>
+}
 
 export type Screen =
   | { app: 'home' }
@@ -57,24 +69,28 @@ export function App() {
     })
   }, [openPath])
 
-  switch (screen.app) {
-    case 'write':
-      return <WriteApp key={screen.key} input={screen.input} onHome={home} />
-    case 'sheets':
-      return <SheetsApp key={screen.key} input={screen.input} onHome={home} />
-    case 'slides':
-      return <SlidesApp key={screen.key} input={screen.input} onHome={home} />
-    case 'notes':
-      return <NotesApp key={screen.key} onHome={home} />
-    case 'tasks':
-      return <TasksApp key={screen.key} onHome={home} />
-    case 'board':
-      return <BoardApp key={screen.key} onHome={home} />
-    case 'sites':
-      return <SitesApp key={screen.key} onHome={home} openFile={(p) => void openPath(p)} openApp={(app) => setScreen({ app, key: Date.now() })} />
-    case 'mail':
-      return <MailApp key={screen.key} onHome={home} openPath={(p) => void openPath(p)} />
-    default:
-      return <Launcher open={setScreen} openFile={openFile} />
+  return <Suspense fallback={<Loading />}>{renderScreen()}</Suspense>
+
+  function renderScreen(): ReactNode {
+    switch (screen.app) {
+      case 'write':
+        return <WriteApp key={screen.key} input={screen.input} onHome={home} />
+      case 'sheets':
+        return <SheetsApp key={screen.key} input={screen.input} onHome={home} />
+      case 'slides':
+        return <SlidesApp key={screen.key} input={screen.input} onHome={home} />
+      case 'notes':
+        return <NotesApp key={screen.key} onHome={home} />
+      case 'tasks':
+        return <TasksApp key={screen.key} onHome={home} />
+      case 'board':
+        return <BoardApp key={screen.key} onHome={home} />
+      case 'sites':
+        return <SitesApp key={screen.key} onHome={home} openFile={(p) => void openPath(p)} openApp={(app) => setScreen({ app, key: Date.now() })} />
+      case 'mail':
+        return <MailApp key={screen.key} onHome={home} openPath={(p) => void openPath(p)} />
+      default:
+        return <Launcher open={setScreen} openFile={openFile} />
+    }
   }
 }
