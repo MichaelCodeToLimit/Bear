@@ -170,6 +170,25 @@ async function saveStored(path: string, data: Uint8Array): Promise<void> {
   await run('files', 'readwrite', (s) => s.put({ path, data: data.slice(), modified: Date.now() } satisfies StoredFile))
 }
 
+/** For the phone UI's file list (phone-files.ts): documents in Bear's storage. */
+export const storedExists = async (path: string) => (await run<string | undefined>('files', 'readonly', (s) => s.getKey(path))) !== undefined
+export const deleteStored = (path: string) => run('files', 'readwrite', (s) => s.delete(path)).then(() => {})
+export async function renameStored(from: string, to: string): Promise<void> {
+  const tx = (await db()).transaction('files', 'readwrite')
+  const store = tx.objectStore('files')
+  const get = store.get(from)
+  get.onsuccess = () => {
+    const file = get.result as StoredFile | undefined
+    if (!file) return tx.abort()
+    store.put({ ...file, path: to, modified: Date.now() } satisfies StoredFile)
+    store.delete(from)
+  }
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onabort = () => reject(tx.error ?? new Error(`${baseName(from)} was not found`))
+  })
+}
+
 const readDocument = (path: string) => (onDisk(path) ? readFromDisk(path) : readStored(path))
 const saveDocument = (path: string, data: Uint8Array) => (onDisk(path) ? saveToDisk(path, data) : saveStored(path, data))
 
@@ -316,6 +335,8 @@ export const webBridge: BearBridge = {
   },
   listFolder,
   openExternal: download,
+  screenCount: async () => 1,
+  capture: unsupported('Exporting slides as pictures'),
   onCloseRequest: (handler) => {
     closeHandlers.add(handler)
     return () => closeHandlers.delete(handler)

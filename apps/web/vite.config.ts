@@ -1,13 +1,13 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type Plugin, type Rollup } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { cpSync, existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { OutputChunk } from 'rollup'
 
-// The web version reuses the desktop renderer (App, Launcher, styles). Only the entry point differs:
-// it installs the browser version of window.bear.
+// The web version reuses the desktop renderer (App, Launcher, styles) and, on phones, the Android
+// app's phone UI. Only the entry point differs: it installs the browser version of window.bear.
 const desktopRenderer = resolve(__dirname, '../desktop/src/renderer')
+const phoneUi = resolve(__dirname, '../mobile/src/phone')
 const entry = resolve(__dirname, 'src/main.tsx')
 
 /** Copy Board's Excalidraw fonts into the public folder so they're served from Bear, not a CDN. */
@@ -23,18 +23,26 @@ function excalidrawFonts(): Plugin {
 }
 
 /**
- * Packages imported by the desktop renderer's files resolve as if this app imported them. Hosts
- * install only the web app and its dependencies (pnpm --filter "@bear/web..."), not the desktop
- * app's, so apps/desktop has no node_modules there.
+ * Packages imported by the desktop renderer's and the phone UI's files resolve as if this app
+ * imported them. Hosts install only the web app and its dependencies (pnpm --filter "@bear/web..."),
+ * not the desktop or Android app's, so those apps have no node_modules there. The phone UI's file
+ * helpers use Android's file storage, so the browser version (src/phone-files.ts) replaces them.
  */
 function resolveFromWeb(): Plugin {
-  const renderer = desktopRenderer.replace(/\\/g, '/')
+  const shared = [desktopRenderer, phoneUi].map((d) => d.replace(/\\/g, '/'))
+  const phoneFiles = resolve(phoneUi, 'files.ts').replace(/\\/g, '/')
   return {
     name: 'bear-resolve-from-web',
     enforce: 'pre',
-    resolveId(source, importer, options) {
-      if (!importer || source.startsWith('.') || source.startsWith('/') || source.startsWith('\0')) return null
-      if (!importer.replace(/\\/g, '/').startsWith(renderer)) return null
+    async resolveId(source, importer, options) {
+      if (!importer || source.startsWith('\0')) return null
+      const from = importer.replace(/\\/g, '/')
+      if (!shared.some((d) => from.startsWith(d))) return null
+      if (source.startsWith('.')) {
+        const target = resolve(importer, '..', source).replace(/\\/g, '/')
+        return target === phoneFiles || `${target}.ts` === phoneFiles ? resolve(__dirname, 'src/phone-files.ts') : null
+      }
+      if (source.startsWith('/')) return null
       return this.resolve(source, entry, { ...options, skipSelf: true })
     }
   }
@@ -50,10 +58,10 @@ function serviceWorker(): Plugin {
     name: 'bear-service-worker',
     apply: 'build',
     generateBundle(_, bundle) {
-      const chunks = Object.values(bundle).filter((f): f is OutputChunk => f.type === 'chunk')
+      const chunks = Object.values(bundle).filter((f): f is Rollup.OutputChunk => f.type === 'chunk')
       const byName = new Map(chunks.map((c) => [c.fileName, c]))
       const shell = new Set<string>()
-      const add = (c: OutputChunk) => {
+      const add = (c: Rollup.OutputChunk) => {
         if (shell.has(c.fileName)) return
         shell.add(c.fileName)
         c.viteMetadata?.importedCss.forEach((css) => shell.add(css))

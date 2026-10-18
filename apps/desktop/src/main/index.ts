@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron'
 import { promises as fs, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -87,8 +87,21 @@ function createWindow(launchFile?: string): BrowserWindow {
     win.webContents.send('window:close-request')
   })
 
-  // Open external links in the default browser, never inside the app.
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  // Open external links in the default browser, never inside the app. The one window Bear opens
+  // itself is the slide show's audience screen: a blank page (same origin) the renderer draws
+  // into, shown full screen on the second display.
+  win.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    if (url === 'about:blank' && frameName === 'bear-audience') {
+      const others = screen.getAllDisplays().filter((d) => d.id !== screen.getDisplayMatching(win.getBounds()).id)
+      const target = others[0] ?? screen.getPrimaryDisplay()
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          x: target.bounds.x, y: target.bounds.y, width: target.bounds.width, height: target.bounds.height,
+          fullscreen: others.length > 0, frame: false, backgroundColor: '#000000', autoHideMenuBar: true, title: 'Bear slide show'
+        }
+      }
+    }
     if (/^https?:/.test(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
@@ -118,6 +131,14 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('file:read', (_e, path: string) => readOpened(path))
+
+  ipcMain.handle('screen:count', () => screen.getAllDisplays().length)
+
+  // A PNG of part of the window (slide pictures export), at the screen's full pixel density.
+  ipcMain.handle('window:capture', async (e, rect: { x: number; y: number; width: number; height: number }) => {
+    const r = { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }
+    return new Uint8Array((await e.sender.capturePage(r)).toPNG())
+  })
 
   ipcMain.handle('file:save', async (_e, path: string, data: Uint8Array) => {
     await fs.writeFile(path, data)

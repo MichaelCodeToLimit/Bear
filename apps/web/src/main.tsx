@@ -1,9 +1,8 @@
-import { StrictMode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { APPS } from '@bear/core'
 import { webBridge } from './bridge'
-import { App } from '../../desktop/src/renderer/App'
-import '../../desktop/src/renderer/styles.css'
+import './styles.css'
 
 window.bear = webBridge
 
@@ -33,8 +32,11 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js'))
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-)
+// Phones get the phone layout (the Android app's UI); tablets and computers get the desktop one.
+// Decided once at start-up, so turning the phone sideways doesn't swap the UI mid-edit.
+const phone = window.matchMedia('(max-width: 640px), (pointer: coarse) and (max-height: 640px)').matches
+
+const root = createRoot(document.getElementById('root')!)
+const show = (ui: ReactNode) => root.render(<StrictMode>{ui}</StrictMode>)
+if (phone) void import('./phone').then(({ PhoneShell }) => show(<PhoneShell />))
+else void import('../../desktop/src/renderer/App').then(({ App }) => show(<App />))

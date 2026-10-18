@@ -20,6 +20,8 @@ const bridge: BearBridge = {
   chooseFolder: (title) => ipcRenderer.invoke('folder:choose', title),
   listFolder: (path) => ipcRenderer.invoke('folder:list', path),
   openExternal: (path) => ipcRenderer.invoke('shell:openPath', path),
+  screenCount: () => ipcRenderer.invoke('screen:count'),
+  capture: (rect) => ipcRenderer.invoke('window:capture', rect),
   onCloseRequest: (handler) => {
     const listener = () => {
       if (handler()) ipcRenderer.send('window:forceClose')

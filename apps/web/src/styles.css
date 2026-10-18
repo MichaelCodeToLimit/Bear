@@ -1,0 +1,3 @@
+/* Bear's styles, plus the phone UI's classes (its files live in apps/mobile, outside this app). */
+@import '../../desktop/src/renderer/styles.css';
+@source '../../mobile/src/phone';

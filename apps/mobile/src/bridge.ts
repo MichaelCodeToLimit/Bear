@@ -134,6 +134,8 @@ export const androidBridge: BearBridge = {
       .map((f): FolderEntry => ({ name: f.name, path: `${dir}/${f.name}`, isDir: f.type === 'directory', size: f.size, modified: f.mtime }))
   },
   openExternal: unsupported('Opening files in other apps'),
+  screenCount: async () => 1,
+  capture: unsupported('Exporting slides as pictures'),
   // Android apps aren't "closed" with unsaved work the way desktop windows are; AutoSave covers it.
   onCloseRequest: () => () => {},
   forceClose: () => {},
