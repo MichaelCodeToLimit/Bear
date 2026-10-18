@@ -83,6 +83,40 @@ describe('bearphoto', () => {
     const bytes = await zip.generateAsync({ type: 'uint8array' })
     await expect(readBearPhoto(bytes)).rejects.toThrow('The file is damaged: layer "Shifted" is missing')
   })
+
+  it('reports a truncated file as damaged', async () => {
+    const bytes = await writeBearPhoto(threeLayerDoc())
+    await expect(readBearPhoto(bytes.slice(0, bytes.length / 2))).rejects.toThrow("The file is damaged and can't be opened")
+  })
+
+  it('reports bad layer entries as damaged', async () => {
+    const zip = await JSZip.loadAsync(await writeBearPhoto(threeLayerDoc()))
+    const json = JSON.parse(await zip.file('document.json')!.async('string'))
+    json.layers[1].width = 'x'
+    zip.file('document.json', JSON.stringify(json))
+    await expect(readBearPhoto(await zip.generateAsync({ type: 'uint8array' }))).rejects.toThrow("The file is damaged and can't be opened")
+    json.layers[1] = null
+    zip.file('document.json', JSON.stringify(json))
+    await expect(readBearPhoto(await zip.generateAsync({ type: 'uint8array' }))).rejects.toThrow("The file is damaged and can't be opened")
+  })
+
+  it('reports a bad document size as damaged', async () => {
+    const zip = await JSZip.loadAsync(await writeBearPhoto(threeLayerDoc()))
+    const json = JSON.parse(await zip.file('document.json')!.async('string'))
+    delete json.width
+    zip.file('document.json', JSON.stringify(json))
+    await expect(readBearPhoto(await zip.generateAsync({ type: 'uint8array' }))).rejects.toThrow("The file is damaged and can't be opened")
+  })
+
+  it('reports a layer image of the wrong size or that cannot be decoded as damaged', async () => {
+    const doc = threeLayerDoc()
+    const zip = await JSZip.loadAsync(await writeBearPhoto(doc))
+    const path = `layers/${doc.layers[1].id}.png`
+    zip.file(path, encodePng(noisy(2, 2, 9)))
+    await expect(readBearPhoto(await zip.generateAsync({ type: 'uint8array' }))).rejects.toThrow("The file is damaged and can't be opened")
+    zip.file(path, new Uint8Array([1, 2, 3]))
+    await expect(readBearPhoto(await zip.generateAsync({ type: 'uint8array' }))).rejects.toThrow("The file is damaged and can't be opened")
+  })
 })
 
 describe('png', () => {

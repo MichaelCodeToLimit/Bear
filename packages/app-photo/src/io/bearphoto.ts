@@ -115,12 +115,20 @@ export async function writeBearPhoto(doc: PhotoDoc): Promise<Uint8Array> {
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } })
 }
 
+const DAMAGED = "The file is damaged and can't be opened"
+
+const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n)
+const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n)
+const isColor = (c: unknown): c is RGBA => Array.isArray(c) && c.length === 4 && c.every(isNum)
+
 export async function readBearPhoto(bytes: Uint8Array): Promise<PhotoDoc> {
   let zip: JSZip
   try {
     zip = await JSZip.loadAsync(bytes)
   } catch {
-    throw new Error(NOT_BEAR)
+    // A zip signature means this was a zip that is now broken (for example cut short).
+    const isZip = bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
+    throw new Error(isZip ? DAMAGED : NOT_BEAR)
   }
   const docFile = zip.file('document.json')
   if (!docFile) throw new Error(NOT_BEAR)
@@ -132,14 +140,37 @@ export async function readBearPhoto(bytes: Uint8Array): Promise<PhotoDoc> {
   }
   if (!json || json.format !== 'bearphoto' || typeof json.version !== 'number' || !Array.isArray(json.layers)) throw new Error(NOT_BEAR)
   if (json.version > 1) throw new Error('This file was made by a newer version of Bear. Update Bear to open it.')
+  if (!isInt(json.width) || !isInt(json.height) || json.width <= 0 || json.height <= 0) throw new Error(DAMAGED)
+  if (!isColor(json.foreground) || !isColor(json.background)) throw new Error(DAMAGED)
 
   const layers: Layer[] = []
   for (const e of json.layers) {
+    if (
+      !e ||
+      typeof e !== 'object' ||
+      typeof e.id !== 'string' ||
+      typeof e.name !== 'string' ||
+      (e.kind !== 'raster' && e.kind !== 'text') ||
+      !isInt(e.width) ||
+      !isInt(e.height) ||
+      e.width < 0 ||
+      e.height < 0 ||
+      !isInt(e.x) ||
+      !isInt(e.y) ||
+      !isNum(e.opacity)
+    ) {
+      throw new Error(DAMAGED)
+    }
     let pixels: Bitmap
     if (e.width > 0 && e.height > 0) {
       const f = zip.file(`layers/${e.id}.png`)
       if (!f) throw new Error(`The file is damaged: layer "${e.name}" is missing`)
-      pixels = decodePng(await f.async('uint8array'))
+      try {
+        pixels = decodePng(await f.async('uint8array'))
+      } catch {
+        throw new Error(DAMAGED)
+      }
+      if (pixels.width !== e.width || pixels.height !== e.height) throw new Error(DAMAGED)
     } else {
       pixels = createBitmap(0, 0)
     }
@@ -147,8 +178,8 @@ export async function readBearPhoto(bytes: Uint8Array): Promise<PhotoDoc> {
       id: e.id,
       name: e.name,
       kind: e.kind,
-      visible: e.visible,
-      locked: e.locked,
+      visible: !!e.visible,
+      locked: !!e.locked,
       opacity: e.opacity,
       blend: BLEND_MODES.includes(e.blend) ? e.blend : 'normal',
       x: e.x,
@@ -158,6 +189,7 @@ export async function readBearPhoto(bytes: Uint8Array): Promise<PhotoDoc> {
     if (e.text) layer.text = e.text
     layers.push(layer)
   }
+  if (!layers.some((l) => l.id === json.activeLayerId)) throw new Error(DAMAGED)
   return {
     width: json.width,
     height: json.height,
