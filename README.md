@@ -108,6 +108,8 @@ Unsigned builds work, but Windows SmartScreen and macOS Gatekeeper warn on first
 
 The Bear website lives in `apps/site` (Astro and React) and is published at <https://michaelcodetolimit.github.io/Bear/>. It has a home page, an app tour, the docs, a playground and a download page.
 
+**Android.** The Download page lists the `.apk` attached to the latest GitHub release. If the release has none, it serves the newest `*.apk` in `apps/site/public/downloads/` (the site computes its size and SHA-256 at build time). To publish a new Android build, copy the new `Bear-<version>-debug.apk` into that folder, delete the old one and push. (The Android app project is not in this repository yet.) Each committed APK stays in git history, so keep only the latest.
+
 | Command | Does |
 |---|---|
 | `pnpm site:dev` | Run the site with hot reload |

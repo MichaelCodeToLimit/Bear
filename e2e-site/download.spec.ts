@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { test, expect, type Page } from '@playwright/test'
 
 const RELEASES = 'https://github.com/MichaelCodeToLimit/Bear/releases'
@@ -113,6 +114,27 @@ test('the cards stack on a phone without horizontal scroll, in dark and light', 
     expect(boxes).toHaveLength(4)
     for (let i = 1; i < boxes.length; i++) expect(boxes[i].top).toBeGreaterThan(boxes[i - 1].bottom - 1)
     for (const b of boxes) expect(b.right).toBeLessThanOrEqual(375)
+  }
+})
+
+// The .apk comes from the GitHub release when it is attached there, otherwise from apps/site/public/downloads.
+test('the Android button downloads the real .apk (and, when the site serves it, the card shows its true SHA-256)', async ({ page, request }) => {
+  await page.goto('download/')
+  const button = page.locator('[data-os-group="android"] a[data-state="ready"]')
+  test.skip((await button.count()) === 0, 'no .apk is available in this build')
+
+  const href = (await button.first().getAttribute('href')) ?? ''
+  expect(href).toMatch(/\.apk$/i)
+  await expect(page.locator('[data-os-group="android"]')).toContainText('Available')
+  if (href.startsWith('/')) {
+    const res = await request.get(href)
+    expect(res.status()).toBe(200)
+    const body = await res.body()
+    expect(body.length).toBeGreaterThan(1_000_000)
+    // An .apk is a zip file: it starts with "PK".
+    expect(body.subarray(0, 2).toString('latin1')).toBe('PK')
+    const sha = createHash('sha256').update(body).digest('hex')
+    await expect(page.locator('[data-os-group="android"]')).toContainText(sha)
   }
 })
 
