@@ -25,6 +25,10 @@ import { ToolOverlay } from './ToolOverlay'
 import { TextEditBox, textBoxHandlers } from './TextEditBox'
 import { useImageDialogs } from './dialogs/useImageDialogs'
 import { useTestHook } from './testHook'
+import { shortcutFor, type Command } from './shortcuts'
+import { useEditCommands } from './useEditCommands'
+import { useSessionFlag } from './useSessionFlag'
+import { GridOverlay, Rulers } from './ViewGuides'
 
 const APP = getApp('photo')
 
@@ -42,6 +46,8 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
   const [canvasSizeOpen, setCanvasSizeOpen] = useState(false)
   const [background, setBackground] = useState<CanvasBackground>('light')
   const [cursor, setCursor] = useState<Point | null>(null)
+  const [rulers, setRulers] = useSessionFlag('bear-photo-rulers')
+  const [grid, setGrid] = useSessionFlag('bear-photo-grid')
   const notices = useNotices()
   const confirm = useConfirm(APP.color)
   const editorRef = useRef(editor)
@@ -136,7 +142,36 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     state.setView((v) => zoomCommand(v, cmd, d.width, d.height))
   }, [state.setView]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keyboard: file commands, undo/redo, zoom, colours, tool letters, Space for Hand and tool keys.
+  const editCommand = useEditCommands(state, tools, addIncoming)
+
+  /** Run a shortcut command. False when it needs a document and there is none (the key is left alone). */
+  const runCommand = useCallback((cmd: Command): boolean => {
+    switch (cmd) {
+      case 'save': void file.save(); return true
+      case 'saveAs': void file.saveAs(); return true
+      case 'open': file.browseOpen(); return true
+      case 'new': file.guard('start a new image', () => setNewOpen(true)); return true
+      case 'paste': editCommand('paste'); return true
+      case 'swapColors': state.setColors(swapColors(state.colors)); return true
+      case 'resetColors': state.setColors(resetColors()); return true
+    }
+    if (!hasDoc) return false
+    switch (cmd) {
+      case 'undo': editor.history.undo(); break
+      case 'redo': editor.history.redo(); break
+      case 'zoomIn': zoom('in'); break
+      case 'zoomOut': zoom('out'); break
+      case 'fit': zoom('fit'); break
+      case 'actual': zoom('actual'); break
+      case 'brushSmaller':
+      case 'brushBigger':
+        break // the active brush tool takes [ and ] itself, in tools.onKeyDown
+      default: editCommand(cmd)
+    }
+    return true
+  }, [file, hasDoc, editor, zoom, state, editCommand])
+
+  // Keyboard: tool letters and Space go to the tools first, then shortcuts become commands.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (document.querySelector('[role=dialog]')) return
@@ -144,28 +179,8 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
       const saveFromTextBox = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && e.target instanceof Element && !!e.target.closest('[data-testid=photo-text-box]')
       if (isTyping(e.target) && !saveFromTextBox) return
       if (tools.onKeyDown(e)) return e.preventDefault()
-      const k = e.key.toLowerCase()
-      const run = (fn: () => void) => {
-        e.preventDefault()
-        fn()
-      }
-      if (e.ctrlKey || e.metaKey) {
-        if (k === 's' && e.shiftKey) return run(() => void file.saveAs())
-        if (k === 's') return run(() => void file.save())
-        if (k === 'o') return run(() => file.browseOpen())
-        if (k === 'n') return run(() => file.guard('start a new image', () => setNewOpen(true)))
-        if (!hasDoc) return
-        if ((k === 'z' && e.shiftKey) || k === 'y') return run(() => editor.history.redo())
-        if (k === 'z') return run(() => editor.history.undo())
-        if (k === '=' || k === '+') return run(() => zoom('in'))
-        if (k === '-') return run(() => zoom('out'))
-        if (k === '0') return run(() => zoom('fit'))
-        if (k === '1') return run(() => zoom('actual'))
-        return
-      }
-      if (e.altKey) return
-      if (k === 'x') return run(() => state.setColors(swapColors(state.colors)))
-      if (k === 'd') return run(() => state.setColors(resetColors()))
+      const cmd = shortcutFor({ key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey })
+      if (cmd && runCommand(cmd)) e.preventDefault()
     }
     // Space is released wherever focus is, so Hand never sticks.
     const onKeyUp = (e: KeyboardEvent) => tools.onKeyUp(e)
@@ -175,7 +190,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [file, hasDoc, editor, zoom, state, tools.onKeyDown, tools.onKeyUp])
+  }, [runCommand, tools.onKeyDown, tools.onKeyUp])
 
   const doc = editor.doc
   const h = editor.history
@@ -209,6 +224,11 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
         onCanvasSize={() => setCanvasSizeOpen(true)}
         onDialog={dialogs.open}
         onImage={dialogs.command}
+        onEdit={editCommand}
+        rulers={rulers}
+        setRulers={setRulers}
+        grid={grid}
+        setGrid={setGrid}
       />
       {file.banner}
       <NoticeBar notices={notices} />
@@ -229,7 +249,9 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
         <Toolbox tool={state.tool} setTool={state.setTool} />
         <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notify} onToolPointer={tools.onPointer} cursor={tools.cursor} preview={dialogs.preview}>
           {hasDoc && <ToolOverlay selection={doc.selection} overlay={tools.overlay} view={state.view} hover={cursor !== null && (state.tool === 'brush' || state.tool === 'eraser')} />}
+          {hasDoc && grid && <GridOverlay docW={doc.width} docH={doc.height} view={state.view} />}
           {hasDoc && tools.overlay?.kind === 'text' && <TextEditBox box={tools.overlay} view={state.view} options={tools.options.text} {...textBoxHandlers(tools)} />}
+          {hasDoc && rulers && <Rulers view={state.view} cursor={cursor} />}
           {!hasDoc && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted">
               <ImagePlus size={40} strokeWidth={1.2} />

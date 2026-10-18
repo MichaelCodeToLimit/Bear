@@ -17,6 +17,8 @@ export interface ToolsState {
   /** The latest tool message for the status bar, cleared after a few seconds. */
   status: string | null
   cursor: string
+  /** Show a message in the status bar for a few seconds. */
+  notify: (message: string) => void
   /** True while a drag is in progress. */
   busy: () => boolean
   /** Abandon a drag in progress (its preview is undone). Undo/redo/History call this on their own. */
@@ -141,6 +143,7 @@ export function useTools(state: PhotoEditorState): ToolsState {
     overlay,
     status,
     cursor: toolById(state.tool).cursor,
+    notify: showStatus,
     busy: () => dispatcher.busy,
     cancelGesture: () => dispatcher.cancelGesture(),
     onPointer,

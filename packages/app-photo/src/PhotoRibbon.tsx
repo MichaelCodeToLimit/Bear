@@ -7,6 +7,7 @@ import { Ribbon, RibbonButton, RibbonGroup, RibbonRows } from '@bear/ui'
 import type { CanvasBackground } from './CanvasView'
 import type { PhotoEditorState } from './usePhotoEditor'
 import type { DialogKind, ImageCommand } from './dialogs/useImageDialogs'
+import type { EditCommand } from './useEditCommands'
 
 export const PHOTO_TABS = [
   { id: 'home', label: 'Home' },
@@ -30,10 +31,13 @@ export interface PhotoRibbonProps {
   onDialog: (kind: DialogKind) => void
   /** Rotate, flip and trim. */
   onImage: (cmd: ImageCommand) => void
+  /** Cut, copy and paste. */
+  onEdit: (cmd: EditCommand) => void
+  rulers: boolean
+  setRulers: (on: boolean) => void
+  grid: boolean
+  setGrid: (on: boolean) => void
 }
-
-/** A command that arrives in a later task: shown so the layout is final, but disabled for now. */
-const soon = (icon: LucideIcon, label: string, large = false) => <RibbonButton key={label} icon={icon} label={label} large={large} showLabel={!large} disabled />
 
 export function PhotoRibbon(p: PhotoRibbonProps) {
   const { state, accent } = p
@@ -50,10 +54,10 @@ export function PhotoRibbon(p: PhotoRibbonProps) {
             <RibbonButton large icon={Redo2} label="Redo" disabled={!hasDoc || !h.canRedo} onClick={() => h.redo()} shortcut="Ctrl+Y" />
           </RibbonGroup>
           <RibbonGroup label="Clipboard">
-            {soon(ClipboardPaste, 'Paste', true)}
+            <RibbonButton large icon={ClipboardPaste} label="Paste" onClick={() => p.onEdit('paste')} shortcut="Ctrl+V" />
             <RibbonRows>
-              {soon(Scissors, 'Cut')}
-              {soon(Copy, 'Copy')}
+              <RibbonButton icon={Scissors} label="Cut" showLabel disabled={!hasDoc} onClick={() => p.onEdit('cut')} shortcut="Ctrl+X" />
+              <RibbonButton icon={Copy} label="Copy" showLabel disabled={!hasDoc} onClick={() => p.onEdit('copy')} shortcut="Ctrl+C" />
             </RibbonRows>
           </RibbonGroup>
           <RibbonGroup label="Crop">
@@ -127,8 +131,8 @@ export function PhotoRibbon(p: PhotoRibbonProps) {
           </RibbonGroup>
           <RibbonGroup label="Show">
             <RibbonRows>
-              {soon(Ruler, 'Rulers')}
-              {soon(Grid3x3, 'Grid')}
+              <RibbonButton icon={Ruler} label="Rulers" showLabel active={p.rulers} disabled={!hasDoc} onClick={() => p.setRulers(!p.rulers)} />
+              <RibbonButton icon={Grid3x3} label="Grid" showLabel active={p.grid} disabled={!hasDoc} onClick={() => p.setGrid(!p.grid)} />
             </RibbonRows>
           </RibbonGroup>
           <RibbonGroup label="Canvas background">
