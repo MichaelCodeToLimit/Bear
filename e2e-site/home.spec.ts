@@ -63,10 +63,11 @@ test('how it works has three cards', async ({ page }) => {
   await expect(page.locator('.how-card')).toHaveCount(3)
 })
 
-test('suite diagram links all 12 apps and marks the 4 not ready as soon', async ({ page }) => {
+test('suite diagram links all 13 apps and marks the 4 not ready as soon', async ({ page }) => {
   await page.goto('./')
-  await expect(page.locator('.suite-diagram a[href*="tour/#"]')).toHaveCount(12)
+  await expect(page.locator('.suite-diagram a[href*="tour/#"]')).toHaveCount(13)
   await expect(page.locator('.suite-diagram a[data-soon]')).toHaveCount(4)
+  await expect(page.locator('#suite-title')).toHaveText('Thirteen apps. One download.')
 })
 
 test('the hero and final CTA each have one plain Download button linking to the full download page', async ({ page }) => {

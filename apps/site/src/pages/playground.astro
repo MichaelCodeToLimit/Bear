@@ -4,6 +4,8 @@ import BearBuddy from '../islands/BearBuddy'
 import TilePhysics from '../islands/TilePhysics'
 import MiniDemos from '../islands/MiniDemos'
 import ThemeMixer from '../islands/ThemeMixer'
+import { SITE_APPS } from '../lib/officeApps'
+import { numberWord } from '../lib/numberWord'
 ---
 
 <BaseLayout title="Playground" description="Little toys built from the Bear brand. Poke them, drag them, break nothing.">
@@ -21,7 +23,7 @@ import ThemeMixer from '../islands/ThemeMixer'
 
       <article class="card pg__card pg__card--phys" data-playground-card>
         <h2>Tile physics</h2>
-        <p>Twelve app tiles, one box. Drag them about or hit Reset to drop them again.</p>
+        <p>{numberWord(SITE_APPS.length)} app tiles, one box. Drag them about or hit Reset to drop them again.</p>
         <TilePhysics client:visible />
       </article>
 

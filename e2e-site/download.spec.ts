@@ -174,3 +174,52 @@ test.describe('without JavaScript', () => {
     await expect(page.locator('[data-edition-switch]')).toBeHidden()
   })
 })
+
+test.describe('saved edition on first paint', () => {
+  test('with bear-edition=studio saved, the Studio panel shows before any module script runs', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'studio'))
+    // Strip the page's module scripts so only the inline pre-paint step and CSS can choose the panel.
+    await page.route('**/download/', async (route) => {
+      const res = await route.fetch()
+      const html = (await res.text()).replace(/<script type="module"[\s\S]*?<\/script>/g, '')
+      await route.fulfill({ response: res, body: html })
+    })
+    await page.goto('download/', { waitUntil: 'domcontentloaded' })
+    expect(await page.evaluate(() => document.querySelectorAll('script[type="module"]').length)).toBe(0)
+    expect(await page.evaluate(() => document.documentElement.dataset.edition)).toBe('studio')
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeVisible()
+    await expect(page.locator('[data-edition-panel="all"]')).toBeHidden()
+    await expect(page.locator('[data-edition-panel="office"]')).toBeHidden()
+    const bg = (choice: string) => page.locator(`[data-edition-choice="${choice}"]`).evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(await bg('studio')).not.toBe(await bg('all'))
+    expect(await bg('all')).toBe('rgba(0, 0, 0, 0)')
+  })
+
+  test('with bear-edition=studio saved, the Studio panel is visible right after domcontentloaded', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'studio'))
+    await page.goto('download/', { waitUntil: 'domcontentloaded' })
+    expect(await page.locator('[data-edition-panel="studio"]').isVisible()).toBe(true)
+    expect(await page.locator('[data-edition-panel="all"]').isVisible()).toBe(false)
+  })
+
+  test('switching after load keeps html[data-edition] and the panels in step', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'studio'))
+    await page.goto('download/')
+    await page.getByRole('radio', { name: 'Office only' }).click()
+    expect(await page.evaluate(() => document.documentElement.dataset.edition)).toBe('office')
+    await expect(page.locator('[data-edition-panel="office"]')).toBeVisible()
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeHidden()
+    await expect(page.getByRole('radio', { name: 'Office only' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('a junk saved value leaves no data-edition, so Everything shows', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'banana'))
+    await page.route('**/download/', async (route) => {
+      const res = await route.fetch()
+      await route.fulfill({ response: res, body: (await res.text()).replace(/<script type="module"[\s\S]*?<\/script>/g, '') })
+    })
+    await page.goto('download/', { waitUntil: 'domcontentloaded' })
+    expect(await page.evaluate(() => document.documentElement.dataset.edition)).toBeUndefined()
+    await expect(page.locator('[data-edition-panel="all"]')).toBeVisible()
+  })
+})

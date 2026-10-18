@@ -27,7 +27,8 @@ const fullTitle = title === 'Bear' ? title : `${title} | Bear`
     <link rel="icon" type="image/png" href={favicon.src} />
     <!-- Runs before first paint. Theme first (so nothing flashes the wrong palette), then motion, then the saved mix.
          The theme rule duplicates resolveTheme() in src/lib/themePref.ts (only a saved 'light' is light; everything else is dark); the motion rule
-         duplicates resolveMotion() in src/lib/motionPref.ts (saved wins, else system reduced-motion). Keep them in sync. -->
+         duplicates resolveMotion() in src/lib/motionPref.ts (saved wins, else system reduced-motion); the edition rule duplicates
+         readEdition() in src/lib/editionPref.ts (only all/office/studio count; anything else leaves the default). Keep them in sync. -->
     <script is:inline>
       var theme = null
       try {
@@ -42,6 +43,12 @@ const fullTitle = title === 'Bear' ? title : `${title} | Bear`
       var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       document.documentElement.dataset.motion =
         saved === 'on' || saved === 'off' ? saved : reduced ? 'off' : 'on'
+      // The Download page edition switcher: show the saved panel before first paint (CSS in PlatformCards.astro).
+      var edition = null
+      try {
+        edition = localStorage.getItem('bear-edition')
+      } catch (e) {}
+      if (edition === 'all' || edition === 'office' || edition === 'studio') document.documentElement.dataset.edition = edition
       // Applies a saved Theme mixer mix. Defensive mirror of parseSavedMix() in
       // src/lib/themeMixer.ts (clamp ranges, ignore anything invalid); keep in sync.
       try {

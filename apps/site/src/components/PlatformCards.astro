@@ -222,6 +222,27 @@ const panels = EDITIONS.map((ed) => {
   .pc-panel[hidden] {
     display: none;
   }
+  /* Once html[data-edition] is set (before first paint by BaseLayout, then kept in sync by editionSwitch.ts), it decides
+     which panel shows and which option looks checked, so a saved Office or Studio choice never flashes Everything first.
+     Without it (no script, nothing saved) the hidden attributes and aria-checked from the server apply. */
+  html[data-edition] .pc-panel {
+    display: none;
+  }
+  html[data-edition=all] .pc-panel[data-edition-panel=all],
+  html[data-edition=office] .pc-panel[data-edition-panel=office],
+  html[data-edition=studio] .pc-panel[data-edition-panel=studio] {
+    display: block;
+  }
+  html[data-edition] .pc-switch__opt[aria-checked=true] {
+    background: transparent;
+    color: var(--ink-muted);
+  }
+  html[data-edition=all] .pc-switch__opt[data-edition-choice=all],
+  html[data-edition=office] .pc-switch__opt[data-edition-choice=office],
+  html[data-edition=studio] .pc-switch__opt[data-edition-choice=studio] {
+    background: var(--btn-bg);
+    color: var(--btn-ink);
+  }
   .pc-blurb,
   .pc-absent {
     margin: 0 auto 1rem;

@@ -28,6 +28,8 @@ export function initEditionSwitch(): void {
       if (on && focus) r.focus()
     }
     for (const p of panels) p.hidden = p.dataset.editionPanel !== edition
+    // The CSS reads this too (BaseLayout sets it before first paint from the saved choice).
+    document.documentElement.dataset.edition = edition
   }
   const choose = (edition: Edition, focus = false) => {
     show(edition, focus)
