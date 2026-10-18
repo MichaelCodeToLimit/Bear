@@ -1,5 +1,6 @@
 import type { Bitmap } from '../model/bitmap'
 import type { Mask } from '../model/mask'
+import { forEachMasked, type Offset } from './maskIter'
 
 /**
  * Tonal / colour adjustments. All mutate the bitmap in place and leave alpha alone.
@@ -9,9 +10,6 @@ import type { Mask } from '../model/mask'
  *
  * The formulas below are mirrored by the WebGL preview shaders; keep them in sync.
  */
-
-type Offset = { x: number; y: number }
-const ZERO: Offset = { x: 0, y: 0 }
 
 /**
  * Drives `adjust` over every pixel the mask lets through. `adjust(d, i)` rewrites the RGB at
@@ -25,37 +23,19 @@ function run(
   adjust: (d: Uint8ClampedArray, i: number) => void,
 ): void {
   const d = b.data
-  const w = b.width
-  if (!mask) {
-    for (let i = 0, n = w * b.height * 4; i < n; i += 4) adjust(d, i)
-    return
-  }
-  const { x: ox, y: oy } = offset ?? ZERO
-  // Layer columns whose document x falls inside the mask.
-  const lx0 = Math.max(0, -ox)
-  const lx1 = Math.min(w, mask.width - ox)
-  const md = mask.data
-  for (let y = 0; y < b.height; y++) {
-    const dy = y + oy
-    if (dy < 0 || dy >= mask.height) continue
-    const mrow = dy * mask.width + ox // mask index of layer column 0
-    let i = (y * w + lx0) * 4
-    for (let x = lx0; x < lx1; x++, i += 4) {
-      const m = md[mrow + x]
-      if (m === 0) continue
-      if (m === 255) {
-        adjust(d, i)
-        continue
-      }
-      const r = d[i]
-      const g = d[i + 1]
-      const bl = d[i + 2]
+  forEachMasked(b.width, b.height, mask, offset, (i, m) => {
+    if (m === 255) {
       adjust(d, i)
-      d[i] = r + ((d[i] - r) * m) / 255
-      d[i + 1] = g + ((d[i + 1] - g) * m) / 255
-      d[i + 2] = bl + ((d[i + 2] - bl) * m) / 255
+      return
     }
-  }
+    const r = d[i]
+    const g = d[i + 1]
+    const bl = d[i + 2]
+    adjust(d, i)
+    d[i] = r + ((d[i] - r) * m) / 255
+    d[i + 1] = g + ((d[i + 1] - g) * m) / 255
+    d[i + 2] = bl + ((d[i + 2] - bl) * m) / 255
+  })
 }
 
 /** Maps R, G and B through a 256-entry lookup table. */
