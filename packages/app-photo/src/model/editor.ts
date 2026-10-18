@@ -1,5 +1,6 @@
-import { cloneBitmap, createBitmap, intersectRect, readRect, writeRect, type Bitmap, type Rect } from './bitmap'
-import { createLayer, getLayer, type Layer, type PhotoDoc, type TextData } from './doc'
+import { cloneBitmap, createBitmap, intersectRect, readRect, unionRect, writeRect, type Bitmap, type Rect } from './bitmap'
+import { createLayer, getLayer, layerBounds, type Layer, type PhotoDoc, type TextData } from './doc'
+import { compositeLayers } from '../ops/composite'
 import { History, type Step } from './history'
 import type { Mask } from './mask'
 
@@ -199,6 +200,44 @@ export class PhotoEditor {
       doc.width = w
       doc.height = h
       doc.selection = null // a selection is document-sized, so it no longer fits
+    })
+  }
+
+  /**
+   * Merge layer `id` into the layer directly below it, as one undoable step. The result keeps the
+   * lower layer's id, name, opacity and blend; its pixels are the upper layer composited onto the
+   * lower one with the upper layer's own blend and opacity. Bounds are the lower layer's bounds
+   * united with the on-canvas part of the upper layer (off-canvas pixels are never visible).
+   */
+  mergeDown(id: string): void {
+    const at = this.doc.layers.findIndex((l) => l.id === id)
+    if (at < 0) throw new Error('Layer not found')
+    if (at === 0) throw new Error('There is no layer below to merge into')
+    const upper = this.doc.layers[at]
+    const lower = this.doc.layers[at - 1]
+    const visibleUpper = intersectRect(layerBounds(upper), { x: 0, y: 0, width: this.doc.width, height: this.doc.height })
+    const rect = visibleUpper ? unionRect(layerBounds(lower), visibleUpper) : layerBounds(lower)
+    // The lower layer is the raw backdrop (its own opacity/blend stay on the result); the upper keeps its own.
+    const shift = (l: Layer, extra: Partial<Layer>): Layer => ({ ...l, x: l.x - rect.x, y: l.y - rect.y, ...extra })
+    const merged = compositeLayers([shift(lower, { visible: true, opacity: 1, blend: 'normal' }), shift(upper, {})], rect.width, rect.height)
+    this.editStructure('Merge Down', (doc) => {
+      lower.pixels = merged
+      lower.x = rect.x
+      lower.y = rect.y
+      lower.kind = 'raster'
+      lower.text = undefined
+      doc.layers.splice(at, 1)
+      doc.activeLayerId = lower.id
+    })
+  }
+
+  /** Composite all visible layers into one "Background" layer covering the document; hidden layers are dropped. */
+  flatten(): void {
+    const pixels = compositeLayers(this.doc.layers, this.doc.width, this.doc.height)
+    const flat = createLayer('Background', pixels)
+    this.editStructure('Flatten Image', (doc) => {
+      doc.layers = [flat]
+      doc.activeLayerId = flat.id
     })
   }
 
