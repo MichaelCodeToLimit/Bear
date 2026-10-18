@@ -23,6 +23,8 @@ import { formatZoom, zoomCommand, type ZoomCommand } from './zoom'
 import { useTools } from './useTools'
 import { ToolOverlay } from './ToolOverlay'
 import { TextEditBox, textBoxHandlers } from './TextEditBox'
+import { useImageDialogs } from './dialogs/useImageDialogs'
+import { useTestHook } from './testHook'
 
 const APP = getApp('photo')
 
@@ -44,6 +46,10 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
   const confirm = useConfirm(APP.color)
   const editorRef = useRef(editor)
   editorRef.current = editor
+  const dialogs = useImageDialogs({ state, tools, accent: APP.color, notify: notices.notify })
+  const dialogsRef = useRef(dialogs)
+  dialogsRef.current = dialogs
+  useTestHook(editorRef)
 
   /** Ask before opening something too large; resolves to the scale to use, or throws AbortError. */
   const askScale = useCallback(async (name: string, scale: number, reason: string) => {
@@ -75,7 +81,8 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     serialize: async (path, { auto }) => {
       // A save by the user includes an open text box; AutoSave leaves the box open while typing.
       if (!auto) tools.commitPending()
-      const doc = editorRef.current.doc
+      // A filter preview may have swapped a layer's pixels; save the real ones.
+      const doc = dialogsRef.current.docForSave(editorRef.current.doc)
       if (needsFlatten(doc, path) && !(await confirm.ask({ title: 'Flatten layers?', body: flattenWarning(path), confirm: 'Flatten and save' }))) throw abortError()
       return serializePhoto(doc, path)
     },
@@ -96,7 +103,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
 
   const recovery = useRecovery({
     accent: APP.color,
-    getDoc: () => (hasDoc ? editorRef.current.doc : null),
+    getDoc: () => (hasDoc ? dialogsRef.current.docForSave(editorRef.current.doc) : null),
     dirty: file.dirty,
     version,
     onRestore: (doc) => {
@@ -200,6 +207,8 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
         setBackground={setBackground}
         zoom={zoom}
         onCanvasSize={() => setCanvasSizeOpen(true)}
+        onDialog={dialogs.open}
+        onImage={dialogs.command}
       />
       {file.banner}
       <NoticeBar notices={notices} />
@@ -218,7 +227,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
         }}
       >
         <Toolbox tool={state.tool} setTool={state.setTool} />
-        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notify} onToolPointer={tools.onPointer} cursor={tools.cursor}>
+        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notify} onToolPointer={tools.onPointer} cursor={tools.cursor} preview={dialogs.preview}>
           {hasDoc && <ToolOverlay selection={doc.selection} overlay={tools.overlay} view={state.view} hover={cursor !== null && (state.tool === 'brush' || state.tool === 'eraser')} />}
           {hasDoc && tools.overlay?.kind === 'text' && <TextEditBox box={tools.overlay} view={state.view} options={tools.options.text} {...textBoxHandlers(tools)} />}
           {!hasDoc && (
@@ -279,6 +288,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
           onClose={() => setCanvasSizeOpen(false)}
         />
       )}
+      {dialogs.element}
       {confirm.dialog}
       {recovery.prompt}
       {file.savePrompt}

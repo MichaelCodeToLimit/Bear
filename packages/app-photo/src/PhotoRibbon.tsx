@@ -6,6 +6,7 @@ import {
 import { Ribbon, RibbonButton, RibbonGroup, RibbonRows } from '@bear/ui'
 import type { CanvasBackground } from './CanvasView'
 import type { PhotoEditorState } from './usePhotoEditor'
+import type { DialogKind, ImageCommand } from './dialogs/useImageDialogs'
 
 export const PHOTO_TABS = [
   { id: 'home', label: 'Home' },
@@ -25,6 +26,10 @@ export interface PhotoRibbonProps {
   setBackground: (b: CanvasBackground) => void
   zoom: (cmd: 'in' | 'out' | 'fit' | 'actual') => void
   onCanvasSize: () => void
+  /** Adjust, Filters and Image size dialogs (Invert and Black & white apply at once). */
+  onDialog: (kind: DialogKind) => void
+  /** Rotate, flip and trim. */
+  onImage: (cmd: ImageCommand) => void
 }
 
 /** A command that arrives in a later task: shown so the layout is final, but disabled for now. */
@@ -34,6 +39,8 @@ export function PhotoRibbon(p: PhotoRibbonProps) {
   const { state, accent } = p
   const { editor, hasDoc } = state
   const h = editor.history
+  const dialog = (icon: LucideIcon, label: string, kind: DialogKind) => <RibbonButton key={label} large icon={icon} label={label} disabled={!hasDoc} onClick={() => p.onDialog(kind)} />
+  const image = (icon: LucideIcon, label: string, cmd: ImageCommand) => <RibbonButton key={label} icon={icon} label={label} showLabel disabled={!hasDoc} onClick={() => p.onImage(cmd)} />
   return (
     <Ribbon tabs={PHOTO_TABS} active={p.tab} onChange={p.setTab} onFile={p.onFile} accent={accent}>
       {p.tab === 'home' && (
@@ -54,13 +61,13 @@ export function PhotoRibbon(p: PhotoRibbonProps) {
           </RibbonGroup>
           <RibbonGroup label="Rotate and flip">
             <RibbonRows>
-              {soon(RotateCw, 'Rotate 90° right')}
-              {soon(RotateCcw, 'Rotate 90° left')}
-              {soon(RotateCcwSquare, 'Rotate 180°')}
+              {image(RotateCw, 'Rotate 90° right', { rotate: 1 })}
+              {image(RotateCcw, 'Rotate 90° left', { rotate: 3 })}
+              {image(RotateCcwSquare, 'Rotate 180°', { rotate: 2 })}
             </RibbonRows>
             <RibbonRows>
-              {soon(FlipHorizontal2, 'Flip horizontal')}
-              {soon(FlipVertical2, 'Flip vertical')}
+              {image(FlipHorizontal2, 'Flip horizontal', { flip: 'h' })}
+              {image(FlipVertical2, 'Flip vertical', { flip: 'v' })}
             </RibbonRows>
           </RibbonGroup>
         </>
@@ -68,11 +75,11 @@ export function PhotoRibbon(p: PhotoRibbonProps) {
       {p.tab === 'image' && (
         <>
           <RibbonGroup label="Size">
-            {soon(Scaling, 'Image size', true)}
+            {dialog(Scaling, 'Image size', 'imageSize')}
             <RibbonButton large icon={Expand} label="Canvas size" disabled={!hasDoc} onClick={p.onCanvasSize} />
           </RibbonGroup>
           <RibbonGroup label="Edges">
-            {soon(Scan, 'Trim', true)}
+            <RibbonButton large icon={Scan} label="Trim" disabled={!hasDoc} onClick={() => p.onImage('trim')} />
           </RibbonGroup>
           <RibbonGroup label="Layers">
             <RibbonButton large icon={Layers2} label="Flatten" disabled={!hasDoc || editor.doc.layers.length < 2} onClick={() => editor.flatten()} />
@@ -82,31 +89,31 @@ export function PhotoRibbon(p: PhotoRibbonProps) {
       {p.tab === 'adjust' && (
         <>
           <RibbonGroup label="Light">
-            {soon(SunMedium, 'Brightness/ Contrast', true)}
-            {soon(SlidersHorizontal, 'Levels', true)}
-            {soon(Spline, 'Curves', true)}
+            {dialog(SunMedium, 'Brightness/ Contrast', 'brightness')}
+            {dialog(SlidersHorizontal, 'Levels', 'levels')}
+            {dialog(Spline, 'Curves', 'curves')}
           </RibbonGroup>
           <RibbonGroup label="Colour">
-            {soon(Palette, 'Hue/ Saturation', true)}
-            {soon(Contrast, 'Invert', true)}
-            {soon(Droplets, 'Black & white', true)}
+            {dialog(Palette, 'Hue/ Saturation', 'hsl')}
+            {dialog(Contrast, 'Invert', 'invert')}
+            {dialog(Droplets, 'Black & white', 'bw')}
           </RibbonGroup>
         </>
       )}
       {p.tab === 'filters' && (
         <>
           <RibbonGroup label="Blur">
-            {soon(Focus, 'Gaussian blur', true)}
-            {soon(Blend, 'Box blur', true)}
-            {soon(Wind, 'Motion blur', true)}
+            {dialog(Focus, 'Gaussian blur', 'gaussian')}
+            {dialog(Blend, 'Box blur', 'box')}
+            {dialog(Wind, 'Motion blur', 'motion')}
           </RibbonGroup>
           <RibbonGroup label="Sharpen">
-            {soon(Sparkles, 'Sharpen', true)}
-            {soon(Ratio, 'Unsharp mask', true)}
+            {dialog(Sparkles, 'Sharpen', 'sharpen')}
+            {dialog(Ratio, 'Unsharp mask', 'unsharp')}
           </RibbonGroup>
           <RibbonGroup label="Texture">
-            {soon(Grid3x3, 'Add noise', true)}
-            {soon(Grid2x2, 'Pixelate', true)}
+            {dialog(Grid3x3, 'Add noise', 'noise')}
+            {dialog(Grid2x2, 'Pixelate', 'pixelate')}
           </RibbonGroup>
         </>
       )}

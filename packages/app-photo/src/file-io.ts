@@ -1,5 +1,5 @@
 import { extensionOf, type FileFilter, type OpenedFile } from '@bear/core'
-import { createBitmap, type Bitmap } from './model/bitmap'
+import type { Bitmap } from './model/bitmap'
 import { createLayer, type PhotoDoc } from './model/doc'
 import { compositeLayers } from './ops/composite'
 import { readBearPhoto, writeBearPhoto } from './io/bearphoto'
@@ -7,6 +7,7 @@ import { readPsd, writePsd } from './io/psd'
 import { decodePng, encodePng } from './io/png'
 import { decodeImage, encodeImage } from './io/browser-image'
 import { checkOpenSize } from './io/limits'
+import { resample } from './ops/resample'
 
 export const OPEN_EXTENSIONS = ['bearphoto', 'psd', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif']
 
@@ -42,50 +43,9 @@ export function docFromBitmap(pixels: Bitmap): PhotoDoc {
   }
 }
 
-/** Bilinear resample (straight alpha, weighted by alpha so transparent edges don't darken). */
+/** Bilinear resample (see ops/resample.ts), kept under this name for the open and paste paths. */
 export function scaleBitmap(src: Bitmap, w: number, h: number): Bitmap {
-  const out = createBitmap(w, h)
-  if (src.width === 0 || src.height === 0) return out
-  const sx = src.width / w
-  const sy = src.height / h
-  const d = src.data
-  for (let y = 0; y < h; y++) {
-    const fy = Math.max(0, Math.min(src.height - 1, (y + 0.5) * sy - 0.5))
-    const y0 = Math.floor(fy)
-    const y1 = Math.min(src.height - 1, y0 + 1)
-    const ty = fy - y0
-    for (let x = 0; x < w; x++) {
-      const fx = Math.max(0, Math.min(src.width - 1, (x + 0.5) * sx - 0.5))
-      const x0 = Math.floor(fx)
-      const x1 = Math.min(src.width - 1, x0 + 1)
-      const tx = fx - x0
-      const taps: [number, number][] = [
-        [(y0 * src.width + x0) * 4, (1 - tx) * (1 - ty)],
-        [(y0 * src.width + x1) * 4, tx * (1 - ty)],
-        [(y1 * src.width + x0) * 4, (1 - tx) * ty],
-        [(y1 * src.width + x1) * 4, tx * ty]
-      ]
-      let r = 0
-      let g = 0
-      let b = 0
-      let a = 0
-      for (const [i, wgt] of taps) {
-        const wa = wgt * d[i + 3]
-        r += d[i] * wa
-        g += d[i + 1] * wa
-        b += d[i + 2] * wa
-        a += wa
-      }
-      const o = (y * w + x) * 4
-      if (a > 0) {
-        out.data[o] = r / a
-        out.data[o + 1] = g / a
-        out.data[o + 2] = b / a
-      }
-      out.data[o + 3] = a
-    }
-  }
-  return out
+  return resample(src, w, h, 'bilinear')
 }
 
 /** Scale every layer (pixels and offsets) and the canvas by `scale`. */

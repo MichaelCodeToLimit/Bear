@@ -3,6 +3,7 @@ import { createLayer, getLayer, layerBounds, type Layer, type PhotoDoc, type Tex
 import { compositeLayers } from '../ops/composite'
 import { History, type Step } from './history'
 import type { Mask } from './mask'
+import { cropCanvas, flipDocInPlace, FLIP_LABELS, resizeDoc, rotateDocInPlace, ROTATE_LABELS, trimRect, type Turns } from './docTransforms'
 
 interface LayerState {
   /** The live object that stays in doc.layers across undo/redo. */
@@ -267,6 +268,29 @@ export class PhotoEditor {
       doc.height = h
       doc.selection = null // a selection is document-sized, so it no longer fits
     })
+  }
+
+  /** Resample the whole image (every layer and offset) to `w` x `h`, as one "Image Size" step. */
+  resizeImage(w: number, h: number): void {
+    this.editStructure('Image Size', (doc) => resizeDoc(doc, w, h))
+  }
+
+  /** Turn the whole document `turns` quarter turns clockwise (3 = 90° left). Clears the selection. */
+  rotateDoc(turns: Turns): void {
+    this.editStructure(ROTATE_LABELS[turns], (doc) => rotateDocInPlace(doc, turns))
+  }
+
+  /** Mirror the whole document. Clears the selection. */
+  flipDoc(axis: 'h' | 'v'): void {
+    this.editStructure(FLIP_LABELS[axis], (doc) => flipDocInPlace(doc, axis))
+  }
+
+  /** Crop the canvas to the visible non-transparent pixels. False (and no step) when there is nothing to trim. */
+  trim(): boolean {
+    const r = trimRect(this.doc)
+    if (!r) return false
+    this.editStructure('Trim', (doc) => cropCanvas(doc, r))
+    return true
   }
 
   /**
