@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createBitmap, type Bitmap, type RGBA } from './bitmap'
 import { createDoc } from './doc'
 import { PhotoEditor } from './editor'
-import { brushDab, stampPoints, Stroke, type StrokeOptions } from './brush'
+import { brushDab, DAB_CACHE, quantizeSize, stampPoints, Stroke, type StrokeOptions } from './brush'
 
 const BLACK: RGBA = [0, 0, 0, 255]
 const opts = (o: Partial<StrokeOptions> = {}): StrokeOptions => ({
@@ -93,15 +93,27 @@ describe('Stroke', () => {
     const s = new Stroke(layer.pixels, opts({ size: 15, hardness: 0.3, opacity: 0.7, flow: 0.6, color: [10, 200, 30, 255] }))
     // A long multi-dab stroke across several 64 px tiles.
     for (let i = 0; i <= 20; i++) s.add(5 + i * 3.5, 10 + i * 3, null)
-    const r = s.end()!
+    expect(s.end()).not.toBeNull()
     expect(Buffer.compare(Buffer.from(layer.pixels.data), Buffer.from(orig))).not.toBe(0)
-    ed.editPixels('Brush', layer.id, r, () => {}, { before: s.original(r) })
+    ed.editPixelTiles('Brush', layer.id, s.savedTiles())
     expect(ed.history.steps.length).toBe(1)
     const painted = layer.pixels.data.slice()
     ed.history.undo()
     expect(Buffer.compare(Buffer.from(layer.pixels.data), Buffer.from(orig))).toBe(0)
     ed.history.redo()
     expect(Buffer.compare(Buffer.from(layer.pixels.data), Buffer.from(painted))).toBe(0)
+  })
+  it('keeps the dab cache bounded under a pressure sweep', () => {
+    const b = createBitmap(600, 600)
+    const s = new Stroke(b, opts({ size: 400, hardness: 0.5 }))
+    for (let i = 0; i < 200; i++) s.add(100 + i * 2, 300, (i + 1) / 200)
+    expect(s.cachedDabs).toBeLessThanOrEqual(DAB_CACHE)
+    // And the set of dab shapes a 1..2000 px brush can ever need is bounded.
+    const sizes = new Set<number>()
+    for (let v = 1; v <= 2000; v += 0.25) sizes.add(quantizeSize(v))
+    expect(sizes.size).toBeLessThan(250)
+    expect(quantizeSize(2000)).toBeGreaterThan(1950)
+    expect(quantizeSize(7.4)).toBe(7)
   })
   it('restore puts the original pixels back', () => {
     const b = createBitmap(100, 100, [1, 2, 3, 4])

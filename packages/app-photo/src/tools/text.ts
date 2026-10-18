@@ -19,6 +19,8 @@ interface Pending {
   layerId: string | null
   text: string
   color: RGBA
+  /** Reads the box's text as shown (set by the app's box, so a commit mid-IME-composition gets the final text). */
+  read?: () => string
 }
 
 let pending: Pending | null = null
@@ -64,6 +66,11 @@ function reopen(ctx: ToolContext, layer: Layer): void {
   open(ctx, { x: layer.x, y: layer.y, layerId: layer.id, text: t.text, color: [...t.color] })
 }
 
+/** The app's box registers how to read its current text; commit then prefers it over the last input. */
+export function attachTextSource(ctx: ToolContext, read: () => string): void {
+  if (pending && pending.editor === ctx.editor) pending.read = read
+}
+
 /** The box's current text (the box reports every change). */
 export function textInput(ctx: ToolContext, text: string): void {
   if (pending && pending.editor === ctx.editor) pending.text = text
@@ -80,7 +87,7 @@ export function commitText(ctx: ToolContext): void {
   lastClick = null
   ctx.setOverlay(null)
   if (!p || p.editor !== ctx.editor) return
-  const text = p.text.replace(/\r\n?/g, '\n').replace(/\n+$/, '')
+  const text = (p.read ? p.read() : p.text).replace(/\r\n?/g, '\n').replace(/\n+$/, '')
   if (!text.trim()) return
   const data: TextData = { text, color: p.color, ...style(ctx) }
   const editor = ctx.editor
@@ -166,6 +173,10 @@ export const text: Tool = {
       return true
     }
     return false
+  },
+  /** Tool switch, undo/redo/History and save keep the text. */
+  commit(ctx) {
+    if (pending) commitText(ctx)
   },
   cancel(ctx) {
     pending = null

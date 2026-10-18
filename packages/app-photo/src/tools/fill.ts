@@ -24,9 +24,11 @@ export const fill: Tool = {
     const lx = Math.floor(p.x) - ox
     const ly = Math.floor(p.y) - oy
     if (lx < 0 || ly < 0 || lx >= pixels.width || ly >= pixels.height) return
-    // In layer space, so pixels of a layer reaching past the canvas can be filled too.
-    const match = wandMask(pixels, lx, ly, Number(ctx.options.tolerance ?? 32), ctx.options.contiguous !== false)
+    // In layer space, so pixels of a layer reaching past the canvas can be filled too. The flood
+    // only walks selected pixels, so selected areas joined through unselected ones stay apart.
     const sel = ctx.editor.doc.selection
+    const within = sel ? { mask: sel, offset: { x: ox, y: oy } } : undefined
+    const match = wandMask(pixels, lx, ly, Number(ctx.options.tolerance ?? 32), ctx.options.contiguous !== false, undefined, undefined, within)
     const W = pixels.width
     // The weight of each pixel (match × selection), and the box around the non-zero ones.
     let x0 = W

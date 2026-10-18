@@ -14,7 +14,8 @@ export class ToolDispatcher {
   private held: ToolId | null = null
 
   constructor(
-    private ctx: () => ToolContext,
+    /** A context for `tool` (default: the active tool), with that tool's options. */
+    private ctx: (tool?: ToolId) => ToolContext,
     private active: () => ToolId,
     private setTool: (t: ToolId) => void
   ) {}
@@ -47,7 +48,12 @@ export class ToolDispatcher {
     fn(this.ctx())
   }
 
-  /** A new document: the active tool drops everything it had pending. */
+  /** Let the active tool keep pending non-drag work (commit an open text box). */
+  commitPending(): void {
+    toolById(this.active()).commit?.(this.ctx())
+  }
+
+  /** A new document: the active tool DISCARDS everything it had pending (it belonged to the old document). */
   reset(): void {
     this.pressed = false
     toolById(this.active()).cancel?.(this.ctx())
@@ -62,7 +68,11 @@ export class ToolDispatcher {
 
   /** Cancel any drag before undo, redo or a History click, so its preview can't be committed over the restored state. */
   attach(editor: PhotoEditor): () => void {
-    editor.history.beforeNavigate = () => this.cancelGesture()
+    editor.history.beforeNavigate = () => {
+      this.cancelGesture()
+      // An open text box becomes a step first, so the undo that follows removes it.
+      this.commitPending()
+    }
     return () => {
       if (editor.history.beforeNavigate) editor.history.beforeNavigate = undefined
     }
@@ -85,8 +95,9 @@ export class ToolDispatcher {
 
   /**
    * Call whenever the active tool changed from `prev`, however it happened (Toolbox, ribbon, letter
-   * key, Space). A real switch makes the old tool drop its work (a pending crop box, an open polygon)
-   * and ends any Space hold; a Space switch keeps it. Returns true when the work was dropped.
+   * key, Space). A real switch makes the old tool commit its work if it can (an open text box) or
+   * else drop it (a pending crop box, an open polygon), and ends any Space hold; a Space switch
+   * keeps it. The old tool gets a context with its OWN options. Returns true when the work ended.
    */
   toolChanged(prev: ToolId): boolean {
     if (this.temporaryTarget !== null && this.temporaryTarget === this.active()) {
@@ -96,7 +107,10 @@ export class ToolDispatcher {
     this.temporaryTarget = null
     this.held = null
     this.pressed = false
-    toolById(prev).cancel?.(this.ctx())
+    const old = toolById(prev)
+    const ctx = this.ctx(prev)
+    if (old.commit) old.commit(ctx)
+    else old.cancel?.(ctx)
     return true
   }
 }

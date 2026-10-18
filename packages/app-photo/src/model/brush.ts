@@ -1,4 +1,4 @@
-import { intersectRect, readRect, unionRect, type Bitmap, type Rect, type RGBA } from './bitmap'
+import { intersectRect, unionRect, type Bitmap, type Rect, type RGBA } from './bitmap'
 import type { Mask } from './mask'
 
 /** A square brush footprint: `size` × `size` alpha values 0..1, row-major. */
@@ -107,6 +107,19 @@ export interface StrokeOptions {
   offset: { x: number; y: number }
 }
 
+/** At most this many dabs are cached per stroke. */
+export const DAB_CACHE = 8
+
+/**
+ * Dab sizes in whole pixels up to 50, then in 2% steps, so a pressure sweep needs only a bounded
+ * set of dab shapes (and a 2000 px brush steps by about 40 px, which isn't visible).
+ */
+export function quantizeSize(size: number): number {
+  const s = Math.max(1, size)
+  if (s <= 50) return Math.round(s)
+  return Math.round(Math.pow(1.02, Math.round(Math.log(s) / Math.log(1.02))))
+}
+
 /** Tile side for the stroke's saved original and coverage; a power of two. */
 const T = 64
 const SHIFT = 6
@@ -167,20 +180,6 @@ export class Stroke {
     return this.dirty
   }
 
-  /** The pixels of `r` (layer-local, inside the target) as they were before the stroke. */
-  original(r: Rect): Bitmap {
-    const out = readRect(this.target, r)
-    this.eachTile((tile, tr) => {
-      const c = intersectRect(tr, r)
-      if (!c) return
-      for (let y = c.y; y < c.y + c.height; y++) {
-        const s = ((y - tr.y) * T + (c.x - tr.x)) * 4
-        out.data.set(tile.orig.subarray(s, s + c.width * 4), ((y - r.y) * out.width + (c.x - r.x)) * 4)
-      }
-    })
-    return out
-  }
-
   /** Put the original pixels back (cancel). Returns the area restored. */
   restore(): Rect | null {
     const w = this.target.width
@@ -204,14 +203,40 @@ export class Stroke {
     })
   }
 
+  /** Number of dabs currently cached (at most DAB_CACHE). */
+  get cachedDabs(): number {
+    return this.dabs.size
+  }
+
+  /** The dab for `size` (quantized), from a small LRU cache so pen pressure can't pile up dabs. */
   private dab(size: number): Dab {
-    const key = Math.max(1, Math.round(size))
+    const key = quantizeSize(size)
     let d = this.dabs.get(key)
-    if (!d) {
+    if (d) {
+      this.dabs.delete(key) // re-insert: Map order is the LRU order
+    } else {
       d = brushDab(key, this.o.hardness)
-      this.dabs.set(key, d)
+      if (this.dabs.size >= DAB_CACHE) this.dabs.delete(this.dabs.keys().next().value!)
     }
+    this.dabs.set(key, d)
     return d
+  }
+
+  /**
+   * The saved original of every tile the stroke touched, as `{ rect, before }` in layer
+   * coordinates (edge tiles are cut to the bitmap). For recording the stroke tile by tile.
+   */
+  savedTiles(): { rect: Rect; before: Bitmap }[] {
+    const out: { rect: Rect; before: Bitmap }[] = []
+    this.eachTile((tile, rect) => {
+      let data = tile.orig
+      if (rect.width < T || rect.height < T) {
+        data = new Uint8ClampedArray(rect.width * rect.height * 4)
+        for (let y = 0; y < rect.height; y++) data.set(tile.orig.subarray(y * T * 4, (y * T + rect.width) * 4), y * rect.width * 4)
+      }
+      out.push({ rect, before: { width: rect.width, height: rect.height, data } })
+    })
+    return out
   }
 
   /** Save the original of every tile `r` touches that isn't saved yet. */

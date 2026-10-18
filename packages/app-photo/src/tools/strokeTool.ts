@@ -33,9 +33,9 @@ const pct = (v: unknown, d: number) => Math.min(1, Math.max(0, (Number(v ?? d) |
 
 /**
  * A brush-like tool. A drag paints one `Stroke` live onto the active layer (refreshing just the
- * dabs' area) and records it on release as ONE `editPixels` step over the union of the dirty
- * rects, with the stroke's saved original as the "before" pixels. Strokes are clipped to the
- * layer's bitmap; it does not grow.
+ * dabs' area) and records it on release as ONE `editPixelTiles` step holding only the 64 px tiles
+ * the stroke touched (their saved originals and current pixels). Strokes are clipped to the
+ * layer's bitmap; it does not grow. Release doesn't stamp.
  */
 export function strokeTool(id: ToolId, label: string, key: string, erase: boolean): Tool {
   let active: Active | null = null
@@ -75,13 +75,12 @@ export function strokeTool(id: ToolId, label: string, key: string, erase: boolea
       cursor(ctx, p)
       paint(ctx, p)
     },
-    up(ctx, p) {
-      paint(ctx, p)
+    up(ctx) {
+      // No dab on release: a pen's lift-off reports pressure 0 and would stamp a 1 px dot.
       const a = active
       active = null
       if (!a || a.editor !== ctx.editor) return
-      const r = a.stroke.end()
-      if (r) ctx.editor.editPixels(label, a.layer.id, r, () => {}, { before: a.stroke.original(r) })
+      if (a.stroke.end()) ctx.editor.editPixelTiles(label, a.layer.id, a.stroke.savedTiles())
     },
     onKey(ctx, e) {
       if (e.ctrlKey || e.metaKey || e.altKey || (e.key !== '[' && e.key !== ']')) return false

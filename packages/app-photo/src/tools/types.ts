@@ -81,6 +81,12 @@ export interface Tool {
   up(ctx: ToolContext, p: ToolPointer): void
   /** A key while this tool is active. Return true when handled (the caller then prevents the default). */
   onKey?(ctx: ToolContext, e: ToolKeyEvent): boolean
-  /** Drop any work in progress (tool switched, document replaced). Must undo live previews. */
+  /** Drop any work in progress (document replaced, gesture abandoned). Must undo live previews. */
   cancel?(ctx: ToolContext): void
+  /**
+   * Keep pending work that isn't a drag (an open text box). Called before a real tool switch
+   * (instead of `cancel`), before undo/redo/History, and before saving. Tools without it are
+   * cancelled on a switch.
+   */
+  commit?(ctx: ToolContext): void
 }

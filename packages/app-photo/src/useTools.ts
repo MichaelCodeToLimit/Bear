@@ -28,6 +28,8 @@ export interface ToolsState {
   onKeyUp: (e: KeyboardEvent) => void
   /** Run `fn` with a fresh ToolContext (UI outside the canvas, such as the text box, talking to its tool). */
   withContext: (fn: (ctx: ToolContext) => void) => void
+  /** Commit an open text box (before saving). */
+  commitPending: () => void
 }
 
 /** Wires the tools in `tools/` to the editor state: one ToolContext per event, built from the latest state. */
@@ -53,12 +55,13 @@ export function useTools(state: PhotoEditorState): ToolsState {
   const [dispatcher] = useState(
     () =>
       new ToolDispatcher(
-        (): ToolContext => {
+        (tool?: ToolId): ToolContext => {
           const { state: s, options: o } = latest.current
+          const id = tool ?? s.tool
           return {
             editor: s.editor,
-            options: o[s.tool],
-            setOption: (id, v) => setOption(s.tool, id, v),
+            options: o[id],
+            setOption: (k, v) => setOption(id, k, v),
             colors: s.colors,
             setColors: s.setColors,
             view: s.view,
@@ -143,6 +146,7 @@ export function useTools(state: PhotoEditorState): ToolsState {
     onPointer,
     onKeyDown,
     onKeyUp,
-    withContext: (fn) => dispatcher.withContext(fn)
+    withContext: (fn) => dispatcher.withContext(fn),
+    commitPending: () => dispatcher.commitPending()
   }
 }

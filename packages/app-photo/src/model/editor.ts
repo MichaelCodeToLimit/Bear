@@ -104,20 +104,13 @@ export class PhotoEditor {
    * Run a pixel change limited to `rect` (layer-local coordinates) as one undoable step.
    * `fn` must only write inside `rect`; anything outside is not captured by undo.
    * If `rect` misses the layer entirely, `fn` is not called and no step is recorded.
-   *
-   * `opts.before` is for edits already shown live (a brush stroke paints the layer as it goes): it
-   * is the rect's pixels as they were before the edit, used instead of reading the layer now. It
-   * must be exactly the size of `rect` clipped to the layer, and `fn` may then be a no-op.
    */
-  editPixels(label: string, layerId: string, rect: Rect, fn: (pixels: Bitmap) => void, opts: { before?: Bitmap } = {}): void {
+  editPixels(label: string, layerId: string, rect: Rect, fn: (pixels: Bitmap) => void): void {
     const layer = getLayer(this.doc, layerId)
     if (!layer) throw new Error('Layer not found')
     const r = intersectRect(rect, { x: 0, y: 0, width: layer.pixels.width, height: layer.pixels.height })
     if (!r) return // nothing in range: fn is not called, so nothing can be written un-undoably
-    if (opts.before && (opts.before.width !== r.width || opts.before.height !== r.height)) {
-      throw new Error('editPixels: `before` does not match the edited rect')
-    }
-    const before = opts.before ?? readRect(layer.pixels, r)
+    const before = readRect(layer.pixels, r)
     fn(layer.pixels)
     const after = readRect(layer.pixels, r)
     const dirty = (): Rect => {
@@ -131,6 +124,39 @@ export class PhotoEditor {
         // Look the layer up by id so this still works if structure steps replaced the record.
         const target = getLayer(this.doc, layerId)
         if (target) writeRect(target.pixels, r, undo ? before : after)
+      },
+      dirty
+    )
+  }
+
+  /**
+   * Record an edit already made to the layer as one undoable step, tile by tile: each entry is a
+   * rect (layer-local) with its pixels from before the edit; the "after" pixels are read from the
+   * layer now. Only the tiles are stored, so a long diagonal stroke costs its touched tiles, not
+   * its bounding box. Rects must lie inside the layer and not overlap. No step for an empty list.
+   */
+  editPixelTiles(label: string, layerId: string, tiles: { rect: Rect; before: Bitmap }[]): void {
+    const layer = getLayer(this.doc, layerId)
+    if (!layer) throw new Error('Layer not found')
+    if (!tiles.length) return
+    const bounds = { x: 0, y: 0, width: layer.pixels.width, height: layer.pixels.height }
+    const saved = tiles.map(({ rect, before }) => {
+      const r = intersectRect(rect, bounds)
+      if (!r || r.x !== rect.x || r.y !== rect.y || r.width !== rect.width || r.height !== rect.height) throw new Error('editPixelTiles: tile outside the layer')
+      if (before.width !== rect.width || before.height !== rect.height) throw new Error('editPixelTiles: `before` does not match its rect')
+      return { rect, before, after: readRect(layer.pixels, rect) }
+    })
+    const union = saved.reduce((u, t) => unionRect(u, t.rect), saved[0].rect)
+    const dirty = (): Rect => {
+      const l = getLayer(this.doc, layerId)
+      return { ...union, x: (l?.x ?? 0) + union.x, y: (l?.y ?? 0) + union.y }
+    }
+    this.record(
+      label,
+      saved.reduce((n, t) => n + t.before.data.length + t.after.data.length, 0),
+      (undo) => {
+        const target = getLayer(this.doc, layerId)
+        if (target) for (const t of saved) writeRect(target.pixels, t.rect, undo ? t.before : t.after)
       },
       dirty
     )

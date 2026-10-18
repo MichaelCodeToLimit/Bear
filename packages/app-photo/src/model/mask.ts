@@ -104,7 +104,8 @@ export function polygonMask(w: number, h: number, pts: [number, number][]): Mask
  * `x, y` are DOCUMENT coordinates. The result is a document-sized mask (`docSize`, default = src size).
  * A pixel matches when its max per-channel difference (alpha included) from the seed pixel is <= `tolerance`.
  * Contiguous mode flood-fills 4-connected; otherwise every matching pixel in the layer is selected.
- * Pixels outside the layer are never selected.
+ * Pixels outside the layer are never selected. With `within`, only pixels where that mask is
+ * non-zero can match (mask cell = src pixel + `within.offset`), so a flood never crosses outside it.
  */
 export function wandMask(
   src: Bitmap,
@@ -114,6 +115,7 @@ export function wandMask(
   contiguous: boolean,
   offset: { x: number; y: number } = { x: 0, y: 0 },
   docSize: { w: number; h: number } = { w: src.width, h: src.height },
+  within?: { mask: Mask; offset: { x: number; y: number } },
 ): Mask {
   const m = emptyMask(docSize.w, docSize.h)
   const sx = Math.floor(x) - offset.x
@@ -129,6 +131,12 @@ export function wandMask(
   const a0 = d[si + 3]
   const tol = Math.max(0, tolerance)
   const matches = (px: number, py: number): boolean => {
+    if (within) {
+      const mx = px + within.offset.x
+      const my = py + within.offset.y
+      const wm = within.mask
+      if (mx < 0 || my < 0 || mx >= wm.width || my >= wm.height || !wm.data[my * wm.width + mx]) return false
+    }
     const i = (py * sw + px) * 4
     return (
       Math.abs(d[i] - r0) <= tol && Math.abs(d[i + 1] - g0) <= tol && Math.abs(d[i + 2] - b0) <= tol && Math.abs(d[i + 3] - a0) <= tol

@@ -73,6 +73,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     openFilters: OPEN_FILTERS,
     savable: SAVABLE,
     serialize: async (path) => {
+      tools.commitPending() // an open text box is saved too
       const doc = editorRef.current.doc
       if (needsFlatten(doc, path) && !(await confirm.ask({ title: 'Flatten layers?', body: flattenWarning(path), confirm: 'Flatten and save' }))) throw abortError()
       return serializePhoto(doc, path)
@@ -130,7 +131,10 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
   // Keyboard: file commands, undo/redo, zoom, colours, tool letters, Space for Hand and tool keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || document.querySelector('[role=dialog]')) return
+      if (document.querySelector('[role=dialog]')) return
+      // Ctrl+S still saves from the Text tool's box (the save commits the box first).
+      const saveFromTextBox = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && e.target instanceof Element && !!e.target.closest('[data-testid=photo-text-box]')
+      if (isTyping(e.target) && !saveFromTextBox) return
       if (tools.onKeyDown(e)) return e.preventDefault()
       const k = e.key.toLowerCase()
       const run = (fn: () => void) => {
