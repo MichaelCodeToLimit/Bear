@@ -2,13 +2,14 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { promises as fs, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  DATA_NAME, addRecent, appForFile, baseName, launchFiles, parseEdition, parseRecent, removeRecent, setEdition,
+  DATA_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent, setEdition,
   type AppId, type FileFilter, type RecentFile
 } from '@bear/core'
+import { buildEdition } from '../edition'
 import { registerMailIpc } from './mail'
 import { writeFileAtomic } from './mail/atomic'
 
-setEdition(parseEdition(__BEAR_EDITION__))
+setEdition(buildEdition())
 
 // Every edition keeps its data in Bear's folder, so Office and Studio installs share settings and files.
 if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', join(app.getPath('appData'), 'Bear'))

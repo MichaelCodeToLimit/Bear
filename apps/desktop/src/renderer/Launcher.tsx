@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, Home, Monitor, Moon, Plus, Sun } from 'lucide-react'
-import { EDITIONS, enabledApps, getApp, getEdition, type AppInfo, type Suite, type OpenedFile, type RecentFile } from '@bear/core'
+import { EDITIONS, enabledApps, getApp, getEdition, type AppId, type AppInfo, type Suite, type OpenedFile, type RecentFile } from '@bear/core'
 import { AppMark, RecentList, useTheme } from '@bear/ui'
 import { TemplateGrid } from '@bear/app-write'
 import { SheetTemplateGrid } from '@bear/app-sheets'
@@ -13,7 +13,8 @@ const SUITES: { id: Suite; heading: string }[] = [
   { id: 'studio', heading: 'Bear Studio' }
 ]
 
-const OPEN_ALL = [
+// Built when the dialog opens, not at import time: the edition is set after the modules load.
+const openFilters = () => [
   { name: 'Supported files', extensions: enabledApps().filter((a) => a.ready).flatMap((a) => a.extensions) },
   { name: 'All files', extensions: ['*'] }
 ]
@@ -23,6 +24,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
   const [error, setError] = useState<string | null>(null)
   const [theme, setTheme] = useTheme()
   const apps = enabledApps()
+  const has = (id: AppId) => apps.some((a) => a.id === id)
 
   useEffect(() => {
     window.bear.getRecent().then(setRecent)
@@ -35,7 +37,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
       if (e.key.toLowerCase() === 'o') {
         e.preventDefault()
         void browse()
-      } else if (e.key.toLowerCase() === 'n') {
+      } else if (e.key.toLowerCase() === 'n' && has('write')) {
         e.preventDefault()
         open({ app: 'write', input: { kind: 'template' }, key: Date.now() })
       }
@@ -49,7 +51,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
   }
 
   async function browse() {
-    const file = await window.bear.openFile(OPEN_ALL)
+    const file = await window.bear.openFile(openFilters())
     if (file) openFile(file)
   }
 
@@ -75,7 +77,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
       <aside className="flex w-[72px] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-4">
         <Logo />
         <NavButton icon={<Home size={20} />} label="Home" active />
-        <NavButton icon={<Plus size={20} />} label="New" onClick={() => open({ app: 'write', input: { kind: 'template' }, key: Date.now() })} />
+        {has('write') && <NavButton icon={<Plus size={20} />} label="New" onClick={() => open({ app: 'write', input: { kind: 'template' }, key: Date.now() })} />}
         <NavButton icon={<FolderOpen size={20} />} label="Open" onClick={() => void browse()} />
         <div className="flex-1" />
         <NavButton
@@ -121,20 +123,26 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
             </section>
           ))}
 
-          <section className="mb-10" style={{ ['--accent' as string]: getApp('write').color }}>
-            <h2 className="mb-3 text-sm font-semibold text-muted">New document</h2>
-            <TemplateGrid onPick={(template) => open({ app: 'write', input: { kind: 'template', template }, key: Date.now() })} />
-          </section>
+          {has('write') && (
+            <section className="mb-10" style={{ ['--accent' as string]: getApp('write').color }}>
+              <h2 className="mb-3 text-sm font-semibold text-muted">New document</h2>
+              <TemplateGrid onPick={(template) => open({ app: 'write', input: { kind: 'template', template }, key: Date.now() })} />
+            </section>
+          )}
 
-          <section className="mb-10" style={{ ['--accent' as string]: getApp('sheets').color }}>
-            <h2 className="mb-3 text-sm font-semibold text-muted">New spreadsheet</h2>
-            <SheetTemplateGrid onPick={(template) => open({ app: 'sheets', input: { kind: 'template', template }, key: Date.now() })} />
-          </section>
+          {has('sheets') && (
+            <section className="mb-10" style={{ ['--accent' as string]: getApp('sheets').color }}>
+              <h2 className="mb-3 text-sm font-semibold text-muted">New spreadsheet</h2>
+              <SheetTemplateGrid onPick={(template) => open({ app: 'sheets', input: { kind: 'template', template }, key: Date.now() })} />
+            </section>
+          )}
 
-          <section className="mb-10" style={{ ['--accent' as string]: getApp('slides').color }}>
-            <h2 className="mb-3 text-sm font-semibold text-muted">New presentation</h2>
-            <DeckTemplateGrid onPick={(template) => open({ app: 'slides', input: { kind: 'template', template }, key: Date.now() })} />
-          </section>
+          {has('slides') && (
+            <section className="mb-10" style={{ ['--accent' as string]: getApp('slides').color }}>
+              <h2 className="mb-3 text-sm font-semibold text-muted">New presentation</h2>
+              <DeckTemplateGrid onPick={(template) => open({ app: 'slides', input: { kind: 'template', template }, key: Date.now() })} />
+            </section>
+          )}
 
           <section>
             <div className="mb-3 flex items-center justify-between">
