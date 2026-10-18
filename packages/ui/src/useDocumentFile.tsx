@@ -25,7 +25,8 @@ export interface DocumentFileOptions {
   openFilters: FileFilter[]
   /** Extensions that can be written back in place; anything else goes through Save As. */
   savable: Set<string>
-  serialize: (path: string) => Promise<Uint8Array>
+  /** `opts.auto` is true when AutoSave (not the user) is saving. */
+  serialize: (path: string, opts: { auto: boolean }) => Promise<Uint8Array>
   /** Load file contents into the app. Return warnings to show the user, if any. */
   load: (file: OpenedFile) => Promise<string[] | void>
   /** Any value that changes on every edit; AutoSave waits for it to settle. */
@@ -64,10 +65,10 @@ export function useDocumentFile(opts: DocumentFileOptions) {
     window.bear.setTitle(`${dirty ? '• ' : ''}${doc.name} - Bear ${app.name}`)
   }, [doc.name, dirty, app.name])
 
-  const writeTo = useCallback(async (path: string) => {
+  const writeTo = useCallback(async (path: string, auto = false) => {
     setSaving(true)
     try {
-      const bytes = await latest.current.serialize(path)
+      const bytes = await latest.current.serialize(path, { auto })
       await window.bear.saveFile(path, bytes)
       setDoc({ path, name: baseName(path) })
       setDirty(false)
@@ -95,7 +96,7 @@ export function useDocumentFile(opts: DocumentFileOptions) {
   const canAutosave = !!doc.path && savable.has(extensionOf(doc.path))
   useEffect(() => {
     if (!autosave || !canAutosave || !dirty || saving) return
-    const t = setTimeout(() => void writeTo(doc.path!), AUTOSAVE_DELAY)
+    const t = setTimeout(() => void writeTo(doc.path!, true), AUTOSAVE_DELAY)
     return () => clearTimeout(t)
   }, [autosave, canAutosave, dirty, saving, doc.path, writeTo, changeToken])
 

@@ -72,8 +72,9 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     saveFilters: SAVE_FILTERS,
     openFilters: OPEN_FILTERS,
     savable: SAVABLE,
-    serialize: async (path) => {
-      tools.commitPending() // an open text box is saved too
+    serialize: async (path, { auto }) => {
+      // A save by the user includes an open text box; AutoSave leaves the box open while typing.
+      if (!auto) tools.commitPending()
       const doc = editorRef.current.doc
       if (needsFlatten(doc, path) && !(await confirm.ask({ title: 'Flatten layers?', body: flattenWarning(path), confirm: 'Flatten and save' }))) throw abortError()
       return serializePhoto(doc, path)
