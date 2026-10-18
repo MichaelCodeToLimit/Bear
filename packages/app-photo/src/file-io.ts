@@ -17,7 +17,7 @@ export const OPEN_FILTERS: FileFilter[] = [
 
 export const SAVE_FILTERS: FileFilter[] = [
   { name: 'Bear Photo', extensions: ['bearphoto'] },
-  { name: 'Photoshop', extensions: ['psd'] },
+  { name: 'Layered image (.psd)', extensions: ['psd'] },
   { name: 'PNG image', extensions: ['png'] },
   { name: 'JPEG image', extensions: ['jpg', 'jpeg'] },
   { name: 'WebP image', extensions: ['webp'] }

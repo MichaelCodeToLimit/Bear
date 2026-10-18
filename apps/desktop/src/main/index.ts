@@ -8,6 +8,7 @@ import {
 import { buildEdition } from '../edition'
 import { registerMailIpc } from './mail'
 import { writeFileAtomic } from './mail/atomic'
+import { KeyedQueue } from './keyed-queue'
 
 setEdition(buildEdition())
 
@@ -47,8 +48,17 @@ function recoveryFile(name: string): string {
 /** Which window (webContents id) last wrote each recovery copy. */
 const recoveryOwners = new Map<string, number>()
 
+/** Windows that closed normally: a write of theirs still in flight is deleted again when it lands. */
+const cleanlyClosed = new Set<number>()
+
+/** Writes and removals of one recovery file run one at a time, so a removal can't be overtaken by a write. */
+const recoveryQueue = new KeyedQueue()
+
+const MAX_RECOVERY_BYTES = 2 * 2 ** 30
+
 /** A window that closed normally leaves no recovery copies behind; a crash or kill keeps them. */
 function removeRecoveriesOf(ownerId: number): void {
+  cleanlyClosed.add(ownerId)
   for (const [name, owner] of recoveryOwners) {
     if (owner !== ownerId) continue
     recoveryOwners.delete(name)
@@ -225,9 +235,22 @@ function registerIpc(): void {
 
   // ---------- Crash recovery (Photo copies in userData/recovery) ----------
 
-  ipcMain.handle('recovery:write', async (e, name: string, data: Uint8Array) => {
-    await writeFileAtomic(recoveryFile(name), data)
-    recoveryOwners.set(name, e.sender.id)
+  ipcMain.handle('recovery:write', (e, name: string, data: Uint8Array) => {
+    const file = recoveryFile(name)
+    if (!(data instanceof Uint8Array)) throw new Error('Recovery data must be bytes')
+    if (data.byteLength > MAX_RECOVERY_BYTES) throw new Error('Recovery copy is too large')
+    const owner = e.sender.id
+    const gone = () => cleanlyClosed.has(owner) || e.sender.isDestroyed()
+    return recoveryQueue.run(name, async () => {
+      if (gone()) return
+      await writeFileAtomic(file, data)
+      // The window closed normally while this was being written: the copy must not outlive it.
+      if (gone()) {
+        if (cleanlyClosed.has(owner)) await fs.rm(file, { force: true })
+        return
+      }
+      recoveryOwners.set(name, owner)
+    })
   })
 
   ipcMain.handle('recovery:list', async (e) => {
@@ -259,9 +282,12 @@ function registerIpc(): void {
 
   ipcMain.handle('recovery:read', async (_e, name: string) => new Uint8Array(await fs.readFile(recoveryFile(name))))
 
-  ipcMain.handle('recovery:remove', async (_e, name: string) => {
-    await fs.rm(recoveryFile(name), { force: true })
-    recoveryOwners.delete(name)
+  ipcMain.handle('recovery:remove', (_e, name: string) => {
+    const file = recoveryFile(name)
+    return recoveryQueue.run(name, async () => {
+      await fs.rm(file, { force: true })
+      recoveryOwners.delete(name)
+    })
   })
 
   // ---------- Folders (Sites document libraries) ----------

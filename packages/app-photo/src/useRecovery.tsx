@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Modal } from '@bear/ui'
 import type { PhotoDoc } from './model/doc'
 import { readBearPhoto, writeBearPhoto } from './io/bearphoto'
-import { SESSION_ID, recoveryInterval, recoveryName, shouldWriteRecovery } from './recovery'
+import { RecoveryWriter, SESSION_ID, recoveryInterval, recoveryName } from './recovery'
 
 interface RecoveryOptions {
   accent: string
@@ -27,9 +27,9 @@ export function useRecovery({ accent, getDoc, dirty, version, onRestore, onError
   const [offers, setOffers] = useState<{ name: string; savedAt: number }[]>([])
   const live = useRef({ dirty, version, getDoc, onError })
   live.current = { dirty, version, getDoc, onError }
-  const written = useRef(false)
-  const lastWrite = useRef(Date.now())
-  const writtenVersion = useRef(-1)
+  const [writer] = useState(
+    () => new RecoveryWriter<PhotoDoc>(window.bear.recovery, NAME, writeBearPhoto, recoveryInterval(), Date.now())
+  )
 
   useEffect(() => {
     void window.bear.recovery.list().then(setOffers, () => setOffers([]))
@@ -37,56 +37,50 @@ export function useRecovery({ accent, getDoc, dirty, version, onRestore, onError
 
   // Write on a timer; a short tick keeps the shortened e2e interval accurate.
   useEffect(() => {
-    let busy = false
     const interval = recoveryInterval()
-    const timer = setInterval(async () => {
+    const timer = setInterval(() => {
       const { dirty: d, version: v, getDoc: get } = live.current
       const doc = get()
-      if (busy || !doc || !shouldWriteRecovery(d && v !== writtenVersion.current, lastWrite.current, Date.now(), interval)) return
-      busy = true
-      try {
-        await window.bear.recovery.write(NAME, await writeBearPhoto(doc))
-        written.current = true
-        writtenVersion.current = v
-        lastWrite.current = Date.now()
-      } catch (e) {
-        console.warn('Photo: could not write a recovery copy', e)
-      } finally {
-        busy = false
-      }
+      if (!doc) return
+      writer.maybeWrite(doc, d, v, Date.now()).catch((e) => console.warn('Photo: could not write a recovery copy', e))
     }, Math.min(5000, Math.max(100, interval / 4)))
     return () => clearInterval(timer)
-  }, [])
+  }, [writer])
 
-  const remove = () => {
-    if (!written.current) return
-    written.current = false
-    writtenVersion.current = -1
-    void window.bear.recovery.remove(NAME).catch(() => {})
-  }
-
+  // Clean again (saved, changes discarded, another file opened): drop the copy, even one mid-write.
   useEffect(() => {
     if (dirty) return
-    lastWrite.current = Date.now()
-    remove()
-  }, [dirty])
+    writer.lastWrite = Date.now()
+    void writer.remove().catch(() => {})
+  }, [dirty, writer])
 
-  useEffect(() => remove, [])
+  useEffect(() => () => void writer.remove().catch(() => {}), [writer])
 
   const offer = offers[0]
   const next = () => setOffers((list) => list.slice(1))
 
   const restore = async () => {
     if (!offer) return
+    let doc: PhotoDoc
     try {
-      const doc = await readBearPhoto(await window.bear.recovery.read(offer.name))
-      onRestore(doc)
-      await window.bear.recovery.remove(offer.name)
-      setOffers([])
+      doc = await readBearPhoto(await window.bear.recovery.read(offer.name))
     } catch (e) {
       live.current.onError(`Could not restore: ${(e as Error).message}`)
       next()
+      return
     }
+    onRestore(doc)
+    setOffers([])
+    // The old copy goes only once this session's own copy exists, so a second crash can't lose the work.
+    try {
+      await writer.writeNow(doc, -1)
+      writer.lastWrite = Date.now()
+    } catch (e) {
+      console.warn('Photo: could not write a recovery copy; keeping the old one', e)
+      return
+    }
+    // The restore itself worked; failing to tidy up the old copy is not worth reporting.
+    await window.bear.recovery.remove(offer.name).catch((e) => console.warn('Photo: could not remove the old recovery copy', e))
   }
 
   const discard = () => {
