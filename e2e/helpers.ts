@@ -20,15 +20,16 @@ export interface Launched {
 
 /**
  * Launch the built app with a throwaway profile. Set BEAR_ELECTRON to use a specific Electron
- * binary (handy when the workspace copy is locked by a running dev instance).
+ * binary (handy when the workspace copy is locked by a running dev instance). `extraArgs` are
+ * Chromium switches, such as `--disable-gpu`.
  */
-export async function launch(reuseDir?: string, files: string[] = []): Promise<Launched> {
+export async function launch(reuseDir?: string, files: string[] = [], extraArgs: string[] = []): Promise<Launched> {
   // Reusing a directory reopens the same profile, to check data survives a restart.
   const dir = reuseDir ?? mkdtempSync(join(tmpdir(), 'bear-e2e-'))
   const app = await electron.launch({
     executablePath: process.env.BEAR_ELECTRON || undefined,
     // Files go last, as when Explorer launches Bear for a document.
-    args: [...launchArgs(dir), ...files],
+    args: [...launchArgs(dir), ...extraArgs, ...files],
     cwd: appDir
   })
   const page = await app.firstWindow()
