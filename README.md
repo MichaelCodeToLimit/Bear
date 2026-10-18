@@ -100,7 +100,7 @@ Each command builds the installers for one OS into `apps/desktop/release/`. Run 
 | `pnpm build:linux:main` | `Bear-<version>-x64.AppImage`, `bear_<version>_amd64.deb`, `Bear-<version>-x64.rpm` and `Bear-<version>-x64.tar.gz` (the rpm needs `rpmbuild`) |
 | `pnpm build:linux:flatpak` | `Bear-<version>-x64.flatpak` (needs `flatpak-builder` plus the 24.08 Freedesktop runtime, SDK and Electron BaseApp from Flathub) |
 
-The installers register Bear for .docx, .xlsx and .pptx files. Opening one of those files starts Bear on it, and if Bear is already running the file opens in a new Bear window. The MSI's `upgradeCode` in `apps/desktop/electron-builder.yml` must never change, because Windows uses it to upgrade older installs in place. To release a new version, bump `version` in `apps/desktop/package.json`.
+The installers register Bear for .docx, .xlsx and .pptx files. Opening one of those files starts Bear on it, and if Bear is already running the file opens in a new Bear window. The MSI's `upgradeCode` in `apps/desktop/electron-builder.config.cjs` must never change, because Windows uses it to upgrade older installs in place. To release a new version, bump `version` in `apps/desktop/package.json`.
 
 Unsigned builds work, but Windows SmartScreen and macOS Gatekeeper warn on first launch. To sign them, set `CSC_LINK`/`CSC_KEY_PASSWORD` (plus the `APPLE_*` notarization variables on macOS) as repository secrets for the workflow.
 

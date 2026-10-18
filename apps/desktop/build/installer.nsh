@@ -6,7 +6,7 @@
 ;   - not installed: Choose Install Location
 ;   - installed:     Repair or Update, in the folder Bear is already in
 ; electron-builder's own location page is turned off (allowToChangeInstallationDirectory: false
-; in electron-builder.yml) and recreated here, so the two pages can share that slot.
+; in electron-builder.config.cjs) and recreated here, so the two pages can share that slot.
 
 !macro customHeader
   ; Visual styles, so Repair and Update render as modern Windows command-link buttons.
