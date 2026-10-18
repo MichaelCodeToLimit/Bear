@@ -7,6 +7,15 @@ import { Button, Modal } from './Modal'
 
 const AUTOSAVE_DELAY = 2500
 
+/** `load` or `serialize` may throw an error named "AbortError" when the user cancelled; nothing is reported. */
+const isAbort = (e: unknown) => (e as Error | null)?.name === 'AbortError'
+
+export function abortError(): Error {
+  const e = new Error('Cancelled')
+  e.name = 'AbortError'
+  return e
+}
+
 export interface DocumentFileOptions {
   app: AppInfo
   /** Name for a new, unsaved document ("Document1", "Book1"). */
@@ -65,7 +74,7 @@ export function useDocumentFile(opts: DocumentFileOptions) {
       setRecent(await window.bear.addRecent(path, app.id))
       return true
     } catch (e) {
-      setError(`Could not save: ${(e as Error).message}`)
+      if (!isAbort(e)) setError(`Could not save: ${(e as Error).message}`)
       return false
     } finally {
       setSaving(false)
@@ -98,7 +107,7 @@ export function useDocumentFile(opts: DocumentFileOptions) {
       setRecent(await window.bear.addRecent(file.path, app.id))
       setNotice(warnings?.length ? `Opened with ${warnings.length} item(s) simplified.` : null)
     } catch (e) {
-      setError(`Could not open ${file.name}: ${(e as Error).message}`)
+      if (!isAbort(e)) setError(`Could not open ${file.name}: ${(e as Error).message}`)
     }
   }, [app.id])
 

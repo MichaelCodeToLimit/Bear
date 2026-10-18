@@ -69,6 +69,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
     if (app.id === 'write') open({ app: 'write', input: { kind: 'template' }, key })
     if (app.id === 'sheets') open({ app: 'sheets', input: { kind: 'template' }, key })
     if (app.id === 'slides') open({ app: 'slides', input: { kind: 'template' }, key })
+    if (app.id === 'photo') open({ app: 'photo', input: { kind: 'new' }, key })
     if (app.id === 'notes' || app.id === 'tasks' || app.id === 'board' || app.id === 'sites' || app.id === 'mail') open({ app: app.id, key })
   }
 

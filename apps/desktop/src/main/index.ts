@@ -1,8 +1,8 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { promises as fs, statSync } from 'node:fs'
+import { app, BrowserWindow, dialog, ipcMain, shell, webContents } from 'electron'
+import { promises as fs, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  DATA_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent, setEdition,
+  DATA_NAME, RECOVERY_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent, setEdition,
   type AppId, type FileFilter, type RecentFile
 } from '@bear/core'
 import { buildEdition } from '../edition'
@@ -36,6 +36,30 @@ async function readOpened(path: string) {
 
 /** Windows that the user has confirmed may close despite unsaved changes. */
 const forceClosing = new WeakSet<BrowserWindow>()
+
+const recoveryDir = () => join(app.getPath('userData'), 'recovery')
+
+function recoveryFile(name: string): string {
+  if (typeof name !== 'string' || !RECOVERY_NAME.test(name)) throw new Error(`Invalid recovery name: ${name}`)
+  return join(recoveryDir(), name)
+}
+
+/** Which window (webContents id) last wrote each recovery copy. */
+const recoveryOwners = new Map<string, number>()
+
+/** A window that closed normally leaves no recovery copies behind; a crash or kill keeps them. */
+function removeRecoveriesOf(ownerId: number): void {
+  for (const [name, owner] of recoveryOwners) {
+    if (owner !== ownerId) continue
+    recoveryOwners.delete(name)
+    // Synchronous: this can be the last window, and the app quits right after.
+    try {
+      rmSync(recoveryFile(name), { force: true })
+    } catch (err) {
+      console.warn('Could not remove recovery copy', name, err)
+    }
+  }
+}
 
 /** The document each new window should open on start, keyed by webContents id. */
 const launchFileFor = new Map<number, string>()
@@ -91,6 +115,12 @@ function createWindow(launchFile?: string): BrowserWindow {
     if (forceClosing.has(win)) return
     e.preventDefault()
     win.webContents.send('window:close-request')
+  })
+
+  // Only a close the renderer agreed to counts as clean ('close' is not emitted for destroy()).
+  const contentsId = win.webContents.id
+  win.on('closed', () => {
+    if (forceClosing.has(win)) removeRecoveriesOf(contentsId)
   })
 
   // Open external links in the default browser, never inside the app.
@@ -191,6 +221,47 @@ function registerIpc(): void {
 
   ipcMain.handle('data:delete', async (_e, name: string) => {
     await fs.rm(dataFile(name), { force: true })
+  })
+
+  // ---------- Crash recovery (Photo copies in userData/recovery) ----------
+
+  ipcMain.handle('recovery:write', async (e, name: string, data: Uint8Array) => {
+    await writeFileAtomic(recoveryFile(name), data)
+    recoveryOwners.set(name, e.sender.id)
+  })
+
+  ipcMain.handle('recovery:list', async (e) => {
+    let names: string[]
+    try {
+      names = await fs.readdir(recoveryDir())
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+      throw err
+    }
+    // Copies that another open window is still keeping up to date are not left over from a crash.
+    const liveElsewhere = (name: string) => {
+      const owner = recoveryOwners.get(name)
+      return owner !== undefined && owner !== e.sender.id && !!webContents.fromId(owner)
+    }
+    const found = await Promise.all(
+      names
+        .filter((n) => RECOVERY_NAME.test(n) && !liveElsewhere(n))
+        .map(async (name) => {
+          try {
+            return { name, savedAt: (await fs.stat(join(recoveryDir(), name))).mtimeMs }
+          } catch {
+            return null
+          }
+        })
+    )
+    return found.filter((f) => f !== null).sort((a, b) => b.savedAt - a.savedAt)
+  })
+
+  ipcMain.handle('recovery:read', async (_e, name: string) => new Uint8Array(await fs.readFile(recoveryFile(name))))
+
+  ipcMain.handle('recovery:remove', async (_e, name: string) => {
+    await fs.rm(recoveryFile(name), { force: true })
+    recoveryOwners.delete(name)
   })
 
   // ---------- Folders (Sites document libraries) ----------
