@@ -3,23 +3,33 @@ import { createLayer, getLayer, type Layer, type PhotoDoc, type TextData } from 
 import { History, type Step } from './history'
 import type { Mask } from './mask'
 
+interface LayerState {
+  /** The live object that stays in doc.layers across undo/redo. */
+  live: Layer
+  /** Immutable copy of its props at snapshot time. */
+  props: Layer
+}
+
 interface Snapshot {
   width: number
   height: number
-  layers: Layer[]
+  layers: LayerState[]
   activeLayerId: string
   selection: Mask | null
 }
 
-/** Rough memory cost of a structure step (layer records only; bitmaps are shared by reference). */
+/** Fixed overhead of a structure step (layer records); bitmap memory is added on top. */
 const STRUCTURE_BYTES = 1024
+
+function copyLayer(l: Layer): Layer {
+  return { ...l, text: l.text ? { ...l.text, color: [...l.text.color] } : undefined }
+}
 
 function snapshot(doc: PhotoDoc): Snapshot {
   return {
     width: doc.width,
     height: doc.height,
-    // Layer records are copied, so later in-place prop changes don't alter the snapshot. Bitmaps are shared.
-    layers: doc.layers.map((l) => ({ ...l })),
+    layers: doc.layers.map((l) => ({ live: l, props: copyLayer(l) })),
     activeLayerId: doc.activeLayerId,
     selection: doc.selection
   }
@@ -28,9 +38,20 @@ function snapshot(doc: PhotoDoc): Snapshot {
 function restore(doc: PhotoDoc, s: Snapshot): void {
   doc.width = s.width
   doc.height = s.height
-  doc.layers = s.layers.map((l) => ({ ...l }))
+  // Reuse the live Layer objects so references held by callers stay valid after undo/redo.
+  doc.layers = s.layers.map(({ live, props }) => Object.assign(live, copyLayer(props)))
   doc.activeLayerId = s.activeLayerId
   doc.selection = s.selection
+}
+
+/** Bytes of bitmaps referenced by only one of the two snapshots; those are what the step keeps alive. */
+function structureBytes(before: Snapshot, after: Snapshot): number {
+  const a = new Set(before.layers.map((l) => l.props.pixels))
+  const b = new Set(after.layers.map((l) => l.props.pixels))
+  let n = STRUCTURE_BYTES
+  for (const p of a) if (!b.has(p)) n += p.data.byteLength
+  for (const p of b) if (!a.has(p)) n += p.data.byteLength
+  return n
 }
 
 export class PhotoEditor {
@@ -69,21 +90,22 @@ export class PhotoEditor {
     const after = snapshot(this.doc)
     this.record(
       label,
-      STRUCTURE_BYTES,
+      structureBytes(before, after),
       (undo) => restore(this.doc, undo ? before : after),
       () => null
     )
   }
 
-  /** Run a pixel change limited to `rect` (layer-local coordinates) as one undoable step. */
+  /**
+   * Run a pixel change limited to `rect` (layer-local coordinates) as one undoable step.
+   * `fn` must only write inside `rect`; anything outside is not captured by undo.
+   * If `rect` misses the layer entirely, `fn` is not called and no step is recorded.
+   */
   editPixels(label: string, layerId: string, rect: Rect, fn: (pixels: Bitmap) => void): void {
     const layer = getLayer(this.doc, layerId)
     if (!layer) throw new Error('Layer not found')
     const r = intersectRect(rect, { x: 0, y: 0, width: layer.pixels.width, height: layer.pixels.height })
-    if (!r) {
-      fn(layer.pixels)
-      return
-    }
+    if (!r) return // nothing in range: fn is not called, so nothing can be written un-undoably
     const before = readRect(layer.pixels, r)
     fn(layer.pixels)
     const after = readRect(layer.pixels, r)

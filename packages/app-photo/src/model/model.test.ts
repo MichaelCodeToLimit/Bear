@@ -194,3 +194,49 @@ describe('structure edits', () => {
     expect(ed.doc.selection).toBeNull()
   })
 })
+
+describe('fix round 1', () => {
+  it('structure step bytes count bitmaps kept alive, so a big delete evicts older steps', () => {
+    const ed = new PhotoEditor(createDoc(2, 2, WHITE))
+    ed.history = new History(50, 5000)
+    ed.setLayerProps(ed.doc.layers[0].id, { opacity: 0.9 })
+    ed.setLayerProps(ed.doc.layers[0].id, { opacity: 0.8 })
+    expect(ed.history.steps).toHaveLength(2)
+    const big = ed.addLayer({ pixels: createBitmap(100, 100) }) // 40000 bytes
+    expect(ed.history.steps).toHaveLength(1) // step alone exceeds cap, older evicted
+    expect(ed.history.steps[0].bytes).toBeGreaterThanOrEqual(40000)
+    ed.deleteLayer(big.id)
+    expect(ed.history.steps.at(-1)!.bytes).toBeGreaterThanOrEqual(40000)
+    expect(ed.history.steps).toHaveLength(1)
+  })
+
+  it('editPixels with a rect missing the layer does not call fn or record a step', () => {
+    const ed = new PhotoEditor(createDoc(2, 2, WHITE))
+    let called = false
+    const v = ed.version
+    ed.editPixels('Paint', ed.doc.layers[0].id, { x: 10, y: 10, width: 2, height: 2 }, () => {
+      called = true
+    })
+    expect(called).toBe(false)
+    expect(ed.history.steps).toHaveLength(0)
+    expect(ed.version).toBe(v)
+  })
+
+  it('layer object identity is stable across undo/redo', () => {
+    const ed = new PhotoEditor(createDoc(2, 2, WHITE))
+    const l = ed.addLayer()
+    ed.setLayerProps(l.id, { opacity: 0.5 })
+    ed.history.undo()
+    expect(ed.doc.layers).toContain(l)
+    expect(l.opacity).toBe(1)
+    ed.history.redo()
+    expect(l.opacity).toBe(0.5)
+    ed.deleteLayer(l.id)
+    ed.history.undo()
+    expect(ed.doc.layers).toContain(l)
+    // in-place prop changes must not corrupt older snapshots
+    ed.setLayerProps(l.id, { opacity: 0.1 })
+    ed.history.undo()
+    expect(l.opacity).toBe(0.5)
+  })
+})
