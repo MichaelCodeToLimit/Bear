@@ -241,8 +241,7 @@ function boxCols(src: Uint8Array, dst: Uint8Array, w: number, h: number, r: numb
  * Returns a new mask of the same size.
  */
 export function featherMask(m: Mask, radius: number): Mask {
-  const out: Mask = { width: m.width, height: m.height, data: m.data.slice() }
-  if (radius <= 0 || m.width === 0 || m.height === 0) return out
+  if (radius <= 0 || m.width === 0 || m.height === 0) return { width: m.width, height: m.height, data: m.data.slice() }
   const sigma = radius / 2
   let box = Math.floor(Math.sqrt(4 * sigma * sigma + 1))
   if (box % 2 === 0) box++
@@ -256,8 +255,7 @@ export function featherMask(m: Mask, radius: number): Mask {
     a = b
     b = t
   }
-  out.data = a
-  return out
+  return { width: m.width, height: m.height, data: a }
 }
 
 /** Selection with 255 - value everywhere. Returns a new mask. */
