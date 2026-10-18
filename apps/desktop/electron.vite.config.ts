@@ -8,6 +8,9 @@ import { resolve } from 'node:path'
 // Workspace packages ship TypeScript source, so they must be bundled rather than externalized.
 const bundled = ['@bear/core']
 
+// Which apps this build shows: all, office or studio. Set BEAR_EDITION when building.
+const define = { __BEAR_EDITION__: JSON.stringify(process.env.BEAR_EDITION ?? 'all') }
+
 /**
  * Board's whiteboard (Excalidraw) normally fetches its fonts from a CDN, which Bear's security
  * policy blocks and which wouldn't work offline. Copy them into the renderer's public folder so
@@ -26,12 +29,15 @@ function excalidrawFonts(): Plugin {
 
 export default defineConfig({
   main: {
+    define,
     plugins: [externalizeDepsPlugin({ exclude: bundled })]
   },
   preload: {
+    define,
     plugins: [externalizeDepsPlugin({ exclude: bundled })]
   },
   renderer: {
+    define,
     root: resolve(__dirname, 'src/renderer'),
     build: {
       rollupOptions: { input: resolve(__dirname, 'src/renderer/index.html') }

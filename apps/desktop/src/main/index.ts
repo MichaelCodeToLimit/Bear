@@ -2,11 +2,16 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { promises as fs, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  DATA_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent,
+  DATA_NAME, addRecent, appForFile, baseName, launchFiles, parseEdition, parseRecent, removeRecent, setEdition,
   type AppId, type FileFilter, type RecentFile
 } from '@bear/core'
 import { registerMailIpc } from './mail'
 import { writeFileAtomic } from './mail/atomic'
+
+setEdition(parseEdition(__BEAR_EDITION__))
+
+// Every edition keeps its data in Bear's folder, so Office and Studio installs share settings and files.
+if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', join(app.getPath('appData'), 'Bear'))
 
 const recentPath = () => join(app.getPath('userData'), 'recent.json')
 
@@ -120,7 +125,7 @@ function registerIpc(): void {
   ipcMain.handle('file:read', (_e, path: string) => readOpened(path))
 
   ipcMain.handle('file:save', async (_e, path: string, data: Uint8Array) => {
-    await fs.writeFile(path, data)
+    await writeFileAtomic(path, data)
   })
 
   ipcMain.handle('file:chooseSavePath', async (e, defaultName: string, filters: FileFilter[]) => {

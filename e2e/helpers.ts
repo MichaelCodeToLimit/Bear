@@ -35,7 +35,7 @@ export async function launch(reuseDir?: string, files: string[] = []): Promise<L
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.setBackgroundThrottling(false)))
   page.on('pageerror', (e) => console.error('pageerror:', e.message))
   // A window opened for a document skips past the launcher, so there's nothing stable to wait for.
-  if (!files.length) await page.waitForSelector('text=Apps')
+  if (!files.length) await page.waitForSelector('[data-testid^=suite-]')
   return { app, page, dir }
 }
 

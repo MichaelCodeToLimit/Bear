@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, Home, Monitor, Moon, Plus, Sun } from 'lucide-react'
-import { APPS, getApp, type AppInfo, type OpenedFile, type RecentFile } from '@bear/core'
+import { EDITIONS, enabledApps, getApp, getEdition, type AppInfo, type Suite, type OpenedFile, type RecentFile } from '@bear/core'
 import { AppMark, RecentList, useTheme } from '@bear/ui'
 import { TemplateGrid } from '@bear/app-write'
 import { SheetTemplateGrid } from '@bear/app-sheets'
@@ -8,8 +8,13 @@ import { DeckTemplateGrid } from '@bear/app-slides'
 import type { OpenApp } from './App'
 import logoUrl from '../../build/icon-128.png'
 
+const SUITES: { id: Suite; heading: string }[] = [
+  { id: 'office', heading: 'Apps' },
+  { id: 'studio', heading: 'Bear Studio' }
+]
+
 const OPEN_ALL = [
-  { name: 'Supported files', extensions: APPS.filter((a) => a.ready).flatMap((a) => a.extensions) },
+  { name: 'Supported files', extensions: enabledApps().filter((a) => a.ready).flatMap((a) => a.extensions) },
   { name: 'All files', extensions: ['*'] }
 ]
 
@@ -17,6 +22,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
   const [recent, setRecent] = useState<RecentFile[]>([])
   const [error, setError] = useState<string | null>(null)
   const [theme, setTheme] = useTheme()
+  const apps = enabledApps()
 
   useEffect(() => {
     window.bear.getRecent().then(setRecent)
@@ -39,7 +45,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
   })
 
   function openFile(file: OpenedFile) {
-    if (!route(file)) setError(`${file.name} can't be opened in Bear yet. Bear opens documents, spreadsheets and presentations.`)
+    if (!route(file)) setError(`${file.name} can't be opened in ${EDITIONS[getEdition()].productName} yet.`)
   }
 
   async function browse() {
@@ -93,25 +99,27 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
             </div>
           )}
 
-          <section className="mb-10">
-            <h2 className="mb-3 text-sm font-semibold text-muted">Apps</h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-              {APPS.map((app) => (
-                <button
-                  key={app.id}
-                  onClick={() => launch(app)}
-                  disabled={!app.ready}
-                  className="group flex items-center gap-3 rounded-lg border border-line bg-surface p-3 text-left transition enabled:hover:-translate-y-0.5 enabled:hover:shadow-md disabled:cursor-default"
-                >
-                  <span className={app.ready ? '' : 'opacity-50 grayscale-[40%]'}><AppMark app={app} size={36} /></span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{app.name}</span>
-                    <span className="block truncate text-xs text-muted">{app.ready ? app.tagline : 'Coming soon'}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
+          {SUITES.filter((suite) => apps.some((a) => a.suite === suite.id)).map((suite) => (
+            <section key={suite.id} data-testid={`suite-${suite.id}`} className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold text-muted">{suite.heading}</h2>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+                {apps.filter((a) => a.suite === suite.id).map((app) => (
+                  <button
+                    key={app.id}
+                    onClick={() => launch(app)}
+                    disabled={!app.ready}
+                    className="group flex items-center gap-3 rounded-lg border border-line bg-surface p-3 text-left transition enabled:hover:-translate-y-0.5 enabled:hover:shadow-md disabled:cursor-default"
+                  >
+                    <span className={app.ready ? '' : 'opacity-50 grayscale-[40%]'}><AppMark app={app} size={36} /></span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{app.name}</span>
+                      <span className="block truncate text-xs text-muted">{app.ready ? app.tagline : 'Coming soon'}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
 
           <section className="mb-10" style={{ ['--accent' as string]: getApp('write').color }}>
             <h2 className="mb-3 text-sm font-semibold text-muted">New document</h2>
