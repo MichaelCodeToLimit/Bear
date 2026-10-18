@@ -20,15 +20,21 @@ export interface DialogFrameProps {
  * A dialog that leaves the canvas visible for the live preview: it sits at the top right of the
  * window, over the panels. A transparent layer underneath catches clicks, so tools and the rest of
  * the window are inactive while it is open, and the app's shortcuts are off (they skip while a
- * `[role=dialog]` exists). Its own keys: Escape cancels, Enter applies, Ctrl+Z / Ctrl+Y undo / redo.
+ * `[role=dialog]` exists). Its own keys: Escape cancels, Enter applies, Ctrl+Z / Ctrl+Y undo / redo;
+ * they only count while focus is in the dialog (it takes focus on open), Enter on a focused button
+ * is left to the button, and a prompt opened on top of the dialog keeps its keys to itself.
  */
 export function DialogFrame({ title, accent, onApply, onCancel, onUndo, onRedo, status, busy, children }: DialogFrameProps) {
   const latest = useRef({ onApply, onCancel, onUndo, onRedo, canApply: !status && !busy })
   latest.current = { onApply, onCancel, onUndo, onRedo, canApply: !status && !busy }
+  const panel = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const l = latest.current
       const k = e.key.toLowerCase()
+      if (!ownsKey(panel.current, e)) return
+      // A focused button handles Enter (and Space) itself: Enter on Cancel cancels.
+      if (k === 'enter' && e.target instanceof Element && e.target.closest('button')) return
       const handled = (fn: () => void) => {
         e.preventDefault()
         e.stopPropagation()
@@ -42,12 +48,14 @@ export function DialogFrame({ title, accent, onApply, onCancel, onUndo, onRedo, 
       }
     }
     window.addEventListener('keydown', onKey, true)
+    // Take focus from the ribbon button that opened the dialog, so the dialog's keys reach it.
+    panel.current?.focus()
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
   return (
     <div className="fixed inset-0 z-50 print:hidden" data-testid="photo-dialog-blocker">
-      <div role="dialog" aria-label={title} className="absolute right-4 top-[132px] w-[320px] rounded-lg border border-line bg-surface text-ink shadow-2xl">
+      <div ref={panel} tabIndex={-1} role="dialog" aria-label={title} className="outline-none absolute right-4 top-[132px] w-[320px] rounded-lg border border-line bg-surface text-ink shadow-2xl">
         <h2 className="px-4 pb-1 pt-3 text-[15px] font-semibold">{title}</h2>
         <div className="flex flex-col gap-3 px-4 pb-3 text-sm">
           {children}
@@ -67,6 +75,18 @@ export function DialogFrame({ title, accent, onApply, onCancel, onUndo, onRedo, 
       </div>
     </div>
   )
+}
+
+/**
+ * True when a key belongs to this dialog: no other dialog is open (a prompt on top gets its own
+ * keys), and focus is inside the dialog or nowhere in particular (the page body).
+ */
+export function ownsKey(panel: HTMLElement | null, e: KeyboardEvent): boolean {
+  if (!panel) return false
+  const doc = panel.ownerDocument
+  for (const d of doc.querySelectorAll('[role=dialog]')) if (d !== panel) return false
+  const t = e.target
+  return t === doc.body || t === doc.documentElement || t === doc || (t instanceof Node && panel.contains(t))
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))

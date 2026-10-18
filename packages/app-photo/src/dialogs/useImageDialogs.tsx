@@ -13,6 +13,7 @@ import { FilterDialog } from './FilterDialog'
 import { FILTER_SPECS, isFilterId } from './filterSpecs'
 import { FilterSession } from './filterSession'
 import { ImageSizeDialog } from './ImageSizeDialog'
+import { runImageChange } from './imageChange'
 
 export type DialogKind = AdjustKind | InstantAdjust | FilterId | 'imageSize'
 export type ImageCommand = { rotate: Turns } | { flip: 'h' | 'v' } | 'trim'
@@ -122,13 +123,13 @@ export function useImageDialogs({ state, tools, accent, notify }: { state: Photo
   useEffect(() => close, [state.loadId, close])
 
   const command = useCallback((cmd: ImageCommand) => {
-    const { state: s, tools: t } = latest.current
+    const { state: s, tools: t, notify: n } = latest.current
     if (!s.hasDoc) return
     settleTools()
     if (cmd === 'trim') {
       if (!s.editor.trim()) t.withContext((ctx) => ctx.status('There is nothing to trim'))
-    } else if ('rotate' in cmd) s.editor.rotateDoc(cmd.rotate)
-    else s.editor.flipDoc(cmd.flip)
+    } else if ('rotate' in cmd) runImageChange('rotate', () => s.editor.rotateDoc(cmd.rotate), n)
+    else runImageChange('flip', () => s.editor.flipDoc(cmd.flip), n)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const docForSave = useCallback((doc: PhotoDoc): PhotoDoc => {
@@ -149,7 +150,7 @@ export function useImageDialogs({ state, tools, accent, notify }: { state: Photo
         height={d.height}
         onApply={(w, h) => {
           setOpen(null)
-          if (w !== d.width || h !== d.height) editor.resizeImage(w, h)
+          if (w !== d.width || h !== d.height) runImageChange('resize', () => editor.resizeImage(w, h), notify)
         }}
         onClose={() => setOpen(null)}
       />

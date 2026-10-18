@@ -155,6 +155,30 @@ describe('FilterSession', () => {
     expect(ed.history.steps.length).toBe(1)
   })
 
+  it('a settings change while apply is running is ignored: it neither aborts nor replaces the apply', async () => {
+    const r = controlledRunner()
+    const { session, ed } = setup(r.run)
+    const done = session.apply({ radius: 4 })
+    session.update({ radius: 9 })
+    vi.advanceTimersByTime(500)
+    expect(r.calls.length).toBe(1)
+    expect(r.calls[0].signal?.aborted).toBe(false)
+    await r.finish(0)
+    expect(await done).toBe(true)
+    expect(ed.history.steps.map((s) => s.label)).toEqual(['Gaussian Blur'])
+  })
+
+  it('a second apply while one is running is ignored', async () => {
+    const r = controlledRunner()
+    const { session, ed } = setup(r.run)
+    const first = session.apply({ radius: 4 })
+    expect(await session.apply({ radius: 8 })).toBe(false)
+    expect(r.calls.length).toBe(1)
+    await r.finish(0)
+    expect(await first).toBe(true)
+    expect(ed.history.steps.length).toBe(1)
+  })
+
   it('cancel while apply is running records nothing', async () => {
     const r = controlledRunner()
     const { session, ed, layer, original } = setup(r.run)

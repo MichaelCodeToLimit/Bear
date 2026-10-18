@@ -3,7 +3,7 @@ import { createLayer, getLayer, layerBounds, type Layer, type PhotoDoc, type Tex
 import { compositeLayers } from '../ops/composite'
 import { History, type Step } from './history'
 import type { Mask } from './mask'
-import { cropCanvas, flipDocInPlace, FLIP_LABELS, resizeDoc, rotateDocInPlace, ROTATE_LABELS, trimRect, type Turns } from './docTransforms'
+import { cropCanvas, FLIP_LABELS, planFlip, planResize, planRotate, ROTATE_LABELS, trimRect, type Turns } from './docTransforms'
 
 interface LayerState {
   /** The live object that stays in doc.layers across undo/redo. */
@@ -270,19 +270,26 @@ export class PhotoEditor {
     })
   }
 
-  /** Resample the whole image (every layer and offset) to `w` x `h`, as one "Image Size" step. */
+  /**
+   * Resample the whole image (every layer and offset) to `w` x `h`, as one "Image Size" step.
+   * Rotate and flip below work the same way: every new bitmap is made first, so if memory runs out
+   * this throws with the document untouched and no step recorded.
+   */
   resizeImage(w: number, h: number): void {
-    this.editStructure('Image Size', (doc) => resizeDoc(doc, w, h))
+    const change = planResize(this.doc, w, h)
+    this.editStructure('Image Size', change)
   }
 
   /** Turn the whole document `turns` quarter turns clockwise (3 = 90° left). Clears the selection. */
   rotateDoc(turns: Turns): void {
-    this.editStructure(ROTATE_LABELS[turns], (doc) => rotateDocInPlace(doc, turns))
+    const change = planRotate(this.doc, turns)
+    this.editStructure(ROTATE_LABELS[turns], change)
   }
 
   /** Mirror the whole document. Clears the selection. */
   flipDoc(axis: 'h' | 'v'): void {
-    this.editStructure(FLIP_LABELS[axis], (doc) => flipDocInPlace(doc, axis))
+    const change = planFlip(this.doc, axis)
+    this.editStructure(FLIP_LABELS[axis], change)
   }
 
   /** Crop the canvas to the visible non-transparent pixels. False (and no step) when there is nothing to trim. */

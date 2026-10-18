@@ -65,6 +65,8 @@ export class FilterSession {
   private abort: AbortController | null = null
   private shown: { key: string; result: Bitmap } | null = null
   private closed = false
+  /** Apply is waiting for its result: nothing else may start or abort it (only cancel). */
+  private applying = false
 
   constructor(private readonly o: FilterSessionOptions) {
     this.original = o.layer.pixels
@@ -81,14 +83,19 @@ export class FilterSession {
     return this.o.layer.id
   }
 
+  /** True while Apply waits for the filter. */
+  get busy(): boolean {
+    return this.applying
+  }
+
   /** True while the layer shows a preview instead of its own pixels. */
   get previewing(): boolean {
     return this.o.layer.pixels !== this.original
   }
 
-  /** New settings: preview them after PREVIEW_DELAY ms unless more arrive first. */
+  /** New settings: preview them after PREVIEW_DELAY ms unless more arrive first. Ignored while Apply runs. */
   update(params: Record<string, number>): void {
-    if (this.closed) return
+    if (this.closed || this.applying) return
     clearTimeout(this.timer)
     this.timer = setTimeout(() => void this.preview(params), PREVIEW_DELAY)
   }
@@ -129,13 +136,15 @@ export class FilterSession {
    * cancelled, superseded or failed (the dialog stays open after a failure).
    */
   async apply(params: Record<string, number>): Promise<boolean> {
-    if (this.closed) return false
+    if (this.closed || this.applying) return false
     clearTimeout(this.timer)
+    this.applying = true
     this.o.onBusy?.(true)
     let result: Bitmap | null
     try {
       result = await this.compute(params)
     } finally {
+      this.applying = false
       this.o.onBusy?.(false)
     }
     if (!result || this.closed) return false
