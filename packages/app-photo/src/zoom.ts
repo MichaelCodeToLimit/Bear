@@ -16,11 +16,14 @@ export function zoomCommand(view: ViewState, cmd: ZoomCommand, docW: number, doc
     const v = zoomAt(view, 1 / view.zoom, cx, cy)
     return { ...v, panX: Math.round(v.panX), panY: Math.round(v.panY) }
   }
-  const target =
-    cmd === 'in'
-      ? ZOOM_STEPS.find((z) => z > view.zoom * 1.001) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1]
-      : [...ZOOM_STEPS].reverse().find((z) => z < view.zoom / 1.001) ?? ZOOM_STEPS[0]
-  return zoomAt(view, target / view.zoom, cx, cy)
+  return zoomAt(view, nextZoomStep(view.zoom, cmd) / view.zoom, cx, cy)
+}
+
+/** The next level in `ZOOM_STEPS` above ('in') or below ('out') `zoom`, stopping at the ends. */
+export function nextZoomStep(zoom: number, dir: 'in' | 'out'): number {
+  return dir === 'in'
+    ? ZOOM_STEPS.find((z) => z > zoom * 1.001) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1]
+    : [...ZOOM_STEPS].reverse().find((z) => z < zoom / 1.001) ?? ZOOM_STEPS[0]
 }
 
 /** "66.7%", "100%", "0.5%". */

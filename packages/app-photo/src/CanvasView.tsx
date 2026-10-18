@@ -3,7 +3,9 @@ import { intersectRect, type Rect } from './model/bitmap'
 import type { PhotoDoc } from './model/doc'
 import { createCompositor, type ManagedCompositor, type Preview } from './render/compositor'
 import { fitView, screenToDoc, zoomAt, type Point, type ViewState } from './render/view'
+import type { ToolPointer } from './tools/types'
 import type { PhotoEditorState } from './usePhotoEditor'
+import type { PointerPhase } from './useTools'
 
 export type CanvasBackground = 'light' | 'dark'
 
@@ -31,6 +33,10 @@ interface CanvasViewProps {
   onNotice: (message: string) => void
   /** A live adjustment preview (Task 14). */
   preview?: Preview
+  /** Tool pointer events: presses, drags, and moves while hovering. */
+  onToolPointer?: (phase: PointerPhase, p: ToolPointer) => void
+  /** CSS cursor for the active tool. */
+  cursor?: string
   /** Overlays drawn above the canvas (selection outline, crop box…). */
   children?: ReactNode
 }
@@ -40,12 +46,12 @@ interface CanvasViewProps {
  * `[data-photo-viewport]` element: after a GPU context loss the compositor swaps in a stand-in canvas,
  * which takes over `data-testid="photo-canvas"`.
  */
-export function CanvasView({ state, background, onCursor, onNotice, preview, children }: CanvasViewProps) {
+export function CanvasView({ state, background, onCursor, onNotice, preview, onToolPointer, cursor, children }: CanvasViewProps) {
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const compositor = useRef<ManagedCompositor | null>(null)
-  const latest = useRef({ state, preview, onCursor, onNotice })
-  latest.current = { state, preview, onCursor, onNotice }
+  const latest = useRef({ state, preview, onCursor, onNotice, onToolPointer })
+  latest.current = { state, preview, onCursor, onNotice, onToolPointer }
   const { editor, version, view, setView, loadId, subscribe, hasDoc } = state
 
   useEffect(() => {
@@ -117,18 +123,49 @@ export function CanvasView({ state, background, onCursor, onNotice, preview, chi
         latest.current.state.setView((v) => ({ ...v, panX: v.panX - dx, panY: v.panY - dy }))
       }
     }
+    const toolPointer = (e: PointerEvent): ToolPointer => {
+      const s = toScreen(e)
+      const d = screenToDoc(latest.current.state.view, s)
+      // Mice report a fixed 0.5 while pressed, so only pens count as pressure.
+      const pressure = e.pointerType === 'pen' ? e.pressure : null
+      return { x: d.x, y: d.y, sx: s.x, sy: s.y, shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey, pressure }
+    }
+    let pressed: number | null = null
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0 || !latest.current.state.hasDoc || pressed !== null) return
+      // Leave option fields, so tool letters and Enter reach the tools again.
+      const focused = document.activeElement
+      if (focused instanceof HTMLElement && focused !== document.body) focused.blur()
+      e.preventDefault()
+      pressed = e.pointerId
+      el.setPointerCapture(e.pointerId)
+      latest.current.onToolPointer?.('down', toolPointer(e))
+    }
     const onMove = (e: PointerEvent) => {
       if (!latest.current.state.hasDoc) return
-      const d = screenToDoc(latest.current.state.view, toScreen(e))
-      latest.current.onCursor({ x: Math.floor(d.x), y: Math.floor(d.y) })
+      const p = toolPointer(e)
+      latest.current.onCursor({ x: Math.floor(p.x), y: Math.floor(p.y) })
+      if (pressed === null || pressed === e.pointerId) latest.current.onToolPointer?.('move', p)
+    }
+    const onUp = (e: PointerEvent) => {
+      if (pressed !== e.pointerId) return
+      pressed = null
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      latest.current.onToolPointer?.('up', toolPointer(e))
     }
     const onLeave = () => latest.current.onCursor(null)
     el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('pointerdown', onDown)
     el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onUp)
     el.addEventListener('pointerleave', onLeave)
     return () => {
       el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('pointerdown', onDown)
       el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onUp)
       el.removeEventListener('pointerleave', onLeave)
     }
   }, [])
@@ -137,6 +174,7 @@ export function CanvasView({ state, background, onCursor, onNotice, preview, chi
     <div
       ref={wrap}
       data-photo-viewport
+      style={{ cursor: hasDoc ? cursor : undefined, touchAction: 'none' }}
       // Styling stays on the wrapper: a stand-in canvas copies the canvas's attributes only once.
       className={`relative min-h-0 min-w-0 flex-1 overflow-hidden ${background === 'dark' ? 'bg-[#262626]' : 'bg-[#d4d4d4]'} ${hasDoc ? '' : '[&>canvas]:invisible'}`}
     >

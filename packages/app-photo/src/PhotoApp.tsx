@@ -20,6 +20,8 @@ import { ColorPanel, resetColors, swapColors } from './panels/ColorPanel'
 import { CanvasSizeDialog, NewImageDialog } from './NewImageDialog'
 import { PhotoBackstage, type BackstagePage } from './PhotoBackstage'
 import { formatZoom, zoomCommand, type ZoomCommand } from './zoom'
+import { useTools } from './useTools'
+import { ToolOverlay } from './ToolOverlay'
 
 const APP = getApp('photo')
 
@@ -30,6 +32,7 @@ const percent = (scale: number) => `${Math.floor(scale * 1000) / 10}%`
 export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => void }) {
   const state = usePhotoEditor()
   const { editor, hasDoc, version, load } = state
+  const tools = useTools(state)
   const [tab, setTab] = useState('home')
   const [backstage, setBackstage] = useState<BackstagePage | null>(null)
   const [newOpen, setNewOpen] = useState(input.kind === 'new')
@@ -123,10 +126,11 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     state.setView((v) => zoomCommand(v, cmd, d.width, d.height))
   }, [state.setView]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keyboard: file commands, undo/redo, zoom and colours (tool keys arrive with the tool framework).
+  // Keyboard: file commands, undo/redo, zoom, colours, tool letters, Space for Hand and tool keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || document.querySelector('[role=dialog]')) return
+      if (tools.onKeyDown(e)) return e.preventDefault()
       const k = e.key.toLowerCase()
       const run = (fn: () => void) => {
         e.preventDefault()
@@ -150,9 +154,15 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
       if (k === 'x') return run(() => state.setColors(swapColors(state.colors)))
       if (k === 'd') return run(() => state.setColors(resetColors()))
     }
+    // Space is released wherever focus is, so Hand never sticks.
+    const onKeyUp = (e: KeyboardEvent) => tools.onKeyUp(e)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [file, hasDoc, editor, zoom, state])
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [file, hasDoc, editor, zoom, state, tools.onKeyDown, tools.onKeyUp])
 
   const doc = editor.doc
   const h = editor.history
@@ -187,7 +197,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
       />
       {file.banner}
       <NoticeBar notices={notices} />
-      <OptionsBar tool={state.tool} />
+      <OptionsBar tool={state.tool} values={tools.options[state.tool]} onChange={(id, v) => tools.setOption(state.tool, id, v)} />
 
       <div
         className="flex min-h-0 flex-1"
@@ -202,7 +212,8 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
         }}
       >
         <Toolbox tool={state.tool} setTool={state.setTool} />
-        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notify}>
+        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notify} onToolPointer={tools.onPointer} cursor={tools.cursor}>
+          {hasDoc && <ToolOverlay selection={doc.selection} overlay={tools.overlay} view={state.view} />}
           {!hasDoc && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted">
               <ImagePlus size={40} strokeWidth={1.2} />
@@ -228,6 +239,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
               <span data-testid="photo-zoom">{formatZoom(state.view.zoom)}</span>
               <span>{doc.width} × {doc.height} px</span>
               <span>{cursor ? `${cursor.x}, ${cursor.y}` : ''}</span>
+              {tools.status && <span data-testid="photo-tool-status">{tools.status}</span>}
             </>
           ) : (
             <span>No image</span>
