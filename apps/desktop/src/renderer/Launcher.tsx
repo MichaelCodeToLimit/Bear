@@ -152,7 +152,8 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
                 <FolderOpen size={15} /> Open other files
               </button>
             </div>
-            <RecentList items={recent} onOpen={(r) => void openRecent(r)} empty="No recent files yet." />
+            {/* The recent list is shared by every edition; show only files this edition can open. */}
+            <RecentList items={recent.filter((r) => has(r.app))} onOpen={(r) => void openRecent(r)} empty="No recent files yet." />
           </section>
         </div>
       </main>

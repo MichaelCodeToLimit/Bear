@@ -4,6 +4,7 @@ import type { BlendMode, Layer } from '../model/doc'
 import { BLEND_MODES } from '../ops/blend'
 import type { PhotoEditorState } from '../usePhotoEditor'
 import { layerThumbnail } from './thumbnail'
+import { mergeDownBlocked } from './mergeDown'
 
 const THUMB = 64
 const BLEND_LABEL = (m: BlendMode) => m.replace('-', ' ').replace(/^./, (c) => c.toUpperCase())
@@ -29,9 +30,10 @@ function Thumbnail({ layer, docW, docH, version }: { layer: Layer; docW: number;
   )
 }
 
-function PanelButton({ icon: Icon, label, onClick, disabled }: { icon: LucideIcon; label: string; onClick: () => void; disabled?: boolean }) {
+/** `reason`, when given, says why the button is unavailable (shown in its tooltip). */
+function PanelButton({ icon: Icon, label, onClick, disabled, reason }: { icon: LucideIcon; label: string; onClick: () => void; disabled?: boolean; reason?: string | null }) {
   return (
-    <button title={label} aria-label={label} onClick={onClick} disabled={disabled} className="flex h-7 w-7 items-center justify-center rounded text-ink hover:bg-hover disabled:opacity-40">
+    <button title={reason ? `${label}: ${reason}` : label} aria-label={label} onClick={onClick} disabled={disabled} className="flex h-7 w-7 items-center justify-center rounded text-ink hover:bg-hover disabled:opacity-40">
       <Icon size={15} strokeWidth={1.8} />
     </button>
   )
@@ -69,6 +71,7 @@ export function LayersPanel({ state }: { state: PhotoEditorState }) {
     refresh()
   }
   const below = active ? doc.layers.indexOf(active) - 1 : -1
+  const mergeBlock = active && below >= 0 ? mergeDownBlocked(active, doc.layers[below]) : null
   const rows = [...doc.layers].reverse()
 
   return (
@@ -174,7 +177,7 @@ export function LayersPanel({ state }: { state: PhotoEditorState }) {
       <div className="flex items-center justify-end gap-0.5 border-t border-line px-2 py-1">
         <PanelButton icon={Plus} label="New layer" disabled={!hasDoc} onClick={() => editor.addLayer()} />
         <PanelButton icon={CopyPlus} label="Duplicate layer" disabled={!active} onClick={() => active && editor.duplicateLayer(active.id)} />
-        <PanelButton icon={Merge} label="Merge down" disabled={!active || below < 0} onClick={() => active && editor.mergeDown(active.id)} />
+        <PanelButton icon={Merge} label="Merge down" disabled={!active || below < 0 || !!mergeBlock} reason={mergeBlock} onClick={() => active && editor.mergeDown(active.id)} />
         <PanelButton icon={Trash2} label="Delete layer" disabled={!active || doc.layers.length <= 1} onClick={() => active && editor.deleteLayer(active.id)} />
       </div>
     </section>

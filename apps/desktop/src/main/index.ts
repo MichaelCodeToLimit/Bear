@@ -111,7 +111,7 @@ function createWindow(launchFile?: string): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    title: 'Bear',
+    title: EDITIONS[edition].productName,
     backgroundColor: '#f5f4f1',
     // Packaged builds take the icon from the .exe; in development use the source PNG.
     icon: app.isPackaged ? undefined : join(__dirname, '../../build/icon.png'),

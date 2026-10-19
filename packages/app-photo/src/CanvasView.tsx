@@ -35,6 +35,8 @@ interface CanvasViewProps {
   preview?: Preview
   /** Tool pointer events: presses, drags, and moves while hovering. */
   onToolPointer?: (phase: PointerPhase, p: ToolPointer) => void
+  /** The press in progress was cancelled by the system (pointercancel). */
+  onToolCancel?: () => void
   /** CSS cursor for the active tool. */
   cursor?: string
   /** Overlays drawn above the canvas (selection outline, crop box…). */
@@ -46,12 +48,12 @@ interface CanvasViewProps {
  * `[data-photo-viewport]` element: after a GPU context loss the compositor swaps in a stand-in canvas,
  * which takes over `data-testid="photo-canvas"`.
  */
-export function CanvasView({ state, background, onCursor, onNotice, preview, onToolPointer, cursor, children }: CanvasViewProps) {
+export function CanvasView({ state, background, onCursor, onNotice, preview, onToolPointer, onToolCancel, cursor, children }: CanvasViewProps) {
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const compositor = useRef<ManagedCompositor | null>(null)
-  const latest = useRef({ state, preview, onCursor, onNotice, onToolPointer })
-  latest.current = { state, preview, onCursor, onNotice, onToolPointer }
+  const latest = useRef({ state, preview, onCursor, onNotice, onToolPointer, onToolCancel })
+  latest.current = { state, preview, onCursor, onNotice, onToolPointer, onToolCancel }
   const { editor, version, view, setView, loadId, subscribe, hasDoc } = state
 
   useEffect(() => {
@@ -153,19 +155,27 @@ export function CanvasView({ state, background, onCursor, onNotice, preview, onT
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       latest.current.onToolPointer?.('up', toolPointer(e))
     }
+    // The system took the pointer away (a palm-rejected pen, a touch turned into a gesture): abandon the
+    // drag, undoing its preview, instead of committing it as if it had been released there.
+    const onCancel = (e: PointerEvent) => {
+      if (pressed !== e.pointerId) return
+      pressed = null
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      latest.current.onToolCancel?.()
+    }
     const onLeave = () => latest.current.onCursor(null)
     el.addEventListener('wheel', onWheel, { passive: false })
     el.addEventListener('pointerdown', onDown)
     el.addEventListener('pointermove', onMove)
     el.addEventListener('pointerup', onUp)
-    el.addEventListener('pointercancel', onUp)
+    el.addEventListener('pointercancel', onCancel)
     el.addEventListener('pointerleave', onLeave)
     return () => {
       el.removeEventListener('wheel', onWheel)
       el.removeEventListener('pointerdown', onDown)
       el.removeEventListener('pointermove', onMove)
       el.removeEventListener('pointerup', onUp)
-      el.removeEventListener('pointercancel', onUp)
+      el.removeEventListener('pointercancel', onCancel)
       el.removeEventListener('pointerleave', onLeave)
     }
   }, [])

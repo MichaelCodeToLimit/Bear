@@ -311,6 +311,36 @@ describe('text', () => {
     ctx.editor.history.undo()
     expect(l.text!.text).toBe('First')
   })
+  it('a reopened text layer takes the current foreground colour, even with the same text', () => {
+    const ctx = fakeContext(undefined, text)
+    text.down(ctx, at(ctx, 3, 3))
+    textInput(ctx, 'First')
+    commitText(ctx)
+    const l = activeLayer(ctx.editor.doc)
+    const steps = ctx.editor.history.steps.length
+    ctx.colors.fg = RED
+    for (let i = 0; i < 2; i++) {
+      text.down(ctx, at(ctx, 4, 3))
+      text.up(ctx, at(ctx, 4, 3))
+    }
+    expect(ctx.overlay).toMatchObject({ kind: 'text', text: 'First', color: RED })
+    commitText(ctx) // text unchanged: the colour alone is a change
+    expect(l.text!.color).toEqual(RED)
+    expect(ctx.editor.history.steps.length).toBe(steps + 1)
+  })
+  it('reopening and committing with nothing changed adds no step', () => {
+    const ctx = fakeContext(undefined, text)
+    text.down(ctx, at(ctx, 3, 3))
+    textInput(ctx, 'First')
+    commitText(ctx)
+    const steps = ctx.editor.history.steps.length
+    for (let i = 0; i < 2; i++) {
+      text.down(ctx, at(ctx, 4, 3))
+      text.up(ctx, at(ctx, 4, 3))
+    }
+    commitText(ctx)
+    expect(ctx.editor.history.steps.length).toBe(steps)
+  })
   it('refuses to reopen a locked text layer', () => {
     const ctx = fakeContext(undefined, text)
     text.down(ctx, at(ctx, 3, 3))

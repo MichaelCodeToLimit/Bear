@@ -57,13 +57,13 @@ function open(ctx: ToolContext, p: Omit<Pending, 'editor'>): void {
   ctx.setOverlay({ kind: 'text', x: p.x, y: p.y, text: p.text, color: p.color, session: ++session })
 }
 
-/** Reopen an existing text layer's box with its text and style. */
+/** Reopen an existing text layer's box with its text and style, in the current foreground colour. */
 function reopen(ctx: ToolContext, layer: Layer): void {
   const t = layer.text!
   ctx.setOption('font', t.font)
   ctx.setOption('size', t.size)
   ctx.setOption('align', t.align[0].toUpperCase() + t.align.slice(1))
-  open(ctx, { x: layer.x, y: layer.y, layerId: layer.id, text: t.text, color: [...t.color] })
+  open(ctx, { x: layer.x, y: layer.y, layerId: layer.id, text: t.text, color: [...ctx.colors.fg] })
 }
 
 /** The app's box registers how to read its current text; commit then prefers it over the last input. */
@@ -98,7 +98,8 @@ export function commitText(ctx: ToolContext): void {
   const layer = getLayer(editor.doc, p.layerId)
   const old = layer?.text
   if (!layer || !old) return // removed while the box was open (undo)
-  if (old.text === data.text && old.font === data.font && old.size === data.size && old.align === data.align) return
+  const sameColor = old.color.every((c, i) => c === data.color[i])
+  if (old.text === data.text && old.font === data.font && old.size === data.size && old.align === data.align && sameColor) return
   const rename = layer.name === textLayerName(old.text)
   const pixels = ctx.rasterizeText(data)
   editor.editStructure('Edit Text', () => {
@@ -121,7 +122,7 @@ function isDoubleClick(ctx: ToolContext, p: ToolPointer): boolean {
 /**
  * Click to place a text box (a contentEditable overlay drawn by the app). Clicking elsewhere or
  * Ctrl+Enter commits, Escape cancels; clicking elsewhere with an empty box moves it there. Double-clicking a text layer's pixels reopens it. Font, size
- * and alignment come from the options; the colour is the foreground (an edited layer keeps its own).
+ * and alignment come from the options; the colour is the foreground, also for a reopened layer.
  */
 export const text: Tool = {
   id: 'text',

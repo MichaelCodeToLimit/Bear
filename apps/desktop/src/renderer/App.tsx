@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
-import { appForFile, type OpenedFile } from '@bear/core'
+import { EDITIONS, appForFile, getEdition, type OpenedFile } from '@bear/core'
 import { WriteApp, type WriteInput } from '@bear/app-write'
 import { SheetsApp, type SheetsInput } from '@bear/app-sheets'
 import { SlidesApp, type SlidesInput } from '@bear/app-slides'
@@ -28,7 +28,7 @@ export function App() {
   const [screen, setScreen] = useState<Screen>({ app: 'home' })
 
   const home = useCallback(() => {
-    window.bear.setTitle('Bear')
+    window.bear.setTitle(EDITIONS[getEdition()].productName)
     setScreen({ app: 'home' })
   }, [])
 
