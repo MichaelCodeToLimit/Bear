@@ -1,7 +1,8 @@
 import { useCallback, useEffect, type MutableRefObject } from 'react'
 import { stripExtension, type OpenedFile } from '@bear/core'
 import { memoryBudget, prepareIncomingImage } from './io/limits'
-import { decodeFlatImage, imageExtension, scaleBitmap } from './file-io'
+import { decodeFlatImageAt, imageExtension, scaleBitmap, scaledSide } from './file-io'
+import { imageSize } from './io/imageSize'
 import type { PhotoEditor } from './model/editor'
 
 export const isTyping = (t: EventTarget | null) =>
@@ -46,11 +47,21 @@ export function useIncomingImages({ hasDoc, editorRef, openDoc, askScale, guard,
           return
         }
         try {
-          let pixels = await decodeFlatImage(new Uint8Array(await f.arrayBuffer()), ext)
-          const check = prepareIncomingImage(pixels.width, pixels.height, memoryBudget())
-          if (!check.ok) {
-            const s = await askScale(name, check.scale, check.reason)
-            pixels = scaleBitmap(pixels, Math.max(1, Math.round(pixels.width * s)), Math.max(1, Math.round(pixels.height * s)))
+          const bytes = new Uint8Array(await f.arrayBuffer())
+          // Check the size from the header first, so a huge picture is decoded straight at the scale chosen.
+          const header = imageSize(bytes, ext)
+          let pixels
+          if (header) {
+            const check = prepareIncomingImage(header.width, header.height, memoryBudget())
+            const s = check.ok ? 1 : await askScale(name, check.scale, check.reason)
+            pixels = await decodeFlatImageAt(bytes, ext, s)
+          } else {
+            pixels = await decodeFlatImageAt(bytes, ext)
+            const check = prepareIncomingImage(pixels.width, pixels.height, memoryBudget())
+            if (!check.ok) {
+              const s = await askScale(name, check.scale, check.reason)
+              pixels = scaleBitmap(pixels, scaledSide(pixels.width, s), scaledSide(pixels.height, s))
+            }
           }
           const doc = editorRef.current.doc
           editorRef.current.addLayer({

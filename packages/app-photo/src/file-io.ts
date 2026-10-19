@@ -7,7 +7,8 @@ import { writeBearPhotoOffThread } from './io/writeOffThread'
 import { readPsd, writePsd } from './io/psd'
 import { decodePng, encodePng } from './io/png'
 import { decodeImage, encodeImage } from './io/browser-image'
-import { checkOpenSize } from './io/limits'
+import { checkOpenSize, type SizeCheck } from './io/limits'
+import { imageSize } from './io/imageSize'
 import { resample } from './ops/resample'
 
 export const OPEN_EXTENSIONS = ['bearphoto', 'psd', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif']
@@ -71,6 +72,36 @@ export async function decodeFlatImage(data: Uint8Array, ext: string): Promise<Bi
   return ext === 'png' ? decodePng(data) : decodeImage(data, ext)
 }
 
+/** A side scaled by `scale`, the same rounding everywhere (open, paste, drop). */
+export const scaledSide = (n: number, scale: number) => Math.max(1, Math.round(n * scale))
+
+/**
+ * Decode a flat image at `scale` (1 = full size). The browser's formats are scaled by the decoder itself;
+ * PNG is decoded and then scaled (only reached once the size check allowed the full-size decode's memory).
+ */
+export async function decodeFlatImageAt(data: Uint8Array, ext: string, scale = 1): Promise<Bitmap> {
+  if (scale >= 1) return decodeFlatImage(data, ext)
+  if (ext === 'png') {
+    const full = decodePng(data)
+    return scaleBitmap(full, scaledSide(full.width, scale), scaledSide(full.height, scale))
+  }
+  const size = imageSize(data, ext)
+  if (!size) {
+    const full = await decodeImage(data, ext)
+    return scaleBitmap(full, scaledSide(full.width, scale), scaledSide(full.height, scale))
+  }
+  return decodeImage(data, ext, { width: scaledSide(size.width, scale), height: scaledSide(size.height, scale) })
+}
+
+/**
+ * The size check for an image's bytes, from its header alone (no pixels decoded). Null when the header
+ * isn't recognised: decode it, then check the decoded size.
+ */
+export function checkHeaderSize(data: Uint8Array, ext: string, budget: number): SizeCheck | null {
+  const size = imageSize(data, ext)
+  return size ? checkOpenSize(size.width, size.height, budget) : null
+}
+
 /** Extension for a file or clipboard item: from its name, else from a MIME type like "image/png". */
 export function imageExtension(name: string, mime = ''): string {
   const ext = extensionOf(name)
@@ -91,6 +122,15 @@ async function readAny(file: OpenedFile): Promise<{ doc: PhotoDoc; warnings: str
  * largest scale that fits instead; call again with that `scale` to open it scaled down.
  */
 export async function loadPhotoFile(file: OpenedFile, budget: number, scale?: number): Promise<LoadResult> {
+  const ext = extensionOf(file.path || file.name)
+  if (scale === undefined && ext !== 'bearphoto') {
+    // Refuse from the header, before a huge PSD or picture is decoded at full size.
+    const check = checkHeaderSize(file.data, ext, budget)
+    if (check && !check.ok) return { needsScale: check.scale, reason: check.reason }
+  }
+  if (scale !== undefined && scale < 1 && ext !== 'bearphoto' && ext !== 'psd') {
+    return { doc: docFromBitmap(await decodeFlatImageAt(file.data, ext, scale)), warnings: [] }
+  }
   const { doc, warnings } = await readAny(file)
   if (scale !== undefined && scale < 1) return { doc: scaleDoc(doc, scale), warnings }
   const check = checkOpenSize(doc.width, doc.height, budget)

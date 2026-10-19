@@ -10,10 +10,14 @@ const MIME: Record<string, string> = {
   png: 'image/png'
 }
 
-/** Decode JPG/WebP/GIF/BMP/AVIF/PNG bytes with the browser's decoder. Browser only. */
-export async function decodeImage(bytes: Uint8Array, ext: string): Promise<Bitmap> {
+/**
+ * Decode JPG/WebP/GIF/BMP/AVIF/PNG bytes with the browser's decoder. With `size`, the decoder scales the
+ * image to that size as it decodes, so the full-size pixels are never handed to Photo. Browser only.
+ */
+export async function decodeImage(bytes: Uint8Array, ext: string, size?: { width: number; height: number }): Promise<Bitmap> {
   const blob = new Blob([bytes as BlobPart], { type: MIME[ext.toLowerCase().replace('.', '')] ?? 'application/octet-stream' })
-  const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
+  const resize = size ? { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'high' as const } : {}
+  const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none', ...resize })
   try {
     const canvas = new OffscreenCanvas(bmp.width, bmp.height)
     const ctx = canvas.getContext('2d')
