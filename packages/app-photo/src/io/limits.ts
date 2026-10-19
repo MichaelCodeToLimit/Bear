@@ -3,7 +3,7 @@ export const MAX_SIDE = 30000
 export type SizeCheck = { ok: true } | { ok: false; reason: 'dimensions' | 'memory'; scale: number }
 
 /** Bytes needed for an image: the layer, the composite and one history copy, all RGBA. */
-function estimateBytes(w: number, h: number): number {
+export function estimateBytes(w: number, h: number): number {
   return w * h * 4 * 3
 }
 

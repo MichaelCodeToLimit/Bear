@@ -7,7 +7,7 @@ import { writeBearPhotoOffThread } from './io/writeOffThread'
 import { readPsd, writePsd } from './io/psd'
 import { decodePng, encodePng } from './io/png'
 import { decodeImage, encodeImage } from './io/browser-image'
-import { checkOpenSize, type SizeCheck } from './io/limits'
+import { DAMAGED_SIZE, checkImageSize, flatDecodePath, planOpen } from './io/openPlan'
 import { imageSize } from './io/imageSize'
 import { resample } from './ops/resample'
 
@@ -76,30 +76,25 @@ export async function decodeFlatImage(data: Uint8Array, ext: string): Promise<Bi
 export const scaledSide = (n: number, scale: number) => Math.max(1, Math.round(n * scale))
 
 /**
- * Decode a flat image at `scale` (1 = full size). The browser's formats are scaled by the decoder itself;
- * PNG is decoded and then scaled (only reached once the size check allowed the full-size decode's memory).
+ * Decode a flat image at `scale` (1 = full size), by the path flatDecodePath picks: at full size PNG goes
+ * through fast-png (exact bytes) and the rest through the browser's decoder; scaled down, the browser's
+ * decoder scales as it decodes (PNG included), so the full-size pixels are never made. Only an image whose
+ * header gives no size is decoded in full and then scaled.
  */
 export async function decodeFlatImageAt(data: Uint8Array, ext: string, scale = 1): Promise<Bitmap> {
-  if (scale >= 1) return decodeFlatImage(data, ext)
-  if (ext === 'png') {
-    const full = decodePng(data)
-    return scaleBitmap(full, scaledSide(full.width, scale), scaledSide(full.height, scale))
+  const size = scale < 1 ? imageSize(data, ext) : null
+  switch (flatDecodePath(ext, scale, !!size)) {
+    case 'fast-png':
+      return decodePng(data)
+    case 'browser':
+      return decodeImage(data, ext)
+    case 'browser-scaled':
+      return decodeImage(data, ext, { width: scaledSide(size!.width, scale), height: scaledSide(size!.height, scale) })
+    case 'browser-then-scale': {
+      const full = await decodeImage(data, ext)
+      return scaleBitmap(full, scaledSide(full.width, scale), scaledSide(full.height, scale))
+    }
   }
-  const size = imageSize(data, ext)
-  if (!size) {
-    const full = await decodeImage(data, ext)
-    return scaleBitmap(full, scaledSide(full.width, scale), scaledSide(full.height, scale))
-  }
-  return decodeImage(data, ext, { width: scaledSide(size.width, scale), height: scaledSide(size.height, scale) })
-}
-
-/**
- * The size check for an image's bytes, from its header alone (no pixels decoded). Null when the header
- * isn't recognised: decode it, then check the decoded size.
- */
-export function checkHeaderSize(data: Uint8Array, ext: string, budget: number): SizeCheck | null {
-  const size = imageSize(data, ext)
-  return size ? checkOpenSize(size.width, size.height, budget) : null
 }
 
 /** Extension for a file or clipboard item: from its name, else from a MIME type like "image/png". */
@@ -110,31 +105,34 @@ export function imageExtension(name: string, mime = ''): string {
   return sub === 'jpeg' ? 'jpg' : sub
 }
 
-async function readAny(file: OpenedFile): Promise<{ doc: PhotoDoc; warnings: string[] }> {
-  const ext = extensionOf(file.path || file.name)
-  if (ext === 'bearphoto') return { doc: await readBearPhoto(file.data), warnings: [] }
-  if (ext === 'psd') return readPsd(file.data)
-  return { doc: docFromBitmap(await decodeFlatImage(file.data, ext)), warnings: [] }
-}
-
 /**
  * Read a file into a document. When it is too large for `budget` bytes (see checkOpenSize), returns the
- * largest scale that fits instead; call again with that `scale` to open it scaled down.
+ * largest scale that fits instead; call again with that `scale` to open it scaled down. Throws, with a
+ * message for the user, for a .psd too large to read at all and for a size that can only be damage.
  */
 export async function loadPhotoFile(file: OpenedFile, budget: number, scale?: number): Promise<LoadResult> {
   const ext = extensionOf(file.path || file.name)
-  if (scale === undefined && ext !== 'bearphoto') {
-    // Refuse from the header, before a huge PSD or picture is decoded at full size.
-    const check = checkHeaderSize(file.data, ext, budget)
-    if (check && !check.ok) return { needsScale: check.scale, reason: check.reason }
+  // The size from the header, before a huge PSD or picture is decoded at full size.
+  const header = ext === 'bearphoto' ? null : imageSize(file.data, ext)
+  const plan = planOpen(ext, header, budget, scale)
+  if (plan.kind === 'refuse') throw new Error(plan.message)
+  if (plan.kind === 'ask') return { needsScale: plan.scale, reason: plan.reason }
+  let doc: PhotoDoc
+  let warnings: string[] = []
+  if (plan.path === 'bearphoto' || plan.path === 'psd') {
+    // Neither can be decoded scaled: read in full (the plan only allows a .psd that fits), then scale.
+    const read = plan.path === 'psd' ? await readPsd(file.data) : { doc: await readBearPhoto(file.data), warnings: [] }
+    doc = plan.scale < 1 ? scaleDoc(read.doc, plan.scale) : read.doc
+    warnings = read.warnings
+  } else {
+    doc = docFromBitmap(await decodeFlatImageAt(file.data, ext, plan.scale))
   }
-  if (scale !== undefined && scale < 1 && ext !== 'bearphoto' && ext !== 'psd') {
-    return { doc: docFromBitmap(await decodeFlatImageAt(file.data, ext, scale)), warnings: [] }
+  // Check what was actually read: a header can understate the size, and .bearphoto has none.
+  const check = checkImageSize(doc.width, doc.height, budget)
+  if (!check.ok) {
+    if (check.reason === 'damaged' || plan.scale < 1) throw new Error(DAMAGED_SIZE)
+    return { needsScale: check.scale, reason: check.reason }
   }
-  const { doc, warnings } = await readAny(file)
-  if (scale !== undefined && scale < 1) return { doc: scaleDoc(doc, scale), warnings }
-  const check = checkOpenSize(doc.width, doc.height, budget)
-  if (!check.ok) return { needsScale: check.scale, reason: check.reason }
   return { doc, warnings }
 }
 

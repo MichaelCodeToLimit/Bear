@@ -1,6 +1,7 @@
 import { useCallback, useEffect, type MutableRefObject } from 'react'
 import { stripExtension, type OpenedFile } from '@bear/core'
-import { memoryBudget, prepareIncomingImage } from './io/limits'
+import { memoryBudget } from './io/limits'
+import { DAMAGED_SIZE, checkDecodedImage } from './io/openPlan'
 import { decodeFlatImageAt, imageExtension, scaleBitmap, scaledSide } from './file-io'
 import { imageSize } from './io/imageSize'
 import type { PhotoEditor } from './model/editor'
@@ -22,7 +23,7 @@ interface IncomingOptions {
 
 /**
  * Dropped or pasted pictures. With no document (or for .bearphoto/.psd) the first one is opened as the
- * document, unsaved; otherwise each goes through prepareIncomingImage and is added as a centred layer.
+ * document, unsaved; otherwise each goes through prepareIncomingImage (checkDecodedImage) and is added as a centred layer.
  * Returns the handler for drops; pastes outside text fields are handled here.
  */
 export function useIncomingImages({ hasDoc, editorRef, openDoc, askScale, guard, markNew, setError }: IncomingOptions) {
@@ -50,18 +51,22 @@ export function useIncomingImages({ hasDoc, editorRef, openDoc, askScale, guard,
           const bytes = new Uint8Array(await f.arrayBuffer())
           // Check the size from the header first, so a huge picture is decoded straight at the scale chosen.
           const header = imageSize(bytes, ext)
-          let pixels
+          let scale = 1
           if (header) {
-            const check = prepareIncomingImage(header.width, header.height, memoryBudget())
-            const s = check.ok ? 1 : await askScale(name, check.scale, check.reason)
-            pixels = await decodeFlatImageAt(bytes, ext, s)
-          } else {
-            pixels = await decodeFlatImageAt(bytes, ext)
-            const check = prepareIncomingImage(pixels.width, pixels.height, memoryBudget())
+            const check = checkDecodedImage(header, memoryBudget())
             if (!check.ok) {
-              const s = await askScale(name, check.scale, check.reason)
-              pixels = scaleBitmap(pixels, scaledSide(pixels.width, s), scaledSide(pixels.height, s))
+              if (check.reason === 'damaged') throw new Error(DAMAGED_SIZE)
+              scale = await askScale(name, check.scale, check.reason)
             }
+          }
+          let pixels = await decodeFlatImageAt(bytes, ext, scale)
+          // Then check what was decoded: there may have been no header, or it understated the size (an AVIF
+          // grid whose first size box is one tile).
+          const after = checkDecodedImage(pixels, memoryBudget())
+          if (!after.ok) {
+            if (after.reason === 'damaged') throw new Error(DAMAGED_SIZE)
+            const s = await askScale(name, after.scale, after.reason)
+            pixels = scaleBitmap(pixels, scaledSide(pixels.width, s), scaledSide(pixels.height, s))
           }
           const doc = editorRef.current.doc
           editorRef.current.addLayer({

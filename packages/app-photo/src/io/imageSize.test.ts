@@ -80,7 +80,17 @@ describe('size check before decoding', () => {
     // Rewrite the header to 20,000 x 20,000; the layer data after it no longer matches.
     psd.set(be32(20000), 14)
     psd.set(be32(20000), 18)
-    const res = await loadPhotoFile({ path: '/x/big.psd', name: 'big.psd', data: psd }, 1 << 30)
-    expect(res).toMatchObject({ reason: 'memory' })
+    // ag-psd can't read it scaled, so there is no "Open at N%": a clear no instead.
+    await expect(loadPhotoFile({ path: '/x/big.psd', name: 'big.psd', data: psd }, 1 << 30)).rejects.toThrow(
+      'This .psd is too large to open here. Try a smaller copy.'
+    )
+  })
+
+  it('a header claiming an impossible size is reported as damaged, not offered at 0%', async () => {
+    const fake = bytes([0x89], 'PNG', [13, 10, 26, 10], be32(13), 'IHDR', be32(2_000_000_000), be32(2_000_000_000), [8, 6, 0, 0, 0], 'junk')
+    await expect(loadPhotoFile({ path: '/x/bad.png', name: 'bad.png', data: fake }, 1 << 30)).rejects.toThrow(
+      "This image's size information looks damaged, so it can't be opened."
+    )
+    await expect(loadPhotoFile({ path: '/x/bad.png', name: 'bad.png', data: fake }, 1 << 30, 0.001)).rejects.toThrow(/looks damaged/)
   })
 })
