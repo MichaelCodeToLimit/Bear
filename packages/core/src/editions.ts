@@ -3,10 +3,15 @@ import { APPS, type AppInfo, type Suite } from './apps'
 /** Which apps a build of Bear ships: everything, only Office, or only Studio. */
 export type Edition = 'all' | 'office' | 'studio'
 
-export const EDITIONS: Record<Edition, { productName: string; suites: Suite[] }> = {
-  all: { productName: 'Bear', suites: ['office', 'studio'] },
-  office: { productName: 'Bear Office', suites: ['office'] },
-  studio: { productName: 'Bear Studio', suites: ['studio'] }
+/**
+ * Name, app id (Windows AppUserModelID / bundle id) and suites of each edition. The installers take their
+ * identity from apps/desktop/build-config/editions.cjs, which is the source of truth; a unit test keeps
+ * these in step with it.
+ */
+export const EDITIONS: Record<Edition, { productName: string; appId: string; suites: Suite[] }> = {
+  all: { productName: 'Bear', appId: 'org.bearsuite.desktop', suites: ['office', 'studio'] },
+  office: { productName: 'Bear Office', appId: 'org.bearsuite.office', suites: ['office'] },
+  studio: { productName: 'Bear Studio', appId: 'org.bearsuite.studio', suites: ['studio'] }
 }
 
 let current: Edition = 'all'

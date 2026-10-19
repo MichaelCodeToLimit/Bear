@@ -160,13 +160,27 @@ function prefixed(name, namePrefix) {
   return name.replace(/^Bear/, namePrefix)
 }
 
+const EDITION_NAMES = ['all', 'office', 'studio']
+
 /**
- * @param {'all' | 'office' | 'studio'} edition
+ * The edition named by BEAR_EDITION. Unset or empty means the full suite; any other value is a typo
+ * that would otherwise quietly build the wrong app, so it stops the build.
+ * @param {string | undefined} value
+ * @returns {'all' | 'office' | 'studio'}
+ */
+function parseBuildEdition(value) {
+  if (value === undefined || value === '') return 'all'
+  if (EDITION_NAMES.includes(value)) return value
+  throw new Error(`Unknown BEAR_EDITION "${value}". Use all, office or studio (or leave it unset for all).`)
+}
+
+/**
+ * @param {string | undefined} edition 'all' | 'office' | 'studio' (unset or empty: 'all'); anything else throws
  * @returns {object} the electron-builder configuration for that edition
  */
 function builderConfig(edition) {
   const config = structuredClone(base)
-  const suite = SUITES[edition]
+  const suite = SUITES[parseBuildEdition(edition)]
   if (!suite) return config // "all": today's configuration, untouched
 
   config.appId = suite.appId
@@ -191,4 +205,4 @@ function builderConfig(edition) {
   return config
 }
 
-module.exports = { builderConfig }
+module.exports = { builderConfig, parseBuildEdition }

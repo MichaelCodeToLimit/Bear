@@ -1,9 +1,11 @@
 import { createRequire } from 'node:module'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { EDITIONS, type Edition } from '@bear/core'
 
 const require = createRequire(import.meta.url)
-const { builderConfig } = require('../../build-config/editions.cjs') as {
-  builderConfig: (edition: 'all' | 'office' | 'studio') => any
+const { builderConfig, parseBuildEdition } = require('../../build-config/editions.cjs') as {
+  builderConfig: (edition: string | undefined) => any
+  parseBuildEdition: (value: string | undefined) => Edition
 }
 
 const exts = (c: any): string[] => c.fileAssociations.map((f: any) => f.ext)
@@ -65,5 +67,54 @@ describe('builderConfig', () => {
   it('only overrides the packaged productName for non-default editions', () => {
     expect(builderConfig('all').extraMetadata).toBeUndefined()
     expect(studio.extraMetadata).toEqual({ productName: 'Bear Studio' })
+  })
+})
+
+describe('BEAR_EDITION', () => {
+  it('means the full suite when unset or empty', () => {
+    expect(parseBuildEdition(undefined)).toBe('all')
+    expect(parseBuildEdition('')).toBe('all')
+    expect(builderConfig(undefined).appId).toBe('org.bearsuite.desktop')
+    expect(builderConfig('').productName).toBe('Bear')
+  })
+
+  it('fails the build for an unknown value', () => {
+    for (const bad of ['Studio', 'stuido', 'full', ' office']) {
+      expect(() => parseBuildEdition(bad)).toThrow(/Unknown BEAR_EDITION/)
+      expect(() => builderConfig(bad)).toThrow(/Unknown BEAR_EDITION/)
+    }
+  })
+
+  describe('electron-vite config', () => {
+    const saved = process.env.BEAR_EDITION
+    afterEach(() => {
+      if (saved === undefined) delete process.env.BEAR_EDITION
+      else process.env.BEAR_EDITION = saved
+      vi.resetModules()
+    })
+    const load = () => import('../../electron.vite.config')
+
+    it('throws for an unknown value', async () => {
+      process.env.BEAR_EDITION = 'stuido'
+      vi.resetModules()
+      await expect(load()).rejects.toThrow(/Unknown BEAR_EDITION/)
+    })
+
+    it('builds the named edition', async () => {
+      process.env.BEAR_EDITION = 'studio'
+      vi.resetModules()
+      const config = (await load()).default as any
+      expect(config.main.define.__BEAR_EDITION__).toBe('"studio"')
+    })
+  })
+})
+
+describe('EDITIONS in @bear/core', () => {
+  it('agree with the builder configuration (the source of truth)', () => {
+    for (const e of Object.keys(EDITIONS) as Edition[]) {
+      const c = builderConfig(e)
+      expect(EDITIONS[e].appId).toBe(c.appId)
+      expect(EDITIONS[e].productName).toBe(c.productName)
+    }
   })
 })

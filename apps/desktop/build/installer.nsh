@@ -53,15 +53,15 @@ Var bearUpdateButton
       Abort ; fresh install: show Choose Install Location instead
     ${endif}
 
-    !insertmacro MUI_HEADER_TEXT "Bear is already installed" "Repair it, or update it to version ${VERSION}."
+    !insertmacro MUI_HEADER_TEXT "${PRODUCT_NAME} is already installed" "Repair it, or update it to version ${VERSION}."
 
     nsDialogs::Create 1018
     Pop $0
 
     ${if} $bearInstalledVersion == ""
-      StrCpy $1 "Bear is installed in $bearInstalledFolder."
+      StrCpy $1 "${PRODUCT_NAME} is installed in $bearInstalledFolder."
     ${else}
-      StrCpy $1 "Bear $bearInstalledVersion is installed in $bearInstalledFolder."
+      StrCpy $1 "${PRODUCT_NAME} $bearInstalledVersion is installed in $bearInstalledFolder."
     ${endif}
     ${NSD_CreateLabel} 0u 0u 100% 18u "$1"
     Pop $0
@@ -84,18 +84,18 @@ Var bearUpdateButton
     ${NSD_OnClick} $bearUpdateButton bearUpdateClicked
 
     ${if} $2 == 2
-      SendMessage $bearRepairButton 0x1609 0 "STR:Not available: the installed Bear ($bearInstalledVersion) is newer than this setup (${VERSION})."
+      SendMessage $bearRepairButton 0x1609 0 "STR:Not available: the installed ${PRODUCT_NAME} ($bearInstalledVersion) is newer than this setup (${VERSION})."
       EnableWindow $bearRepairButton 0
-      SendMessage $bearUpdateButton 0x1609 0 "STR:Not available: you already have a newer version. To go back to ${VERSION}, uninstall Bear first."
+      SendMessage $bearUpdateButton 0x1609 0 "STR:Not available: you already have a newer version. To go back to ${VERSION}, uninstall ${PRODUCT_NAME} first."
       EnableWindow $bearUpdateButton 0
       StrCpy $bearDefaultAction ""
     ${else}
-      SendMessage $bearRepairButton 0x1609 0 "STR:Reinstall Bear's program files, shortcuts and file types, and clear its caches. Fixes Bear if it won't start or behaves oddly."
+      SendMessage $bearRepairButton 0x1609 0 "STR:Reinstall ${PRODUCT_NAME}'s program files, shortcuts and file types, and clear its caches. Fixes ${PRODUCT_NAME} if it won't start or behaves oddly."
       ${if} $2 == 1
-        SendMessage $bearUpdateButton 0x1609 0 "STR:Replace Bear $bearInstalledVersion with Bear ${VERSION}."
+        SendMessage $bearUpdateButton 0x1609 0 "STR:Replace ${PRODUCT_NAME} $bearInstalledVersion with ${PRODUCT_NAME} ${VERSION}."
         StrCpy $bearDefaultAction "update"
       ${else}
-        SendMessage $bearUpdateButton 0x1609 0 "STR:You already have the latest version (${VERSION}). To update, run a newer Bear setup."
+        SendMessage $bearUpdateButton 0x1609 0 "STR:You already have the latest version (${VERSION}). To update, run a newer ${PRODUCT_NAME} setup."
         EnableWindow $bearUpdateButton 0
         StrCpy $bearDefaultAction "repair"
       ${endif}
@@ -157,9 +157,9 @@ Var bearUpdateButton
   ; Replaces the "Installing" header (MUI sets that after the pre function, so this runs on show).
   Function bearInstFilesShow
     ${if} $bearAction == "repair"
-      !insertmacro MUI_HEADER_TEXT "Repairing" "Please wait while Bear is being repaired."
+      !insertmacro MUI_HEADER_TEXT "Repairing" "Please wait while ${PRODUCT_NAME} is being repaired."
     ${elseif} $bearAction == "update"
-      !insertmacro MUI_HEADER_TEXT "Updating" "Please wait while Bear is being updated to ${VERSION}."
+      !insertmacro MUI_HEADER_TEXT "Updating" "Please wait while ${PRODUCT_NAME} is being updated to ${VERSION}."
     ${endif}
   FunctionEnd
 !macroend
@@ -171,8 +171,14 @@ Var bearUpdateButton
   ${if} $bearAction == "repair"
     ; Caches live in the current user's profile, also for a machine-wide install.
     SetShellVarContext current
-    ; Electron names the folder after package.json "name" (@bear/desktop).
-    StrCpy $0 "$APPDATA\@bear\desktop"
+    ; Each edition has its own Chromium profile. Electron names it after the packaged package.json:
+    ; "name" (@bear/desktop) for Bear, the productName set by extraMetadata for Bear Office / Bear Studio.
+    ; Bear's shared data (documents, mail, notebooks) is in @bear\desktop outside these cache folders.
+    !if "${PRODUCT_NAME}" == "Bear"
+      StrCpy $0 "$APPDATA\@bear\desktop"
+    !else
+      StrCpy $0 "$APPDATA\${PRODUCT_NAME}"
+    !endif
     RMDir /r "$0\Cache"
     RMDir /r "$0\Code Cache"
     RMDir /r "$0\GPUCache"
@@ -181,9 +187,9 @@ Var bearUpdateButton
     ${if} $installMode == "all"
       SetShellVarContext all
     ${endif}
-    DetailPrint "Bear has been repaired."
+    DetailPrint "${PRODUCT_NAME} has been repaired."
   ${elseif} $bearAction == "update"
-    DetailPrint "Bear has been updated from $bearInstalledVersion to ${VERSION}."
+    DetailPrint "${PRODUCT_NAME} has been updated from $bearInstalledVersion to ${VERSION}."
   ${endif}
 !macroend
 
