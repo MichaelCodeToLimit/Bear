@@ -25,7 +25,10 @@ export const RECOVERY_NAME = /^[a-z0-9-]{1,64}\.bearphoto$/
 export interface RecoveryBridge {
   /** Write (or replace) a recovery copy, atomically. */
   write(name: string, data: Uint8Array): Promise<void>
-  /** Recovery copies left behind, newest first. Copies another open window is still writing are left out. */
+  /**
+   * Recovery copies left behind, newest first. Copies another open window is still writing are left out,
+   * and so are those of another Bear process that is still running (another edition sharing the data folder).
+   */
   list(): Promise<{ name: string; savedAt: number }[]>
   read(name: string): Promise<Uint8Array>
   remove(name: string): Promise<void>

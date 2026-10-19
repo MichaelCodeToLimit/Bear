@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, webContents } from 'electron'
-import { promises as fs, rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { promises as fs, rmdirSync, rmSync, statSync, type Dirent } from 'node:fs'
+import { dirname, join } from 'node:path'
 import {
   DATA_NAME, EDITIONS, RECOVERY_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent, setEdition,
   type AppId, type FileFilter, type RecentFile
@@ -10,17 +10,21 @@ import { bearDataDir } from './data-dir'
 import { registerMailIpc } from './mail'
 import { writeFileAtomic } from './mail/atomic'
 import { KeyedQueue } from './keyed-queue'
+import { copyOwnership, ownerFolderName, parseOwnerFolder, probeProcess, thisProcess, type ProbeResult } from './recovery-owners'
 
 const edition = buildEdition()
 setEdition(edition)
 
 // Tests only: Electron doesn't take appData from %APPDATA%, so a test that checks the real (no
 // --user-data-dir) folder layout points it at a temporary folder with BEAR_TEST_APPDATA. The profile
-// moves with it, exactly as Electron would place it there. Never set outside tests.
+// moves with it, exactly as Electron would place it there. With --user-data-dir as well, the profile
+// stays there and only Bear's data folder moves (<BEAR_TEST_APPDATA>/@bear/desktop): two test processes
+// with their own profiles then share one data folder, like two editions side by side. Never set outside tests.
 const testAppData = process.env.BEAR_TEST_APPDATA
-if (testAppData && !app.commandLine.hasSwitch('user-data-dir')) {
+const userDataSwitch = app.commandLine.hasSwitch('user-data-dir')
+if (testAppData) {
   app.setPath('appData', testAppData)
-  app.setPath('userData', join(testAppData, app.getName()))
+  if (!userDataSwitch) app.setPath('userData', join(testAppData, app.getName()))
 }
 
 // Bear's own files are shared by every edition; each edition keeps Electron's default Chromium
@@ -28,7 +32,7 @@ if (testAppData && !app.commandLine.hasSwitch('user-data-dir')) {
 const dataDir = bearDataDir({
   appData: app.getPath('appData'),
   userData: app.getPath('userData'),
-  userDataSwitch: app.commandLine.hasSwitch('user-data-dir')
+  userDataSwitch: userDataSwitch && !testAppData
 })
 
 const recentPath = () => join(dataDir, 'recent.json')
@@ -56,10 +60,23 @@ const forceClosing = new WeakSet<BrowserWindow>()
 
 const recoveryDir = () => join(dataDir, 'recovery')
 
-function recoveryFile(name: string): string {
+// This process's copies go in recovery/<pid>-<start>/, so another edition running at the same time can
+// tell they are still live (see recovery-owners.ts).
+const self = thisProcess()
+const ownRecoveryDir = () => join(recoveryDir(), ownerFolderName(self))
+
+function checkRecoveryName(name: string): void {
   if (typeof name !== 'string' || !RECOVERY_NAME.test(name)) throw new Error(`Invalid recovery name: ${name}`)
-  return join(recoveryDir(), name)
 }
+
+/** Where this process keeps the copy called `name`. */
+function recoveryFile(name: string): string {
+  checkRecoveryName(name)
+  return join(ownRecoveryDir(), name)
+}
+
+/** Copies left by a crashed process (or a flat copy from an earlier build) that recovery:list offered: name → path. */
+const orphanCopies = new Map<string, string>()
 
 /** Which window (webContents id) last wrote each recovery copy. */
 const recoveryOwners = new Map<string, number>()
@@ -84,6 +101,12 @@ function removeRecoveriesOf(ownerId: number): void {
     } catch (err) {
       console.warn('Could not remove recovery copy', name, err)
     }
+  }
+  // The folder goes too once it's empty (another window's copy, or a write in flight, keeps it).
+  try {
+    rmdirSync(ownRecoveryDir())
+  } catch {
+    // Not empty, or never made.
   }
 }
 
@@ -270,36 +293,86 @@ function registerIpc(): void {
     })
   })
 
+  // Copies in this process's folder, folders of processes that are gone, and flat copies from an earlier
+  // build. A folder whose process is still running (another edition with Photo open) is never looked into.
   ipcMain.handle('recovery:list', async (e) => {
-    let names: string[]
+    let entries: Dirent[]
     try {
-      names = await fs.readdir(recoveryDir())
+      entries = await fs.readdir(recoveryDir(), { withFileTypes: true })
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
       throw err
     }
-    // Copies that another open window is still keeping up to date are not left over from a crash.
+    // Copies that another open window of this process is still keeping up to date are not left over from a crash.
     const liveElsewhere = (name: string) => {
       const owner = recoveryOwners.get(name)
       return owner !== undefined && owner !== e.sender.id && !!webContents.fromId(owner)
     }
-    const found = await Promise.all(
-      names
-        .filter((n) => RECOVERY_NAME.test(n) && !liveElsewhere(n))
-        .map(async (name) => {
-          try {
-            return { name, savedAt: (await fs.stat(join(recoveryDir(), name))).mtimeMs }
-          } catch {
-            return null
-          }
-        })
+    const copiesIn = async (folder: string) => {
+      try {
+        return (await fs.readdir(folder)).filter((n) => RECOVERY_NAME.test(n))
+      } catch {
+        return []
+      }
+    }
+    const groups = await Promise.all(
+      entries.map(async (ent): Promise<{ name: string; path: string; own: boolean }[]> => {
+        if (ent.isFile()) return RECOVERY_NAME.test(ent.name) ? [{ name: ent.name, path: join(recoveryDir(), ent.name), own: false }] : []
+        if (!ent.isDirectory()) return []
+        const owner = parseOwnerFolder(ent.name)
+        const probe: ProbeResult | undefined = owner && owner.pid !== self.pid ? await probeProcess(owner.pid) : undefined
+        const who = copyOwnership(ent.name, self, probe)
+        if (who === 'live') return []
+        const folder = join(recoveryDir(), ent.name)
+        const names = await copiesIn(folder)
+        if (who === 'self') return names.filter((n) => !liveElsewhere(n)).map((name) => ({ name, path: join(folder, name), own: true }))
+        // A crashed process's folder with no copies left (only a half-written temp file, say) is just tidied away.
+        if (!names.length) await fs.rm(folder, { recursive: true, force: true }).catch(() => {})
+        return names.map((name) => ({ name, path: join(folder, name), own: false }))
+      })
     )
-    return found.filter((f) => f !== null).sort((a, b) => b.savedAt - a.savedAt)
+    const found = await Promise.all(
+      groups.flat().map(async (c) => {
+        try {
+          return { ...c, savedAt: (await fs.stat(c.path)).mtimeMs }
+        } catch {
+          return null
+        }
+      })
+    )
+    const out: { name: string; savedAt: number }[] = []
+    const seen = new Set<string>()
+    for (const c of found.filter((f) => f !== null).sort((a, b) => b.savedAt - a.savedAt)) {
+      // Names are random per window session; if two folders ever hold the same one, the newer is offered.
+      if (seen.has(c.name)) continue
+      seen.add(c.name)
+      if (c.own) orphanCopies.delete(c.name)
+      else orphanCopies.set(c.name, c.path)
+      out.push({ name: c.name, savedAt: c.savedAt })
+    }
+    return out
   })
 
-  ipcMain.handle('recovery:read', async (_e, name: string) => new Uint8Array(await fs.readFile(recoveryFile(name))))
+  // A name is read from where recovery:list found it (a crashed process's folder), else from this process's own.
+  ipcMain.handle('recovery:read', async (_e, name: string) => {
+    checkRecoveryName(name)
+    return new Uint8Array(await fs.readFile(orphanCopies.get(name) ?? recoveryFile(name)))
+  })
 
   ipcMain.handle('recovery:remove', (_e, name: string) => {
+    checkRecoveryName(name)
+    const orphan = orphanCopies.get(name)
+    if (orphan) {
+      return recoveryQueue.run(name, async () => {
+        await fs.rm(orphan, { force: true })
+        orphanCopies.delete(name)
+        // The crashed process's folder goes with its last copy (restored or discarded).
+        const folder = dirname(orphan)
+        if (folder === recoveryDir()) return
+        const rest = await fs.readdir(folder).catch(() => [] as string[])
+        if (!rest.some((n) => RECOVERY_NAME.test(n))) await fs.rm(folder, { recursive: true, force: true }).catch(() => {})
+      })
+    }
     const file = recoveryFile(name)
     return recoveryQueue.run(name, async () => {
       await fs.rm(file, { force: true })

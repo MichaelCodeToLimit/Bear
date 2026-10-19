@@ -2,8 +2,8 @@ import { expect, test, type ElectronApplication, type Page } from '@playwright/t
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { close, launch, stubOpenDialog, stubSaveDialog } from './helpers'
+import { basename, dirname, join } from 'node:path'
+import { assertTestFolder, close, launch, stubOpenDialog, stubSaveDialog } from './helpers'
 import { readBearPhoto, writeBearPhoto } from '../packages/app-photo/src/io/bearphoto'
 import { decodePng, encodePng } from '../packages/app-photo/src/io/png'
 import { readPsd } from '../packages/app-photo/src/io/psd'
@@ -487,35 +487,54 @@ async function killHard(app: ElectronApplication) {
   await exited
 }
 
+const RECOVERY_COPY = /^photo-[a-z0-9-]+\.bearphoto$/
+
+/** Recovery copies under `recoveryDir`: in a process's own folder (<pid>-<start>/), or flat from older builds. */
+function recoveryCopies(recoveryDir: string): string[] {
+  if (!existsSync(recoveryDir)) return []
+  const out: string[] = []
+  for (const e of readdirSync(recoveryDir, { withFileTypes: true })) {
+    if (e.isFile() && RECOVERY_COPY.test(e.name)) out.push(join(recoveryDir, e.name))
+    else if (e.isDirectory())
+      for (const f of readdirSync(join(recoveryDir, e.name))) if (RECOVERY_COPY.test(f)) out.push(join(recoveryDir, e.name, f))
+  }
+  return out
+}
+
+async function copyChecksums(recoveryDir: string): Promise<string[]> {
+  const out: string[] = []
+  for (const f of recoveryCopies(recoveryDir)) {
+    try {
+      out.push(checksumOf(await readBearPhoto(new Uint8Array(readFileSync(f)))))
+    } catch {
+      out.push('unreadable')
+    }
+  }
+  return out
+}
+
+/** Open Photo with a new image holding a brush stroke, with recovery copies every second; returns its checksum. */
+async function strokeWithRecovery(page: Page): Promise<string> {
+  await page.evaluate(() => (window.__bearPhotoRecoveryMs = 1000))
+  await openPhoto(page)
+  await newImage(page, 'Screen')
+  const box = await viewport(page)
+  await drag(page, box.x + box.width * 0.3, box.y + box.height * 0.3, box.x + box.width * 0.7, box.y + box.height * 0.6)
+  await expect(currentRow(page)).toHaveText('Brush')
+  return docChecksum(page)
+}
+
 test('recovery: a killed app offers its work back', async () => {
   const first = await launch()
   let second: ElectronApplication | undefined
   let killed = false
   try {
     const { page, dir } = first
-    await page.evaluate(() => (window.__bearPhotoRecoveryMs = 1000))
-    await openPhoto(page)
-    await newImage(page, 'Screen')
-    const box = await viewport(page)
-    await drag(page, box.x + box.width * 0.3, box.y + box.height * 0.3, box.x + box.width * 0.7, box.y + box.height * 0.6)
-    await expect(currentRow(page)).toHaveText('Brush')
-    const sum = await docChecksum(page)
+    const sum = await strokeWithRecovery(page)
 
     const recoveryDir = join(dir, 'userdata', 'recovery')
-    const copies = () => (existsSync(recoveryDir) ? readdirSync(recoveryDir).filter((f) => /^photo-[a-z0-9-]+\.bearphoto$/.test(f)) : [])
     // Wait for a copy that holds the stroke, not just any copy: decode it and compare with the open document.
-    const copyChecksums = async () => {
-      const out: string[] = []
-      for (const f of copies()) {
-        try {
-          out.push(checksumOf(await readBearPhoto(new Uint8Array(readFileSync(join(recoveryDir, f))))))
-        } catch {
-          out.push('unreadable')
-        }
-      }
-      return out
-    }
-    await expect.poll(copyChecksums, { timeout: 10_000 }).toEqual([sum])
+    await expect.poll(() => copyChecksums(recoveryDir), { timeout: 10_000 }).toEqual([sum])
 
     await killHard(first.app)
     killed = true
@@ -533,6 +552,58 @@ test('recovery: a killed app offers its work back', async () => {
   } finally {
     if (!killed) await close(first.app)
     await close(second)
+  }
+})
+
+test("recovery: another running process's copy is not offered until that process is gone", async () => {
+  // Two profiles, one Bear data folder: like Bear Studio and Bear running side by side.
+  const shared = assertTestFolder(mkdtempSync(join(tmpdir(), 'bear-e2e-appdata-')))
+  const recoveryDir = join(shared, '@bear', 'desktop', 'recovery')
+  const a = await launch(undefined, [], [], shared)
+  let b: ElectronApplication | undefined
+  let killed = false
+  try {
+    // Never against real data: the profile is the test's own and the data folder the temp one.
+    const paths = await a.app.evaluate(({ app }) => ({ appData: app.getPath('appData'), userData: app.getPath('userData') }))
+    expect(paths.appData).toBe(shared)
+    expect(paths.userData).toBe(join(a.dir, 'userdata'))
+    assertTestFolder(paths.userData)
+
+    const sum = await strokeWithRecovery(a.page)
+    await expect.poll(() => copyChecksums(recoveryDir), { timeout: 10_000 }).toEqual([sum])
+    const [copy] = recoveryCopies(recoveryDir)
+    const aPid = await a.app.evaluate(() => process.pid)
+    expect(basename(dirname(copy))).toMatch(new RegExp(`^${aPid}-\\d+$`))
+
+    // B opens Photo while A is still running: no prompt, and A's copy is left alone.
+    const launchedB = await launch(undefined, [], [], shared)
+    b = launchedB.app
+    const pageB = launchedB.page
+    expect(await pageB.evaluate(() => window.bear.recovery.list())).toEqual([])
+    await openPhoto(pageB)
+    const newDialog = pageB.getByRole('dialog', { name: 'New image' })
+    await expect(newDialog).toBeVisible()
+    await pageB.waitForTimeout(3000) // the list (and its process check) is async: give a prompt time to show
+    await expect(pageB.getByTestId('photo-recovery')).toHaveCount(0)
+    expect(recoveryCopies(recoveryDir)).toEqual([copy])
+
+    // A crashes. Photo, opened again in B, offers A's work back.
+    await killHard(a.app)
+    killed = true
+    await newDialog.getByRole('button', { name: 'Cancel' }).click()
+    await pageB.getByTitle('Home').click()
+    await expect(pageB.getByTestId('suite-studio')).toBeVisible()
+    await openPhoto(pageB)
+    const prompt = pageB.getByRole('dialog', { name: 'Restore your work?' })
+    await expect(pageB.getByTestId('photo-recovery')).toContainText('Photo closed unexpectedly. Restore')
+    await prompt.getByRole('button', { name: 'Restore', exact: true }).click()
+    await expect(prompt).toBeHidden()
+    expect(await docChecksum(pageB)).toBe(sum)
+    // A's copy, and its folder, go once B has written its own copy of the work.
+    await expect.poll(() => existsSync(dirname(copy)), { timeout: 10_000 }).toBe(false)
+  } finally {
+    if (!killed) await close(a.app)
+    await close(b)
   }
 })
 
