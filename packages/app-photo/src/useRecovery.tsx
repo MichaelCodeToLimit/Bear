@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Modal } from '@bear/ui'
 import type { PhotoDoc } from './model/doc'
-import { readBearPhoto, writeBearPhoto } from './io/bearphoto'
+import { readBearPhoto } from './io/bearphoto'
+import { writeBearPhotoOffThread } from './io/writeOffThread'
 import { RecoveryWriter, SESSION_ID, recoveryInterval, recoveryName } from './recovery'
 
 interface RecoveryOptions {
@@ -28,7 +29,7 @@ export function useRecovery({ accent, getDoc, dirty, version, onRestore, onError
   const live = useRef({ dirty, version, getDoc, onError })
   live.current = { dirty, version, getDoc, onError }
   const [writer] = useState(
-    () => new RecoveryWriter<PhotoDoc>(window.bear.recovery, NAME, writeBearPhoto, recoveryInterval(), Date.now())
+    () => new RecoveryWriter<PhotoDoc>(window.bear.recovery, NAME, (d) => writeBearPhotoOffThread(d), recoveryInterval(), Date.now())
   )
 
   useEffect(() => {

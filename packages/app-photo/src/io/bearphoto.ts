@@ -36,13 +36,8 @@ interface DocJson {
   layers: LayerJson[]
 }
 
-/** Box-average downscale so the longest side is at most `max`. */
-function downscale(src: Bitmap, max: number): Bitmap {
-  const longest = Math.max(src.width, src.height)
-  if (longest <= max || longest === 0) return src
-  const f = max / longest
-  const w = Math.max(1, Math.round(src.width * f))
-  const h = Math.max(1, Math.round(src.height * f))
+/** Box-average resample to `w` × `h` (meant for shrinking; growing repeats pixels). Colour is alpha-weighted. */
+function boxResize(src: Bitmap, w: number, h: number): Bitmap {
   const out = createBitmap(w, h)
   for (let y = 0; y < h; y++) {
     const y0 = Math.floor((y * src.height) / h)
@@ -77,6 +72,32 @@ function downscale(src: Bitmap, max: number): Bitmap {
   return out
 }
 
+/**
+ * The flattened image at most PREVIEW_SIDE on its longest side. Each layer is shrunk to the preview's
+ * scale first and the small layers are composited, so a 24 MP document never needs a full-size
+ * composite just for its thumbnail. (Layer edges may land up to a preview pixel off: fine for a preview.)
+ */
+export function previewOf(doc: PhotoDoc): Bitmap {
+  const longest = Math.max(doc.width, doc.height)
+  if (longest <= PREVIEW_SIDE) return compositeLayers(doc.layers, doc.width, doc.height)
+  const f = PREVIEW_SIDE / longest
+  const pw = Math.max(1, Math.round(doc.width * f))
+  const ph = Math.max(1, Math.round(doc.height * f))
+  const layers: Layer[] = []
+  for (const l of doc.layers) {
+    const { width, height } = l.pixels
+    if (!l.visible || l.opacity <= 0 || width === 0 || height === 0) continue
+    const x0 = Math.floor(l.x * f)
+    const y0 = Math.floor(l.y * f)
+    const x1 = Math.max(x0 + 1, Math.round((l.x + width) * f))
+    const y1 = Math.max(y0 + 1, Math.round((l.y + height) * f))
+    // Entirely outside the preview: nothing to shrink.
+    if (x1 <= 0 || y1 <= 0 || x0 >= pw || y0 >= ph) continue
+    layers.push({ ...l, x: x0, y: y0, pixels: boxResize(l.pixels, x1 - x0, y1 - y0) })
+  }
+  return compositeLayers(layers, pw, ph)
+}
+
 export async function writeBearPhoto(doc: PhotoDoc): Promise<Uint8Array> {
   const json: DocJson = {
     format: 'bearphoto',
@@ -106,12 +127,15 @@ export async function writeBearPhoto(doc: PhotoDoc): Promise<Uint8Array> {
   }
   const zip = new JSZip()
   const opts = { date: ZIP_DATE, createFolders: false }
+  // PNGs are compressed already: deflating them again costs seconds on a large image and saves next to
+  // nothing, so they are stored as they are. document.json is deflated (the archive-wide default below).
+  const stored = { ...opts, compression: 'STORE' as const }
   zip.file('document.json', JSON.stringify(json), opts)
   for (const l of doc.layers) {
-    if (l.pixels.width > 0 && l.pixels.height > 0) zip.file(`layers/${l.id}.png`, encodePng(l.pixels), opts)
+    if (l.pixels.width > 0 && l.pixels.height > 0) zip.file(`layers/${l.id}.png`, encodePng(l.pixels), stored)
   }
-  const flat = compositeLayers(doc.layers, doc.width, doc.height)
-  if (flat.width > 0 && flat.height > 0) zip.file('preview.png', encodePng(downscale(flat, PREVIEW_SIDE)), opts)
+  const preview = previewOf(doc)
+  if (preview.width > 0 && preview.height > 0) zip.file('preview.png', encodePng(preview), stored)
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } })
 }
 

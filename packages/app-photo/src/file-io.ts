@@ -2,7 +2,8 @@ import { extensionOf, type FileFilter, type OpenedFile } from '@bear/core'
 import type { Bitmap } from './model/bitmap'
 import { createLayer, type PhotoDoc } from './model/doc'
 import { compositeLayers } from './ops/composite'
-import { readBearPhoto, writeBearPhoto } from './io/bearphoto'
+import { readBearPhoto } from './io/bearphoto'
+import { writeBearPhotoOffThread } from './io/writeOffThread'
 import { readPsd, writePsd } from './io/psd'
 import { decodePng, encodePng } from './io/png'
 import { decodeImage, encodeImage } from './io/browser-image'
@@ -105,7 +106,8 @@ export async function serializePhoto(doc: PhotoDoc, path: string): Promise<Uint8
   const ext = extensionOf(path)
   switch (ext) {
     case 'bearphoto':
-      return writeBearPhoto(doc)
+      // Off the main thread: a large image takes seconds to encode, and AutoSave runs while the user works.
+      return writeBearPhotoOffThread(doc)
     case 'psd':
       return writePsd(doc)
     case 'png':
