@@ -5,6 +5,7 @@ import {
 } from '@bear/core'
 import { Button, Modal } from './Modal'
 import { EditCounter, cleanAfterSave } from './saveState'
+import { SaveQueue } from './saveQueue'
 
 const AUTOSAVE_DELAY = 2500
 
@@ -79,8 +80,12 @@ export function useDocumentFile(opts: DocumentFileOptions) {
     window.bear.setTitle(`${dirty ? '• ' : ''}${doc.name} - Bear ${app.name}`)
   }, [doc.name, dirty, app.name])
 
-  const writeTo = useCallback(async (path: string, auto = false) => {
-    setSaving(true)
+  // One save at a time: a save asked for while another is writing waits behind it (see SaveQueue), so an
+  // older snapshot (a slow AutoSave) can never land after a newer one, and `saving` stays on until all are done.
+  const queue = useRef<SaveQueue | null>(null)
+  if (!queue.current) queue.current = new SaveQueue(setSaving)
+
+  const writeTo = useCallback((path: string, auto = false) => queue.current!.request(auto, async () => {
     try {
       // A save by the user includes held input (AutoSave leaves an open text box alone while typing).
       if (!auto) latest.current.commitPending?.()
@@ -95,10 +100,8 @@ export function useDocumentFile(opts: DocumentFileOptions) {
     } catch (e) {
       if (!isAbort(e)) setError(`Could not save: ${(e as Error).message}`)
       return false
-    } finally {
-      setSaving(false)
     }
-  }, [app.id, edits, setDirty])
+  }), [app.id, edits, setDirty])
 
   const saveAs = useCallback(async () => {
     const suggested = withExtension(stripExtension(doc.path ?? doc.name), defaultExt)
