@@ -14,6 +14,15 @@ import { KeyedQueue } from './keyed-queue'
 const edition = buildEdition()
 setEdition(edition)
 
+// Tests only: Electron doesn't take appData from %APPDATA%, so a test that checks the real (no
+// --user-data-dir) folder layout points it at a temporary folder with BEAR_TEST_APPDATA. The profile
+// moves with it, exactly as Electron would place it there. Never set outside tests.
+const testAppData = process.env.BEAR_TEST_APPDATA
+if (testAppData && !app.commandLine.hasSwitch('user-data-dir')) {
+  app.setPath('appData', testAppData)
+  app.setPath('userData', join(testAppData, app.getName()))
+}
+
 // Bear's own files are shared by every edition; each edition keeps Electron's default Chromium
 // profile, so the editions can run side by side (see data-dir.ts).
 const dataDir = bearDataDir({

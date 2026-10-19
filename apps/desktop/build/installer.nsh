@@ -174,11 +174,12 @@ Var bearUpdateButton
     ; Each edition has its own Chromium profile. Electron names it after the packaged package.json:
     ; "name" (@bear/desktop) for Bear, the productName set by extraMetadata for Bear Office / Bear Studio.
     ; Bear's shared data (documents, mail, notebooks) is in @bear\desktop outside these cache folders.
-    !if "${PRODUCT_NAME}" == "Bear"
+    ; (LogicLib's == is StrCmp, a string comparison.)
+    ${if} "${PRODUCT_NAME}" == "Bear"
       StrCpy $0 "$APPDATA\@bear\desktop"
-    !else
+    ${else}
       StrCpy $0 "$APPDATA\${PRODUCT_NAME}"
-    !endif
+    ${endif}
     RMDir /r "$0\Cache"
     RMDir /r "$0\Code Cache"
     RMDir /r "$0\GPUCache"

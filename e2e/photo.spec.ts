@@ -334,6 +334,11 @@ test.describe('Photo', () => {
     expect(await layerNames(page)).toEqual(expected)
     expect(expected).toEqual(expect.arrayContaining(['Base', 'Masked']))
     await expect(page.getByTestId('photo-notice')).toContainText(/layer masks/i)
+    // Saving this .psd in place would lose the masks: AutoSave is off and says why.
+    const toggle = titleBar(page).getByRole('switch')
+    await expect(toggle).toBeDisabled()
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await expect(titleBar(page).locator('label', { hasText: 'AutoSave' })).toHaveAttribute('title', /AutoSave is off because saving this .psd would drop parts/)
   })
 
   test('export PNG: 300×200 with the expected corner pixel', async () => {
@@ -528,5 +533,30 @@ test('recovery: a killed app offers its work back', async () => {
   } finally {
     if (!killed) await close(first.app)
     await close(second)
+  }
+})
+
+test('closing the window with an open text box commits it and asks to save', async () => {
+  const { app, page } = await launch()
+  try {
+    await openPhoto(page)
+    await newImage(page, { width: 200, height: 120 })
+    await page.getByTestId('tool-text').click()
+    const box = await viewport(page)
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(page.getByTestId('photo-text-box')).toBeVisible()
+    await page.keyboard.type('Unsaved words')
+    await expect(titleBar(page)).toContainText('· Saved') // nothing committed yet
+    // The window's close button: main asks the renderer, which must not let the text vanish.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
+    const prompt = page.getByRole('dialog', { name: 'Save changes?' })
+    await expect(prompt).toBeVisible()
+    await expect(page.getByTestId('layer-row')).toHaveCount(2)
+    expect(await layerNames(page)).toContain('Unsaved words')
+    await prompt.getByRole('button', { name: 'Cancel' }).click()
+    await expect(prompt).toBeHidden()
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
+  } finally {
+    await close(app)
   }
 })
