@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FilePlus2, FolderOpen, ImagePlus, Redo2, Save, Undo2 } from 'lucide-react'
-import { getApp, type OpenedFile } from '@bear/core'
+import { extensionOf, getApp, type OpenedFile } from '@bear/core'
 import { StatusBar, TitleBar, abortError, useDocumentFile } from '@bear/ui'
 import type { Point } from './render/view'
 import { memoryBudget } from './io/limits'
@@ -36,6 +36,9 @@ export type PhotoInput = { kind: 'new' } | { kind: 'file'; file: OpenedFile }
 
 const percent = (scale: number) => `${Math.floor(scale * 1000) / 10}%`
 
+/** Why AutoSave is off for a .psd that didn't open completely (saving it in place would lose those parts). */
+export const PSD_AUTOSAVE_OFF = "AutoSave is off because saving this .psd would drop parts Photo can't keep. Use Save As to keep a .bearphoto copy."
+
 export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => void }) {
   const state = usePhotoEditor()
   const { editor, hasDoc, version, load } = state
@@ -67,6 +70,9 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     return scale
   }, [confirm.ask]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A .psd whose open left parts out (it had warnings): AutoSave must never write over it.
+  const [lossyPath, setLossyPath] = useState<string | null>(null)
+
   /** Read a file (with the "Open at N%" prompt) and make it the document. */
   const openDoc = useCallback(async (f: OpenedFile) => {
     let res = await loadPhotoFile(f, memoryBudget())
@@ -74,6 +80,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     if (!('doc' in res)) throw new Error('it is too large to open')
     notices.clear()
     load(res.doc, 'Open')
+    setLossyPath(res.warnings.length && f.path && extensionOf(f.path) === 'psd' ? f.path : null)
     setNewOpen(false)
     if (res.warnings.length) notices.notify(`Some parts of ${f.name} didn't carry over: ${res.warnings.join('; ')}.`)
   }, [askScale, load, notices.clear, notices.notify]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -86,16 +93,18 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
     saveFilters: SAVE_FILTERS,
     openFilters: OPEN_FILTERS,
     savable: SAVABLE,
-    serialize: async (path, { auto }) => {
-      // A save by the user includes an open text box; AutoSave leaves the box open while typing.
-      if (!auto) tools.commitPending()
+    serialize: async (path) => {
       // A filter preview may have swapped a layer's pixels; save the real ones.
       const doc = dialogsRef.current.docForSave(editorRef.current.doc)
       if (needsFlatten(doc, path) && !(await confirm.ask({ title: 'Flatten layers?', body: flattenWarning(path), confirm: 'Flatten and save' }))) throw abortError()
       return serializePhoto(doc, path)
     },
     load: openDoc,
-    changeToken
+    changeToken,
+    // A save by the user, and closing the window, take an open text box with them; AutoSave leaves it open while typing.
+    commitPending: () => tools.commitPending(),
+    // An explicit Save still writes the .psd: the user chose it.
+    autosaveBlockedFor: (path) => (path === lossyPath ? PSD_AUTOSAVE_OFF : null)
   })
 
   // Mark the file dirty on every recorded edit (and undo/redo), not on view-only refreshes.
@@ -249,7 +258,7 @@ export function PhotoApp({ input, onHome }: { input: PhotoInput; onHome: () => v
         }}
       >
         <Toolbox tool={state.tool} setTool={state.setTool} />
-        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notifySticky} onToolPointer={tools.onPointer} cursor={tools.cursor} preview={dialogs.preview}>
+        <CanvasView state={state} background={background} onCursor={setCursor} onNotice={notices.notifySticky} onToolPointer={tools.onPointer} onToolCancel={tools.cancelGesture} cursor={tools.cursor} preview={dialogs.preview}>
           {hasDoc && <ToolOverlay selection={doc.selection} overlay={tools.overlay} view={state.view} hover={cursor !== null && (state.tool === 'brush' || state.tool === 'eraser')} />}
           {hasDoc && grid && <GridOverlay docW={doc.width} docH={doc.height} view={state.view} />}
           {hasDoc && tools.overlay?.kind === 'text' && <TextEditBox box={tools.overlay} view={state.view} options={tools.options.text} {...textBoxHandlers(tools)} />}

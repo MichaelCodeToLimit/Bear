@@ -4,6 +4,7 @@ import {
   type AppInfo, type FileFilter, type OpenedFile, type RecentFile
 } from '@bear/core'
 import { Button, Modal } from './Modal'
+import { EditCounter, cleanAfterSave } from './saveState'
 
 const AUTOSAVE_DELAY = 2500
 
@@ -31,6 +32,13 @@ export interface DocumentFileOptions {
   load: (file: OpenedFile) => Promise<string[] | void>
   /** Any value that changes on every edit; AutoSave waits for it to settle. */
   changeToken: unknown
+  /**
+   * Commit input the app is still holding (an open text box) into the document. Called before a save
+   * by the user (not AutoSave) and before the window's close check, so that input is saved or prompts.
+   */
+  commitPending?: () => void
+  /** A reason when AutoSave must not write to `path` (its toggle is then unavailable, with that reason); else null. */
+  autosaveBlockedFor?: (path: string) => string | null
 }
 
 export interface DocState {
@@ -45,7 +53,13 @@ export interface DocState {
 export function useDocumentFile(opts: DocumentFileOptions) {
   const { app, untitled, defaultExt, saveFilters, openFilters, savable, changeToken } = opts
   const [doc, setDoc] = useState<DocState>({ path: null, name: untitled })
-  const [dirty, setDirty] = useState(false)
+  const [dirty, setDirtyState] = useState(false)
+  // Apps call setDirty(true) on every edit, synchronously; the count tells a save what happened meanwhile.
+  const edits = useRef(new EditCounter()).current
+  const setDirty = useCallback((d: boolean) => {
+    edits.mark(d)
+    setDirtyState(d)
+  }, [edits])
   const [autosave, setAutosave] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,10 +82,14 @@ export function useDocumentFile(opts: DocumentFileOptions) {
   const writeTo = useCallback(async (path: string, auto = false) => {
     setSaving(true)
     try {
+      // A save by the user includes held input (AutoSave leaves an open text box alone while typing).
+      if (!auto) latest.current.commitPending?.()
+      const editsAtStart = edits.count
       const bytes = await latest.current.serialize(path, { auto })
       await window.bear.saveFile(path, bytes)
       setDoc({ path, name: baseName(path) })
-      setDirty(false)
+      // Edited while this (possibly slow) save was writing: those edits aren't in the file yet.
+      if (cleanAfterSave(editsAtStart, edits.count)) setDirty(false)
       setRecent(await window.bear.addRecent(path, app.id))
       return true
     } catch (e) {
@@ -80,7 +98,7 @@ export function useDocumentFile(opts: DocumentFileOptions) {
     } finally {
       setSaving(false)
     }
-  }, [app.id])
+  }, [app.id, edits, setDirty])
 
   const saveAs = useCallback(async () => {
     const suggested = withExtension(stripExtension(doc.path ?? doc.name), defaultExt)
@@ -93,7 +111,8 @@ export function useDocumentFile(opts: DocumentFileOptions) {
     return saveAs()
   }, [doc.path, savable, saveAs, writeTo])
 
-  const canAutosave = !!doc.path && savable.has(extensionOf(doc.path))
+  const blocked = (doc.path && opts.autosaveBlockedFor?.(doc.path)) || null
+  const canAutosave = !!doc.path && savable.has(extensionOf(doc.path)) && !blocked
   useEffect(() => {
     if (!autosave || !canAutosave || !dirty || saving) return
     const t = setTimeout(() => void writeTo(doc.path!, true), AUTOSAVE_DELAY)
@@ -129,7 +148,10 @@ export function useDocumentFile(opts: DocumentFileOptions) {
   useEffect(
     () =>
       window.bear.onCloseRequest(() => {
-        if (!dirtyRef.current) return true
+        // Held input (an open text box) becomes an edit first, so it gets the unsaved-changes prompt.
+        const before = edits.count
+        latest.current.commitPending?.()
+        if (!dirtyRef.current && cleanAfterSave(before, edits.count)) return true
         setPending({ label: 'close', action: () => window.bear.forceClose() })
         return false
       }),
@@ -203,7 +225,7 @@ export function useDocumentFile(opts: DocumentFileOptions) {
 
   return {
     doc, dirty, setDirty, saving, recent, setError, setNotice,
-    autosave: { enabled: autosave && canAutosave, available: canAutosave, onToggle: () => setAutosave((a) => !a) },
+    autosave: { enabled: autosave && canAutosave, available: canAutosave, reason: blocked, onToggle: () => setAutosave((a) => !a) },
     save, saveAs, openFile, browseOpen, openRecent, markNew, guard, exportPdf,
     statusText: saving ? 'Saving…' : dirty ? 'Unsaved changes' : doc.path ? 'All changes saved' : 'Not saved yet',
     savePrompt, banner
