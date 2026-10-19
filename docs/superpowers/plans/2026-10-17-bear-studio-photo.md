@@ -14,7 +14,7 @@
 
 - Work on branch `feat/studio-photo` in a worktree created from **`origin/main`** (not local `main`, which has diverged and lacks `apps/site` and the current `release.yml`). Cherry-pick the spec commit `bc9bfb4` and this plan's commit first. Never push local `main`.
 - Licence stays MIT: no GPL/LGPL/AGPL dependencies. Allowed new deps: `ag-psd`, `fast-png` (both MIT).
-- Original names and artwork only. Never "Adobe", "Photoshop" or Adobe icons in UI, code identifiers, file names or site copy. Format names (".psd") are fine.
+- Original names and artwork only. Never "Adobe", "Photoshop" or Adobe icons in UI, code identifiers, file names or site copy. The one exception: "Adobe" may appear in the site's independence disclaimer (Bear is not affiliated with Adobe). Format names (".psd") are fine.
 - Names: suite **Bear Studio**; app **Photo** (`id: 'photo'`, window title `<name> - Bear Photo`); future Studio apps Vector, PDF, Video, Motion, Audio, Layout (`ready: false`).
 - Editions: `BEAR_EDITION = all | office | studio`, default `all`.
 - The existing MSI `upgradeCode: 7DE83F53-2188-4823-80F3-8C5D58ABE5B8` and `appId: org.bearsuite.desktop` belong to the `all` edition forever. New fixed values: Office `org.bearsuite.office` / `3F6B2C1E-8A4D-4E57-9B21-5C0D7E9A4F13`; Studio `org.bearsuite.studio` / `A2C9E4B7-61F3-4D8A-B5E0-7F14C3D96E28`.
