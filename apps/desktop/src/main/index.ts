@@ -2,20 +2,27 @@ import { app, BrowserWindow, dialog, ipcMain, shell, webContents } from 'electro
 import { promises as fs, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  DATA_NAME, RECOVERY_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent, setEdition,
+  DATA_NAME, EDITIONS, RECOVERY_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent, setEdition,
   type AppId, type FileFilter, type RecentFile
 } from '@bear/core'
 import { buildEdition } from '../edition'
+import { bearDataDir } from './data-dir'
 import { registerMailIpc } from './mail'
 import { writeFileAtomic } from './mail/atomic'
 import { KeyedQueue } from './keyed-queue'
 
-setEdition(buildEdition())
+const edition = buildEdition()
+setEdition(edition)
 
-// Every edition keeps its data in Bear's folder, so Office and Studio installs share settings and files.
-if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', join(app.getPath('appData'), 'Bear'))
+// Bear's own files are shared by every edition; each edition keeps Electron's default Chromium
+// profile, so the editions can run side by side (see data-dir.ts).
+const dataDir = bearDataDir({
+  appData: app.getPath('appData'),
+  userData: app.getPath('userData'),
+  userDataSwitch: app.commandLine.hasSwitch('user-data-dir')
+})
 
-const recentPath = () => join(app.getPath('userData'), 'recent.json')
+const recentPath = () => join(dataDir, 'recent.json')
 
 async function readRecent(): Promise<RecentFile[]> {
   try {
@@ -38,7 +45,7 @@ async function readOpened(path: string) {
 /** Windows that the user has confirmed may close despite unsaved changes. */
 const forceClosing = new WeakSet<BrowserWindow>()
 
-const recoveryDir = () => join(app.getPath('userData'), 'recovery')
+const recoveryDir = () => join(dataDir, 'recovery')
 
 function recoveryFile(name: string): string {
   if (typeof name !== 'string' || !RECOVERY_NAME.test(name)) throw new Error(`Invalid recovery name: ${name}`)
@@ -210,11 +217,12 @@ function registerIpc(): void {
     if (err) throw new Error(err)
   })
 
-  // ---------- App data (JSON documents in userData/data) ----------
+  // ---------- App data (JSON documents in <Bear data>/data) ----------
+  // Two editions open at the same time may both write one file: the last write wins (no locking).
 
   const dataFile = (name: string) => {
     if (!DATA_NAME.test(name)) throw new Error(`Invalid data name: ${name}`)
-    return join(app.getPath('userData'), 'data', `${name}.json`)
+    return join(dataDir, 'data', `${name}.json`)
   }
 
   ipcMain.handle('data:read', async (_e, name: string) => {
@@ -233,7 +241,7 @@ function registerIpc(): void {
     await fs.rm(dataFile(name), { force: true })
   })
 
-  // ---------- Crash recovery (Photo copies in userData/recovery) ----------
+  // ---------- Crash recovery (Photo copies in <Bear data>/recovery) ----------
 
   ipcMain.handle('recovery:write', (e, name: string, data: Uint8Array) => {
     const file = recoveryFile(name)
@@ -343,9 +351,9 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(() => {
-    app.setAppUserModelId('org.bearsuite.desktop')
+    app.setAppUserModelId(EDITIONS[edition].appId)
     registerIpc()
-    registerMailIpc()
+    registerMailIpc(dataDir)
     const files = [...pendingLaunchFiles.splice(0), ...launchFiles(process.argv, isFile)]
     if (files.length) files.forEach((f) => createWindow(f))
     else createWindow()
