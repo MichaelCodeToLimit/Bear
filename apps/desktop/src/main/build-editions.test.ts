@@ -22,6 +22,7 @@ describe('builderConfig', () => {
     expect(all.nsis.artifactName).toBe('Bear-Setup-${version}.${ext}')
     expect(all.deb.artifactName).toBe('bear_${version}_amd64.${ext}')
     expect(all.linux.executableName).toBe('bear')
+    expect(all.linux.packageName).toBeUndefined() // electron-builder's default: the product name, Bear
     expect(all.linux.category).toBe('Office')
     expect(all.extraMetadata).toBeUndefined()
   })
@@ -48,6 +49,9 @@ describe('builderConfig', () => {
     expect(studio.msi.shortcutName).toBe('Bear Studio')
     expect(studio.nsis.uninstallDisplayName).toBe('Bear Studio')
     expect(studio.linux.category).toBe('Graphics')
+    // deb/rpm package names: rpm refuses a space, so not the product name.
+    expect(office.linux.packageName).toBe('bear-office')
+    expect(studio.linux.packageName).toBe('bear-studio')
     expect(office.linux.category).toBe('Office')
     for (const key of ['rpm', 'flatpak', 'appImage'] as const) {
       expect(office[key].artifactName).toMatch(/^Bear-Office-/)
