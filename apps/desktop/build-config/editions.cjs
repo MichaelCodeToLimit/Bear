@@ -202,8 +202,9 @@ function builderConfig(edition) {
 
   config.linux.executableName = suite.executableName
   // Without this the deb/rpm package name falls back to productName ("Bear Office"), and rpm refuses a name
-  // with a space. "all" keeps today's name, Bear.
-  config.linux.packageName = suite.executableName
+  // with a space. "all" keeps today's name, Bear. (electron-builder only accepts packageName per target.)
+  config.deb.packageName = suite.executableName
+  config.rpm.packageName = suite.executableName
   config.linux.category = suite.category
   return config
 }
