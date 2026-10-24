@@ -201,6 +201,9 @@ function builderConfig(edition) {
   config.deb.artifactName = suite.debPrefix + '_${version}_${arch}.${ext}'
 
   config.linux.executableName = suite.executableName
+  // Without this the deb/rpm package name falls back to productName ("Bear Office"), and rpm refuses a name
+  // with a space. "all" keeps today's name, Bear.
+  config.linux.packageName = suite.executableName
   config.linux.category = suite.category
   return config
 }

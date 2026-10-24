@@ -13,11 +13,12 @@ const solid = (w: number, h: number, c: [number, number, number, number]): Bitma
   return b
 }
 
-function bigDoc(): PhotoDoc {
-  const doc = createDoc(1200, 600, [255, 255, 255, 255])
+/** `scale` 10 is a 1200×600 document (big enough for a shrunk preview); smaller is quicker to deflate. */
+function bigDoc(scale = 10): PhotoDoc {
+  const doc = createDoc(120 * scale, 60 * scale, [255, 255, 255, 255])
   // A red square on the right half, partly off the canvas, and a hidden layer that must not show.
-  doc.layers.push(createLayer('Red', solid(720, 360, [255, 0, 0, 255]), { x: 840, y: 120 }))
-  doc.layers.push(createLayer('Hidden', solid(1200, 600, [0, 0, 255, 255]), { visible: false }))
+  doc.layers.push(createLayer('Red', solid(72 * scale, 36 * scale, [255, 0, 0, 255]), { x: 84 * scale, y: 12 * scale }))
+  doc.layers.push(createLayer('Hidden', solid(120 * scale, 60 * scale, [0, 0, 255, 255]), { visible: false }))
   return doc
 }
 
@@ -31,7 +32,7 @@ describe('.bearphoto writer', () => {
   })
 
   it('still reads files written the old way (everything deflated)', async () => {
-    const doc = bigDoc()
+    const doc = bigDoc(1)
     const zip = await JSZip.loadAsync(await writeBearPhoto(doc))
     const old = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
     const back = await readBearPhoto(old)
@@ -40,7 +41,7 @@ describe('.bearphoto writer', () => {
   })
 
   it('builds the preview from shrunk layers, matching a full composite', async () => {
-    const doc = bigDoc()
+    const doc = bigDoc(6) // 720×360: still shrunk to the 512 px preview
     const preview = previewOf(doc)
     expect([preview.width, preview.height]).toEqual([512, 256])
     const px = (b: Bitmap, x: number, y: number) => Array.from(b.data.slice((y * b.width + x) * 4, (y * b.width + x) * 4 + 4))
