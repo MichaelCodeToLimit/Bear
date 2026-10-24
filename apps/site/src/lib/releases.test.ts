@@ -1,14 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { classifyAsset, formatSize, toRelease, fetchLatestRelease, pickBest, detectOS, windowsDownloads, type DownloadFile } from './releases'
-
-const file = (name: string, os: DownloadFile['os'], recommended: boolean): DownloadFile => ({
-  name,
-  url: `https://example.test/${name}`,
-  size: 1,
-  os,
-  label: name,
-  recommended
-})
+import { classifyAsset, formatSize, toRelease, fetchLatestRelease, detectOS, platformCards, type ReleaseInfo } from './releases'
 
 const fixture = {
   tag_name: 'v0.1.0',
@@ -146,62 +137,221 @@ describe('fetchLatestRelease', () => {
   })
 })
 
-describe('pickBest', () => {
-  it('returns null when no file matches the os', () => {
-    expect(pickBest([file('a.exe', 'windows', true)], 'mac')).toBeNull()
-    expect(pickBest([file('a.exe', 'windows', true)], null)).toBeNull()
-  })
-  it('prefers the recommended file', () => {
-    expect(pickBest([file('a.msi', 'windows', false), file('a.exe', 'windows', true)], 'windows')?.name).toBe('a.exe')
-  })
-  it('falls back to the first file for the os', () => {
-    expect(pickBest([file('a.zip', 'mac', false)], 'mac')?.name).toBe('a.zip')
-  })
-})
-
 describe('detectOS', () => {
   it('detects desktop systems', () => {
     expect(detectOS('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36')).toBe('windows')
     expect(detectOS('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15')).toBe('mac')
     expect(detectOS('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36')).toBe('linux')
   })
-  it('returns null for Android and iOS', () => {
-    expect(detectOS('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36')).toBeNull()
+  it('detects Android before Linux, and returns null for iOS', () => {
+    expect(detectOS('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36')).toBe('android')
+    expect(detectOS('Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36 Chrome/120.0 Safari/537.36')).toBe('android')
+    expect(detectOS('Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15')).toBeNull()
     expect(detectOS('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15')).toBeNull()
   })
 })
 
-describe('windowsDownloads', () => {
-  const rel = (files: DownloadFile[]) => ({ version: '0.1.1', date: '2026-10-14T10:00:00Z', notesUrl: 'https://x/n', files })
-  it('returns nulls without a release', () => {
-    expect(windowsDownloads(null)).toEqual({ exe: null, msi: null, version: null })
+describe('classifyAsset kinds, arch and new Linux formats', () => {
+  it('gives every file a kind', () => {
+    expect(classifyAsset('Bear-Setup-0.1.1.exe')).toMatchObject({ kind: 'exe', arch: null })
+    expect(classifyAsset('Bear-0.1.1.msi')).toMatchObject({ kind: 'msi' })
+    expect(classifyAsset('Bear-0.1.1-arm64.dmg')).toMatchObject({ kind: 'dmg', arch: 'arm64' })
+    expect(classifyAsset('Bear-0.1.1-x64-mac.zip')).toMatchObject({ kind: 'zip', arch: 'x64' })
+    expect(classifyAsset('bear_0.1.1_amd64.deb')).toMatchObject({ kind: 'deb' })
+    expect(classifyAsset('Bear-0.1.1-x64.AppImage')).toMatchObject({ kind: 'appimage' })
   })
-  it('picks the exe and msi out of a mixed release', () => {
-    const exe = file('Bear-Setup.exe', 'windows', true)
-    const msi = file('Bear.msi', 'windows', false)
-    expect(windowsDownloads(rel([file('Bear.dmg', 'mac', true), exe, msi]))).toEqual({ exe, msi, version: '0.1.1' })
+  it('treats a mac file with no arch in its name as Intel', () => {
+    expect(classifyAsset('Bear-0.1.1.dmg')).toMatchObject({ arch: 'x64' })
+    expect(classifyAsset('Bear-0.1.1-mac.zip')).toMatchObject({ arch: 'x64' })
   })
-  it('picks Windows-only files', () => {
-    const exe = file('a.exe', 'windows', true)
-    const msi = file('a.msi', 'windows', false)
-    expect(windowsDownloads(rel([exe, msi]))).toMatchObject({ exe, msi })
+  it('recognises flatpak, rpm and tar.gz with their labels', () => {
+    expect(classifyAsset('Bear-0.1.1-x64.flatpak')).toMatchObject({ os: 'linux', kind: 'flatpak', label: 'Flatpak' })
+    expect(classifyAsset('Bear-0.1.1-x64.rpm')).toMatchObject({ os: 'linux', kind: 'rpm', label: '.rpm (Fedora, openSUSE)' })
+    expect(classifyAsset('Bear-0.1.1-x64.tar.gz')).toMatchObject({ os: 'linux', kind: 'targz', label: '.tar.gz (any distro)' })
+    expect(classifyAsset('bear_0.1.1_amd64.deb')?.label).toBe('.deb (Debian, Ubuntu)')
   })
-  it('gives exe null when only an msi exists', () => {
-    const msi = file('a.msi', 'windows', false)
-    expect(windowsDownloads(rel([msi]))).toEqual({ exe: null, msi, version: '0.1.1' })
+  it('classifies an apk as the recommended Android file, whatever the case', () => {
+    const want = { os: 'android', kind: 'apk', arch: null, label: 'APK (Android 7 or later)', recommended: true, edition: 'all' }
+    expect(classifyAsset('Bear-0.1.1-debug.apk')).toEqual(want)
+    expect(classifyAsset('BEAR-0.1.1-DEBUG.APK')).toEqual(want)
+    expect(classifyAsset('Bear-0.1.1-debug.apk.sha256')).toBeNull()
   })
-  it('gives nulls when there are no Windows files', () => {
-    expect(windowsDownloads(rel([file('a.dmg', 'mac', true)]))).toMatchObject({ exe: null, msi: null })
+  it('keeps metadata hidden', () => {
+    for (const n of ['Bear-0.1.1-x64.rpm.blockmap', 'latest-linux.yml', 'builder-debug.yml', 'Bear-0.1.1-arm64.dmg.blockmap']) expect(classifyAsset(n)).toBeNull()
   })
 })
 
-describe('pickBest on mac', () => {
-  it('does not guess when both architectures are offered', () => {
-    const files = [file('Bear-0.1.0-arm64.dmg', 'mac', true), file('Bear-0.1.0-x64.dmg', 'mac', true), file('Bear-0.1.0-mac.zip', 'mac', false)]
-    expect(pickBest(files, 'mac')).toBeNull()
+const BASE = 'https://github.com/MichaelCodeToLimit/Bear/releases/download/v0.1.1/'
+const HASH = 'a'.repeat(64)
+const names = [
+  'Bear-Setup-0.1.1.exe',
+  'Bear-0.1.1.msi',
+  'Bear-0.1.1-arm64.dmg',
+  'Bear-0.1.1-x64.dmg',
+  'Bear-0.1.1-arm64-mac.zip',
+  'Bear-0.1.1-x64-mac.zip',
+  'bear_0.1.1_amd64.deb',
+  'Bear-0.1.1-x64.AppImage',
+  'Bear-0.1.1-x64.flatpak',
+  'Bear-0.1.1-x64.rpm',
+  'Bear-0.1.1-x64.tar.gz',
+  'Bear-0.1.1-debug.apk'
+]
+const payload = (list: string[], extra: Record<string, unknown> = {}) => ({
+  tag_name: 'v0.1.1',
+  published_at: '2026-10-14T10:00:00Z',
+  html_url: 'https://github.com/MichaelCodeToLimit/Bear/releases/tag/v0.1.1',
+  assets: list.map((n) => ({ name: n, browser_download_url: BASE + n, size: 2_000_000, ...extra }))
+})
+const rel = (list: string[], extra: Record<string, unknown> = {}): ReleaseInfo => toRelease(payload(list, extra)) as ReleaseInfo
+
+describe('toRelease digest', () => {
+  it('parses a valid sha256 digest', () => {
+    expect(rel(['Bear-Setup-0.1.1.exe'], { digest: `sha256:${HASH}` }).files[0].sha256).toBe(HASH)
   })
-  it('returns the single recommended mac file', () => {
-    const files = [file('Bear-0.1.0.dmg', 'mac', true), file('Bear-0.1.0-mac.zip', 'mac', false)]
-    expect(pickBest(files, 'mac')?.name).toBe('Bear-0.1.0.dmg')
+  it.each([[`sha256:${'A'.repeat(64)}`], ['sha256:abc'], [`sha1:${HASH}`], [HASH], [42], [null]])('rejects %s', (d) => {
+    expect(rel(['Bear-Setup-0.1.1.exe'], { digest: d }).files[0].sha256).toBeNull()
+  })
+  it('is null when absent', () => {
+    expect(rel(['Bear-Setup-0.1.1.exe']).files[0].sha256).toBeNull()
+  })
+})
+
+describe('platformCards', () => {
+  it('returns four unavailable cards for a null release', () => {
+    const cards = platformCards(null)
+    expect(cards.map((c) => c.os)).toEqual(['windows', 'mac', 'linux', 'android'])
+    expect(cards.every((c) => !c.available && c.version === null && c.meta === null)).toBe(true)
+    expect(cards[0].slots.map((s) => [s.id, s.label, s.file])).toEqual([['exe', 'Download .exe', null], ['msi', '.msi for IT', null]])
+    expect(cards[1].slots.map((s) => [s.id, s.label])).toEqual([['arm64', 'Apple silicon'], ['x64', 'Intel']])
+    expect(cards[2].slots.map((s) => [s.id, s.label])).toEqual([['deb', '.deb'], ['appimage', 'AppImage'], ['flatpak', 'Flatpak']])
+    expect(cards[2].other).toEqual([])
+    expect(cards[3]).toMatchObject({ title: 'Android', description: 'Android 7.0 or later. Install the APK file straight onto your phone or tablet.', extras: [], other: [] })
+    expect(cards[3].slots.map((s) => [s.id, s.label, s.file])).toEqual([['apk', 'Download .apk', null]])
+  })
+  it('fills every slot for a full release', () => {
+    const [win, mac, linux, android] = platformCards(rel(names, { digest: `sha256:${HASH}` }))
+    expect([win, mac, linux, android].every((c) => c.available && c.version === '0.1.1')).toBe(true)
+    expect(win.slots.map((s) => s.file?.name)).toEqual(['Bear-Setup-0.1.1.exe', 'Bear-0.1.1.msi'])
+    expect(mac.slots.map((s) => s.file?.name)).toEqual(['Bear-0.1.1-arm64.dmg', 'Bear-0.1.1-x64.dmg'])
+    expect(mac.extras.map((f) => f.name)).toEqual(['Bear-0.1.1-arm64-mac.zip', 'Bear-0.1.1-x64-mac.zip'])
+    expect(linux.slots.map((s) => s.file?.name)).toEqual(['bear_0.1.1_amd64.deb', 'Bear-0.1.1-x64.AppImage', 'Bear-0.1.1-x64.flatpak'])
+    expect(linux.other.map((f) => f.name)).toEqual(['Bear-0.1.1-x64.rpm', 'Bear-0.1.1-x64.tar.gz'])
+    expect(android.slots.map((s) => s.file?.name)).toEqual(['Bear-0.1.1-debug.apk'])
+    expect(android.slots[0].file?.sha256).toBe(HASH)
+    expect(android.meta).toBe('v0.1.1 · 2 MB')
+    expect(win.slots[0].file?.sha256).toBe(HASH)
+    expect(win.meta).toBe('v0.1.1 · .exe 2 MB · .msi 2 MB')
+    expect(mac.meta).toBe('v0.1.1 · Apple silicon 2 MB · Intel 2 MB')
+  })
+  it('handles a partial release: no flatpak, windows only', () => {
+    const cards = platformCards(rel(names.filter((n) => !n.endsWith('.flatpak'))))
+    expect(cards[2].slots.map((s) => s.file?.name ?? null)).toEqual(['bear_0.1.1_amd64.deb', 'Bear-0.1.1-x64.AppImage', null])
+    const winOnly = platformCards(rel(['Bear-Setup-0.1.1.exe']))
+    expect(winOnly.map((c) => c.available)).toEqual([true, false, false, false])
+    expect(winOnly[0].slots[1].file).toBeNull()
+    expect(winOnly[0].meta).toBe('v0.1.1 · 2 MB')
+    expect(winOnly[1].meta).toBeNull()
+  })
+  it('a release without an apk leaves the Android card unavailable with an empty slot', () => {
+    const android = platformCards(rel(names.filter((n) => !n.endsWith('.apk'))))[3]
+    expect(android.available).toBe(false)
+    expect(android.version).toBeNull()
+    expect(android.meta).toBeNull()
+    expect(android.slots[0].file).toBeNull()
+  })
+  it('an apk-only release makes only the Android card available', () => {
+    const cards = platformCards(rel(['Bear-0.1.1-debug.apk']))
+    expect(cards.map((c) => c.available)).toEqual([false, false, false, true])
+    expect(cards[3].slots[0].file?.url).toBe(BASE + 'Bear-0.1.1-debug.apk')
+  })
+  it('drops an apk with a hostile url', () => {
+    const p = payload(['Bear-Setup-0.1.1.exe', 'Bear-0.1.1-debug.apk'])
+    p.assets[1].browser_download_url = 'https://evil.test/Bear-0.1.1-debug.apk'
+    const android = platformCards(toRelease(p))[3]
+    expect(android.available).toBe(false)
+    expect(android.slots[0].file).toBeNull()
+  })
+  it('puts an arch-less mac dmg in the Intel slot and a zip without arch in extras', () => {
+    const mac = platformCards(rel(['Bear-0.1.1.dmg', 'Bear-0.1.1-mac.zip']))[1]
+    expect(mac.slots[0].file).toBeNull()
+    expect(mac.slots[1].file?.name).toBe('Bear-0.1.1.dmg')
+    expect(mac.extras.map((f) => f.name)).toEqual(['Bear-0.1.1-mac.zip'])
+  })
+  it('never offers a hostile url', () => {
+    const p = payload(['Bear-Setup-0.1.1.exe', 'Bear-0.1.1.msi'])
+    p.assets[1].browser_download_url = 'https://evil.test/Bear-0.1.1.msi'
+    const win = platformCards(toRelease(p))[0]
+    expect(win.slots[1].file).toBeNull()
+    expect(win.slots[0].file?.url.startsWith(BASE)).toBe(true)
+  })
+})
+
+describe('editions', () => {
+  it('detects the edition from the file name and still classifies kind and arch', () => {
+    expect(classifyAsset('Bear-Studio-Setup-0.2.0.exe')).toMatchObject({ kind: 'exe', os: 'windows', edition: 'studio' })
+    expect(classifyAsset('bear-office_0.2.0_amd64.deb')).toMatchObject({ kind: 'deb', os: 'linux', edition: 'office' })
+    expect(classifyAsset('Bear-0.2.0-arm64.dmg')).toMatchObject({ kind: 'dmg', arch: 'arm64', edition: 'all' })
+    expect(classifyAsset('Bear-Office-0.2.0-arm64-mac.zip')).toMatchObject({ kind: 'zip', arch: 'arm64', edition: 'office' })
+    expect(classifyAsset('BEAR-STUDIO-0.2.0-x64.AppImage')).toMatchObject({ kind: 'appimage', edition: 'studio' })
+    expect(classifyAsset('bear-studio_0.2.0_amd64.deb')).toMatchObject({ kind: 'deb', edition: 'studio' })
+    expect(classifyAsset('Bear-Setup-0.2.0.exe')).toMatchObject({ edition: 'all' })
+    expect(classifyAsset('bear_0.2.0_amd64.deb')).toMatchObject({ edition: 'all' })
+  })
+  it('keeps edition metadata files hidden', () => {
+    for (const n of ['Bear-Studio-Setup-0.2.0.exe.blockmap', 'latest.yml', 'Bear-Office-0.2.0-x64.rpm.blockmap']) expect(classifyAsset(n)).toBeNull()
+  })
+
+  const ed = (prefix: string, deb: string) => [
+    `${prefix}-Setup-0.2.0.exe`,
+    `${prefix}-0.2.0.msi`,
+    `${prefix}-0.2.0-arm64.dmg`,
+    `${prefix}-0.2.0-x64.dmg`,
+    `${prefix}-0.2.0-arm64-mac.zip`,
+    `${prefix}-0.2.0-x64-mac.zip`,
+    `${deb}_0.2.0_amd64.deb`,
+    `${prefix}-0.2.0-x64.AppImage`,
+    `${prefix}-0.2.0-x64.flatpak`,
+    `${prefix}-0.2.0-x64.rpm`,
+    `${prefix}-0.2.0-x64.tar.gz`
+  ]
+  const three = [...ed('Bear', 'bear'), ...ed('Bear-Office', 'bear-office'), ...ed('Bear-Studio', 'bear-studio')]
+
+  it.each([
+    ['all', 'Bear', 'bear'],
+    ['office', 'Bear-Office', 'bear-office'],
+    ['studio', 'Bear-Studio', 'bear-studio']
+  ] as const)('platformCards(release, %s) only uses that edition', (edition, prefix, deb) => {
+    const cards = platformCards(rel(three), edition)
+    const used = cards.flatMap((c) => [...c.slots.map((s) => s.file), ...c.extras, ...c.other]).filter((f) => f !== null)
+    expect(used).toHaveLength(11)
+    expect(used.every((f) => f!.edition === edition)).toBe(true)
+    expect(cards[0].slots[0].file?.name).toBe(`${prefix}-Setup-0.2.0.exe`)
+    expect(cards[2].slots[0].file?.name).toBe(`${deb}_0.2.0_amd64.deb`)
+  })
+  it('defaults to the full suite', () => {
+    expect(platformCards(rel(three))[0].slots[0].file?.name).toBe('Bear-Setup-0.2.0.exe')
+  })
+  it('an edition with no files gives unavailable cards even when the release has others', () => {
+    const cards = platformCards(rel(names), 'studio')
+    expect(cards.every((c) => !c.available && c.meta === null && c.version === null)).toBe(true)
+    expect(cards.flatMap((c) => c.slots).every((s) => s.file === null)).toBe(true)
+  })
+  it('Everything and Office end with the Android card, which shows the shared .apk; Studio has no Android card', () => {
+    const release = rel([...three, 'Bear-0.2.0-debug.apk'])
+    for (const edition of ['all', 'office'] as const) {
+      const cards = platformCards(release, edition)
+      expect(cards.map((c) => c.os)).toEqual(['windows', 'mac', 'linux', 'android'])
+      expect(cards[3].available).toBe(true)
+      expect(cards[3].slots[0].file?.name).toBe('Bear-0.2.0-debug.apk')
+    }
+    expect(platformCards(release, 'studio').map((c) => c.os)).toEqual(['windows', 'mac', 'linux'])
+    expect(platformCards(null, 'studio').map((c) => c.os)).toEqual(['windows', 'mac', 'linux'])
+  })
+  it('the Office Android card takes the .apk from the full-suite files even when Office has no desktop files', () => {
+    const cards = platformCards(rel(names), 'office')
+    expect(cards.slice(0, 3).every((c) => !c.available)).toBe(true)
+    expect(cards[3].available).toBe(true)
+    expect(cards[3].slots[0].file?.edition).toBe('all')
   })
 })

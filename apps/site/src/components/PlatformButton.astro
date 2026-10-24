@@ -1,0 +1,38 @@
+---
+import { SITE } from '../site.config'
+import { formatSize, type DownloadFile } from '../lib/releases'
+
+interface Props {
+  /** Visible text. */
+  label: string
+  /** "Windows", "macOS" or "Linux", used in the accessible name. */
+  osName: string
+  file: DownloadFile | null
+  /** True when no release exists at all: every button links to the Releases page. */
+  pending: boolean
+  version: string | null
+  /** The product the file installs ("Bear", "Bear Office" or "Bear Studio"), used in the accessible name. */
+  product?: string
+  primary?: boolean
+  /** Plain small link style (the Mac .zip links, the contents of "Other"). */
+  link?: boolean
+}
+const { label, osName, file, pending, version, product = 'Bear', primary = false, link = false } = Astro.props
+const cls = link ? 'pc-link' : primary ? 'btn btn--primary' : 'btn btn--ghost'
+---
+
+{
+  pending ? (
+    <a class={cls} href={SITE.releasesUrl} data-state="pending" data-download aria-label={`${label} for ${osName}: opens the releases page on GitHub`}>
+      {label}
+    </a>
+  ) : file ? (
+    <a class={cls} href={file.url} data-state="ready" data-download aria-label={`${label} for ${osName}, ${product} ${version}, ${formatSize(file.size)}`}>
+      {label}
+    </a>
+  ) : (
+    <span class={link ? 'pc-link pc-off' : `btn btn--ghost pc-off`} data-state="missing" aria-disabled="true" title="Not in this release">
+      {label}
+    </span>
+  )
+}

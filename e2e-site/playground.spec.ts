@@ -16,7 +16,7 @@ test('playground has one h1 and four headed cards, no console errors', async ({ 
   await expect(page.locator('[data-playground-card]')).toHaveCount(4)
   await expect(page.locator('[data-playground-card] h2')).toHaveCount(4)
   await page.locator('[data-tile-physics]').scrollIntoViewIfNeeded()
-  await expect(page.locator('[data-bodies="12"]')).toBeVisible({ timeout: 5000 })
+  await expect(page.locator('[data-bodies="13"]')).toBeVisible({ timeout: 5000 })
   expect(errors).toEqual([])
 })
 
@@ -74,18 +74,18 @@ test('with motion off the pupils stay still', async ({ browser }) => {
   await context.close()
 })
 
-test('tile physics makes 12 bodies and Reset keeps them', async ({ page }) => {
+test('tile physics makes 13 bodies and Reset keeps them', async ({ page }) => {
   await page.goto('playground/')
   await page.locator('[data-tile-physics]').scrollIntoViewIfNeeded()
-  await expect(page.locator('[data-bodies="12"]')).toBeVisible({ timeout: 5000 })
+  await expect(page.locator('[data-bodies="13"]')).toBeVisible({ timeout: 5000 })
   await page.getByRole('button', { name: /reset/i }).first().click()
-  await expect(page.locator('[data-bodies="12"]')).toBeVisible()
+  await expect(page.locator('[data-bodies="13"]')).toBeVisible()
 })
 
 test('wheel over the tile canvas is not default-prevented', async ({ page }) => {
   await page.goto('playground/')
   await page.locator('[data-tile-physics]').scrollIntoViewIfNeeded()
-  await expect(page.locator('[data-bodies="12"]')).toBeVisible({ timeout: 5000 })
+  await expect(page.locator('[data-bodies="13"]')).toBeVisible({ timeout: 5000 })
   const prevented = await page.locator('canvas.tp__canvas').evaluate((el) => {
     const ev = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })
     el.dispatchEvent(ev)
@@ -242,4 +242,10 @@ test('Surprise me persists a readable mix', async ({ page }) => {
   await page.getByRole('button', { name: 'Surprise me' }).scrollIntoViewIfNeeded()
   await page.getByRole('button', { name: 'Surprise me' }).click()
   await expect.poll(() => page.evaluate(() => localStorage.getItem('bear-mix'))).not.toBeNull()
+})
+
+test('tile physics copy and canvas label count the site apps', async ({ page }) => {
+  await page.goto('playground/')
+  await expect(page.locator('.pg__card--phys > p').first()).toContainText('Thirteen app tiles, one box.')
+  await expect(page.locator('canvas.tp__canvas')).toHaveAttribute('aria-label', 'Thirteen app tiles tumbling in a box. Drag them around.')
 })

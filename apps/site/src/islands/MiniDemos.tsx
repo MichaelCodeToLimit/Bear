@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { APPS } from '@bear/core'
+import { OFFICE_APPS as APPS } from '../lib/officeApps'
 import { useMotion } from './useMotion'
 import { IslandBoundary } from './IslandBoundary'
 

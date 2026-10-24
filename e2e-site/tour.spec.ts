@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const READY = ['write', 'sheets', 'slides', 'notes', 'mail', 'sites', 'board', 'tasks']
+const READY = ['write', 'sheets', 'slides', 'notes', 'mail', 'sites', 'board', 'tasks', 'photo']
 
 function trackConsole(page: Page): string[] {
   const errors: string[] = []
@@ -44,7 +44,7 @@ test('clicking a tile updates the hash', async ({ page }) => {
 test('unknown hash is ignored', async ({ page }) => {
   const errors = trackConsole(page)
   await page.goto('tour/#nope')
-  await expect(page.locator('[data-tile]')).toHaveCount(12)
+  await expect(page.locator('[data-tile]')).toHaveCount(13)
   await expect(page.locator('[data-panel]')).toHaveCount(0)
   expect(errors).toEqual([])
 })
@@ -73,12 +73,12 @@ test('arrow keys move focus across the grid', async ({ page }) => {
   await expect(page.locator('[data-panel]')).toBeVisible()
 })
 
-test('with JavaScript off the static list shows all 12 apps', async ({ browser }) => {
+test('with JavaScript off the static list shows all 13 apps', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false })
   const page = await context.newPage()
   await page.goto('tour/')
   const items = page.locator('[data-tour-static] > li')
-  await expect(items).toHaveCount(12)
+  await expect(items).toHaveCount(13)
   await expect(items.first()).toBeVisible()
   await context.close()
 })

@@ -1,10 +1,25 @@
 # Builds every Bear download and, for v* tags, drafts a GitHub release with all of them.
 #
+# Bear ships as three editions: the full suite ("all"), Bear Office and Bear Studio. Each is built by its own
+# matrix entry with BEAR_EDITION set (electron-builder and the renderer build both read it).
+#
 # Files produced (the website's Download page classifies them by name, so keep these stable):
-#   Windows  Bear-Setup-<v>.exe, Bear-<v>.msi
-#   macOS    Bear-<v>-arm64.dmg, Bear-<v>-x64.dmg, Bear-<v>-arm64-mac.zip, Bear-<v>-x64-mac.zip
-#   Linux    Bear-<v>-x64.AppImage, bear_<v>_amd64.deb, Bear-<v>-x64.rpm, Bear-<v>-x64.tar.gz,
-#            Bear-<v>-x64.flatpak (own job; a failure there never blocks the release)
+#   Edition "all" (Bear)
+#     Windows  Bear-Setup-<v>.exe, Bear-<v>.msi
+#     macOS    Bear-<v>-arm64.dmg, Bear-<v>-x64.dmg, Bear-<v>-arm64-mac.zip, Bear-<v>-x64-mac.zip
+#     Linux    Bear-<v>-x64.AppImage, bear_<v>_amd64.deb, Bear-<v>-x64.rpm, Bear-<v>-x64.tar.gz,
+#              Bear-<v>-x64.flatpak (own job; a failure there never blocks the release)
+#   Edition "office" (Bear Office)
+#     Windows  Bear-Office-Setup-<v>.exe, Bear-Office-<v>.msi
+#     macOS    Bear-Office-<v>-arm64.dmg, Bear-Office-<v>-x64.dmg, Bear-Office-<v>-arm64-mac.zip, Bear-Office-<v>-x64-mac.zip
+#     Linux    Bear-Office-<v>-x64.AppImage, bear-office_<v>_amd64.deb, Bear-Office-<v>-x64.rpm,
+#              Bear-Office-<v>-x64.tar.gz, Bear-Office-<v>-x64.flatpak (own job, non-blocking)
+#   Edition "studio" (Bear Studio)
+#     Windows  Bear-Studio-Setup-<v>.exe, Bear-Studio-<v>.msi
+#     macOS    Bear-Studio-<v>-arm64.dmg, Bear-Studio-<v>-x64.dmg, Bear-Studio-<v>-arm64-mac.zip, Bear-Studio-<v>-x64-mac.zip
+#     Linux    Bear-Studio-<v>-x64.AppImage, bear-studio_<v>_amd64.deb, Bear-Studio-<v>-x64.rpm,
+#              Bear-Studio-<v>-x64.tar.gz, Bear-Studio-<v>-x64.flatpak (own job, non-blocking)
+# No two editions share a file name, so the release job can merge all artifacts into one folder.
 #
 # Triggers: a v* tag (builds, then drafts the release), a manual run, or a push to the
 # ci/release-dry-run branch (builds everything and uploads workflow artifacts, but creates no release).
@@ -24,6 +39,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # 3 platforms x 3 editions = 9 jobs. `target` and `edition` are the two axes; each include row below
+        # matches its target and adds that platform's runner, script and files to all three editions.
+        # (Include rows with no axis keys would instead be merged into every combination and overwrite each other.)
+        target: [win, mac, linux]
+        edition: [all, office, studio]
         include:
           - os: windows-latest
             target: win
@@ -56,7 +76,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Failures are copied into an error annotation: run logs need a GitHub sign-in, annotations don't.
+      # Typecheck and unit tests do not depend on the edition, so they run once per platform, in the "all" jobs.
       - name: Typecheck
+        if: matrix.edition == 'all'
         shell: bash
         run: |
           set +e
@@ -66,6 +88,7 @@ jobs:
           if [ $code -ne 0 ]; then echo "::error title=typecheck failed (exit $code)::$(head -c 1800 typecheck.log | tr '\r\n' '  ')"; fi
           exit $code
       - name: Unit tests
+        if: matrix.edition == 'all'
         shell: bash
         run: |
           set +e
@@ -92,6 +115,8 @@ jobs:
           if [ $code -ne 0 ]; then echo "::error title=installer build failed (exit $code)::$(grep -vE '^[[:space:]]*$' build.log | tail -n 30 | cut -c1-240 | head -c 3500 | tr '\r\n' '  ')"; fi
           exit $code
         env:
+          # Read by electron-builder.config.cjs and by electron-vite (the renderer build) for this edition.
+          BEAR_EDITION: ${{ matrix.edition }}
           # Optional code signing. Without these secrets the installers are built unsigned.
           # Windows: a .pfx (base64) and its password. macOS: a Developer ID .p12 plus Apple ID
           # credentials for notarization.
@@ -103,13 +128,17 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
       - uses: actions/upload-artifact@v4
         with:
-          name: bear-${{ matrix.target }}
+          name: bear-${{ matrix.target }}-${{ matrix.edition }}
           path: ${{ matrix.files }}
           if-no-files-found: error
 
   # Flatpak needs flatpak-builder and the Freedesktop runtime from Flathub, which is the part most
   # likely to break, so it runs on its own and never blocks the release.
   flatpak:
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [all, office, studio]
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -128,9 +157,11 @@ jobs:
           flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08 org.electronjs.Electron2.BaseApp//24.08
       - name: Build flatpak
         run: pnpm --filter @bear/desktop build:linux:flatpak --publish never
+        env:
+          BEAR_EDITION: ${{ matrix.edition }}
       - uses: actions/upload-artifact@v4
         with:
-          name: bear-flatpak
+          name: bear-flatpak-${{ matrix.edition }}
           path: apps/desktop/release/*.flatpak
           if-no-files-found: error
 

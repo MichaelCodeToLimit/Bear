@@ -22,7 +22,7 @@ test('product window shows the Bear apps panel with five Open links', async ({ p
 test('marquee lists formats and pauses with the motion toggle', async ({ page }) => {
   await page.goto('./')
   const marquee = page.locator('.marquee')
-  for (const t of ['.docx', '.xlsx', '.pptx', 'IMAP', 'Linux']) await expect(marquee).toContainText(t)
+  for (const t of ['.docx', '.xlsx', '.pptx', 'IMAP', 'Linux', 'Android']) await expect(marquee).toContainText(t)
   const track = page.locator('.marquee__track')
   await expect(track).toHaveCSS('animation-play-state', 'running')
   await page.locator('[data-motion-toggle]').first().click()
@@ -63,39 +63,36 @@ test('how it works has three cards', async ({ page }) => {
   await expect(page.locator('.how-card')).toHaveCount(3)
 })
 
-test('suite diagram links all 12 apps and marks the 4 not ready as soon', async ({ page }) => {
+test('suite diagram links all 13 apps and marks the 4 not ready as soon', async ({ page }) => {
   await page.goto('./')
-  await expect(page.locator('.suite-diagram a[href*="tour/#"]')).toHaveCount(12)
+  await expect(page.locator('.suite-diagram a[href*="tour/#"]')).toHaveCount(13)
   await expect(page.locator('.suite-diagram a[data-soon]')).toHaveCount(4)
+  await expect(page.locator('#suite-title')).toHaveText('Thirteen apps. One download.')
 })
 
-test('Windows download buttons: hero and final CTA point at the .exe or the Releases page', async ({ page }) => {
+test('the hero and final CTA each have one plain Download button linking to the full download page', async ({ page }) => {
   await page.goto('./')
-  const buttons = page.locator('[data-windows-download="exe"], [data-windows-download="releases"]')
-  expect(await buttons.count()).toBeGreaterThanOrEqual(2)
-  for (const b of await buttons.all()) {
-    await expect(b).toContainText('Download for Windows')
-    const href = (await b.getAttribute('href')) ?? ''
-    expect(/\/releases\/download\/.+\.exe$/.test(href) || href === 'https://github.com/MichaelCodeToLimit/Bear/releases').toBe(true)
+  for (const section of ['.hero', '.cta']) {
+    const download = page.locator(`${section} a.btn--primary`)
+    await expect(download, `${section} has exactly one primary button`).toHaveCount(1)
+    await expect(download).toHaveText('Download')
+    await expect(download).toHaveAttribute('href', '/Bear/download/')
   }
-  await expect(page.locator('.hero [data-windows-download]').first()).toBeVisible()
-})
-
-test('"Other systems" links and the top-bar Download go to the download page', async ({ page }) => {
-  await page.goto('./')
-  const other = page.getByRole('link', { name: /Other systems/ })
-  expect(await other.count()).toBeGreaterThanOrEqual(2)
-  for (const l of await other.all()) await expect(l).toHaveAttribute('href', '/Bear/download/')
+  // The platform-specific buttons live on the Download page only.
+  await expect(page.getByText('Download for Windows')).toHaveCount(0)
+  await expect(page.getByText('.msi for IT')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /Other systems/ })).toHaveCount(0)
   await expect(page.locator('header.topbar').getByRole('link', { name: /^Download/ }).first()).toHaveAttribute('href', '/Bear/download/')
 })
 
-test('ghost buttons beside the Windows button are not stretched at 1280px', async ({ page }) => {
+test('the hero buttons sit side by side at the same height at 1280px', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('./')
-  const primary = await page.locator('.hero a.windl__main').boundingBox()
+  const primary = await page.locator('.hero a.btn--primary').boundingBox()
   const ghost = await page.locator('.hero__actions a.btn--ghost').first().boundingBox()
   expect(primary && ghost).toBeTruthy()
   expect(ghost!.height).toBeLessThanOrEqual(primary!.height * 1.3)
+  expect(Math.abs(ghost!.y - primary!.y)).toBeLessThan(primary!.height)
 })
 
 test('with JavaScript off and reduced motion, the marquee is paused', async ({ browser }) => {
@@ -104,11 +101,6 @@ test('with JavaScript off and reduced motion, the marquee is paused', async ({ b
   await page.goto('http://127.0.0.1:4321/Bear/')
   await expect(page.locator('.marquee__track')).toHaveCSS('animation-play-state', 'paused')
   await context.close()
-})
-
-test('the Download page omits "Other systems"', async ({ page }) => {
-  await page.goto('download/')
-  await expect(page.getByRole('link', { name: /Other systems/ })).toHaveCount(0)
 })
 
 test('home has no horizontal scroll at 375px', async ({ page }) => {
@@ -133,4 +125,35 @@ test('home ships at most 60 KB of gzipped JavaScript', async ({ page }) => {
     inline.reduce((sum, s) => sum + gzipSync(s).length, 0)
   console.log(`home js gzipped bytes: ${total}`)
   expect(total).toBeLessThanOrEqual(60 * 1024)
+})
+
+test('the Bear Studio band introduces Photo and links to its tour entry and guide', async ({ page }) => {
+  await page.goto('./')
+  const band = page.locator('[data-studio-band]')
+  await expect(band.locator('.eyebrow')).toHaveText('Bear Studio')
+  await expect(band.locator('h2')).toHaveText('Creative apps, free forever. First up: Photo.')
+  await expect(band.getByRole('link', { name: 'See Photo in the tour' })).toHaveAttribute('href', '/Bear/tour/#photo')
+  await expect(band.getByRole('link', { name: 'Read the Photo guide' })).toHaveAttribute('href', '/Bear/docs/apps/photo/')
+  await expect(band).not.toContainText(/Adobe|Photoshop/)
+})
+
+test('the Bear Studio band fits a phone in dark and light', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 })
+  for (const theme of ['dark', 'light']) {
+    await page.goto('./')
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    const box = await page.locator('[data-studio-band]').boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(375)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+  }
+})
+
+test('the Bear Studio stroke stops animating with motion off', async ({ page }) => {
+  await page.goto('./')
+  const stroke = page.locator('.studio__stroke path')
+  await expect(stroke).toHaveCSS('animation-name', 'studio-paint')
+  await page.locator('[data-motion-toggle]').first().click()
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'off')
+  await expect(stroke).toHaveCSS('animation-name', 'none')
 })

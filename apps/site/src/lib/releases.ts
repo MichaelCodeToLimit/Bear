@@ -1,6 +1,10 @@
+import type { Edition } from '@bear/core'
 import { SITE } from '../site.config'
 
-export type OS = 'windows' | 'mac' | 'linux'
+export type OS = 'windows' | 'mac' | 'linux' | 'android'
+
+export type FileKind = 'exe' | 'msi' | 'dmg' | 'zip' | 'deb' | 'appimage' | 'flatpak' | 'rpm' | 'targz' | 'apk'
+export type Arch = 'arm64' | 'x64'
 
 export interface DownloadFile {
   name: string
@@ -9,6 +13,13 @@ export interface DownloadFile {
   os: OS
   label: string
   recommended: boolean
+  kind: FileKind
+  /** Mac only: the chip the file is built for. A mac file with no arch in its name is Intel. */
+  arch: Arch | null
+  /** Which build of Bear the file is: the full suite, Bear Office or Bear Studio. */
+  edition: Edition
+  /** Lowercase hex SHA-256 from the GitHub asset digest, or null when it is missing or malformed. */
+  sha256: string | null
 }
 
 export interface ReleaseInfo {
@@ -18,35 +29,45 @@ export interface ReleaseInfo {
   files: DownloadFile[]
 }
 
-/** The Windows installer (.exe) and MSI package from a release, either of which may be missing. */
-export function windowsDownloads(release: ReleaseInfo | null): {
-  exe: DownloadFile | null
-  msi: DownloadFile | null
-  version: string | null
-} {
-  if (!release) return { exe: null, msi: null, version: null }
-  const win = release.files.filter((f) => f.os === 'windows')
-  return {
-    exe: win.find((f) => f.name.toLowerCase().endsWith('.exe')) ?? null,
-    msi: win.find((f) => f.name.toLowerCase().endsWith('.msi')) ?? null,
-    version: release.version
-  }
+type Classified = Pick<DownloadFile, 'os' | 'label' | 'recommended' | 'kind' | 'arch' | 'edition'>
+
+/** The edition is in the name: Bear-Office-… or bear-office_…, Bear-Studio-… or bear-studio_… (any case); anything else is the full suite. */
+function editionOf(n: string): Edition {
+  if (n.includes('bear-office')) return 'office'
+  if (n.includes('bear-studio')) return 'studio'
+  return 'all'
 }
 
-/** Map an asset file name to a system and label. Returns null for files that should not be shown. */
-export function classifyAsset(name: string): { os: OS; label: string; recommended: boolean } | null {
+/** Map an asset file name to a system, label and edition. Returns null for files that should not be shown. */
+export function classifyAsset(name: string): Classified | null {
   const n = name.toLowerCase()
-  // electron-builder puts the architecture in the file name; only mac needs it in the label.
+  const kind = classifyKind(n)
+  return kind ? { ...kind, edition: editionOf(n) } : null
+}
+
+function classifyKind(n: string): Omit<Classified, 'edition'> | null {
+  // electron-builder puts the architecture in the file name; only mac needs it.
+  const arch: Arch = /arm64/.test(n) ? 'arm64' : 'x64'
   const macArch = /arm64/.test(n) ? ' (Apple silicon)' : /x64|x86_64|amd64/.test(n) ? ' (Intel)' : ''
-  if (n.endsWith('.exe')) return { os: 'windows', label: 'Installer (just for you, no admin needed)', recommended: true }
-  if (n.endsWith('.msi')) return { os: 'windows', label: 'MSI package (whole computer, for IT)', recommended: false }
-  if (n.endsWith('.dmg')) return { os: 'mac', label: `Disk image${macArch}`, recommended: true }
+  if (n.endsWith('.exe')) return { os: 'windows', kind: 'exe', arch: null, label: 'Installer (just for you, no admin needed)', recommended: true }
+  if (n.endsWith('.msi')) return { os: 'windows', kind: 'msi', arch: null, label: 'MSI package (whole computer, for IT)', recommended: false }
+  if (n.endsWith('.dmg')) return { os: 'mac', kind: 'dmg', arch, label: `Disk image${macArch}`, recommended: true }
   if (n.endsWith('.zip') && (n.endsWith('-mac.zip') || n.includes('-darwin'))) {
-    return { os: 'mac', label: `Zip${macArch}`, recommended: false }
+    return { os: 'mac', kind: 'zip', arch, label: `Zip${macArch}`, recommended: false }
   }
-  if (n.endsWith('.appimage')) return { os: 'linux', label: 'AppImage (any distro)', recommended: true }
-  if (n.endsWith('.deb')) return { os: 'linux', label: '.deb (Debian, Ubuntu)', recommended: false }
+  if (n.endsWith('.appimage')) return { os: 'linux', kind: 'appimage', arch: null, label: 'AppImage (any distro)', recommended: true }
+  if (n.endsWith('.deb')) return { os: 'linux', kind: 'deb', arch: null, label: '.deb (Debian, Ubuntu)', recommended: false }
+  if (n.endsWith('.flatpak')) return { os: 'linux', kind: 'flatpak', arch: null, label: 'Flatpak', recommended: false }
+  if (n.endsWith('.rpm')) return { os: 'linux', kind: 'rpm', arch: null, label: '.rpm (Fedora, openSUSE)', recommended: false }
+  if (n.endsWith('.apk')) return { os: 'android', kind: 'apk', arch: null, label: 'APK (Android 7 or later)', recommended: true }
+  if (n.endsWith('.tar.gz')) return { os: 'linux', kind: 'targz', arch: null, label: '.tar.gz (any distro)', recommended: false }
   return null
+}
+
+const SHA256 = /^sha256:([0-9a-f]{64})$/
+function parseDigest(d: unknown): string | null {
+  if (typeof d !== 'string') return null
+  return SHA256.exec(d)?.[1] ?? null
 }
 
 export function formatSize(bytes: number): string {
@@ -75,6 +96,7 @@ export function toRelease(json: unknown): ReleaseInfo | null {
       name: asset.name,
       url: asset.browser_download_url,
       size: typeof asset.size === 'number' ? asset.size : 0,
+      sha256: parseDigest(asset.digest),
       ...kind
     })
   }
@@ -98,22 +120,114 @@ export async function fetchLatestRelease(
   }
 }
 
+/**
+ * Guess the visitor's system from the user agent, for the "Your device" badge only (every download stays one click away).
+ * Limits: Android Chrome in "desktop site" mode and Chrome OS send a Linux user agent, so they match Linux; iPadOS 13+
+ * in desktop mode reports a Macintosh user agent and matches Mac. iPhone/iPad/iPod (old-style agents) get no badge.
+ * The Android check comes before Linux because Android user agents also contain "Linux".
+ */
 export function detectOS(userAgent: string): OS | null {
-  if (/android|iphone|ipad|ipod/i.test(userAgent)) return null
+  if (/iphone|ipad|ipod/i.test(userAgent)) return null
+  if (/android/i.test(userAgent)) return 'android'
   if (/windows/i.test(userAgent)) return 'windows'
   if (/macintosh|mac os x/i.test(userAgent)) return 'mac'
   if (/linux|x11/i.test(userAgent)) return 'linux'
   return null
 }
 
-export function pickBest(files: DownloadFile[], os: OS | null): DownloadFile | null {
-  if (!os) return null
-  const mine = files.filter((f) => f.os === os)
-  if (os === 'mac') {
-    // A browser cannot tell Apple silicon from Intel, so do not guess between the two disk images.
-    const rec = mine.filter((f) => f.recommended)
-    if (rec.length > 1) return null
-    return rec[0] ?? mine[0] ?? null
+export interface CardSlot {
+  id: 'exe' | 'msi' | 'arm64' | 'x64' | 'deb' | 'appimage' | 'flatpak' | 'apk'
+  /** Visible button text. */
+  label: string
+  /** Short name used in the size line. */
+  short: string
+  file: DownloadFile | null
+}
+
+export interface PlatformCard {
+  os: OS
+  title: string
+  description: string
+  /** True when the release has at least one file for this system. */
+  available: boolean
+  version: string | null
+  slots: CardSlot[]
+  /** Mac .zip variants. */
+  extras: DownloadFile[]
+  /** Linux .rpm and .tar.gz files. */
+  other: DownloadFile[]
+  /** "v0.1.1 · .exe 113 MB · .msi 114 MB", or null when nothing is available. */
+  meta: string | null
+}
+
+/** Editions that get an Android card. The phone app is one build that runs as Bear Office; Bear Studio has none. */
+export const ANDROID_EDITIONS: readonly Edition[] = ['all', 'office']
+
+/**
+ * The download cards for one edition, in order: windows, mac, linux, then android for the editions in
+ * ANDROID_EDITIONS (four cards for Everything and Office, three for Studio). Pure; a null release, or a release
+ * without that edition, gives empty, unavailable cards. The Android card always shows the release's .apk, which is
+ * classified as edition 'all': the phone app is the same for every edition that offers it.
+ */
+export function platformCards(release: ReleaseInfo | null, edition: Edition = 'all'): PlatformCard[] {
+  const releaseFiles = release?.files ?? []
+  const desktopFiles = releaseFiles.filter((f) => f.os !== 'android' && f.edition === edition)
+  const androidFiles = releaseFiles.filter((f) => f.os === 'android' && f.edition === 'all')
+  const filesFor = (os: OS): DownloadFile[] => (os === 'android' ? androidFiles : desktopFiles)
+  const pick = (os: OS, kind: FileKind, arch?: Arch): DownloadFile | null =>
+    filesFor(os).find((f) => f.os === os && f.kind === kind && (arch === undefined || f.arch === arch)) ?? null
+  const all = (os: OS, kind: FileKind): DownloadFile[] => filesFor(os).filter((f) => f.os === os && f.kind === kind)
+  const build = (
+    os: OS,
+    title: string,
+    description: string,
+    slots: CardSlot[],
+    extras: DownloadFile[] = [],
+    other: DownloadFile[] = []
+  ): PlatformCard => {
+    const available = filesFor(os).some((f) => f.os === os)
+    let meta: string | null = null
+    if (available && release) {
+      const filled = slots.filter((s) => s.file)
+      const parts = filled.length === 1 ? [formatSize(filled[0].file!.size)] : filled.map((s) => `${s.short} ${formatSize(s.file!.size)}`)
+      meta = [`v${release.version}`, ...parts].join(' · ')
+    }
+    return { os, title, description, available, version: available && release ? release.version : null, slots, extras, other, meta }
   }
-  return mine.find((f) => f.recommended) ?? mine[0] ?? null
+  const cards = [
+    build('windows', 'Windows', 'Windows 10 and 11, 64-bit. The installer sets Bear up for your account in seconds, without admin rights.', [
+      { id: 'exe', label: 'Download .exe', short: '.exe', file: pick('windows', 'exe') },
+      { id: 'msi', label: '.msi for IT', short: '.msi', file: pick('windows', 'msi') }
+    ]),
+    build(
+      'mac',
+      'macOS',
+      'macOS 12 or later. Choose the download for your Mac’s chip.',
+      [
+        { id: 'arm64', label: 'Apple silicon', short: 'Apple silicon', file: pick('mac', 'dmg', 'arm64') },
+        { id: 'x64', label: 'Intel', short: 'Intel', file: pick('mac', 'dmg', 'x64') }
+      ],
+      all('mac', 'zip')
+    ),
+    build(
+      'linux',
+      'Linux',
+      'Ubuntu, Debian, Fedora and most 64-bit distributions.',
+      [
+        { id: 'deb', label: '.deb', short: '.deb', file: pick('linux', 'deb') },
+        { id: 'appimage', label: 'AppImage', short: 'AppImage', file: pick('linux', 'appimage') },
+        { id: 'flatpak', label: 'Flatpak', short: 'Flatpak', file: pick('linux', 'flatpak') }
+      ],
+      [],
+      [...all('linux', 'rpm'), ...all('linux', 'targz')]
+    )
+  ]
+  if (ANDROID_EDITIONS.includes(edition)) {
+    cards.push(
+      build('android', 'Android', 'Android 7.0 or later. Install the APK file straight onto your phone or tablet.', [
+        { id: 'apk', label: 'Download .apk', short: '.apk', file: pick('android', 'apk') }
+      ])
+    )
+  }
+  return cards
 }

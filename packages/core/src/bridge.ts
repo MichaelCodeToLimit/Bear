@@ -18,6 +18,22 @@ export interface FolderEntry {
 /** Names usable with readData/writeData: letters, digits, dash, underscore, dot. */
 export const DATA_NAME = /^[a-z0-9][a-z0-9._-]{0,80}$/i
 
+/** Names usable with the recovery API: one Photo recovery copy per window session. */
+export const RECOVERY_NAME = /^[a-z0-9-]{1,64}\.bearphoto$/
+
+/** Crash-recovery copies of unsaved work, stored in Bear's data folder (userData/recovery). */
+export interface RecoveryBridge {
+  /** Write (or replace) a recovery copy, atomically. */
+  write(name: string, data: Uint8Array): Promise<void>
+  /**
+   * Recovery copies left behind, newest first. Copies another open window is still writing are left out,
+   * and so are those of another Bear process that is still running (another edition sharing the data folder).
+   */
+  list(): Promise<{ name: string; savedAt: number }[]>
+  read(name: string): Promise<Uint8Array>
+  remove(name: string): Promise<void>
+}
+
 export interface OpenedFile {
   path: string
   name: string
@@ -49,11 +65,16 @@ export interface BearBridge {
   listFolder(path: string): Promise<FolderEntry[]>
   /** Open a file with the system's default app. */
   openExternal(path: string): Promise<void>
+  /** How many screens are connected (presenter view uses the second one for the audience). */
+  screenCount(): Promise<number>
+  /** PNG of a part of this window, in CSS pixels (captured at the screen's full density). */
+  capture(rect: { x: number; y: number; width: number; height: number }): Promise<Uint8Array>
   /** Called when the window is about to close. Return false to cancel the close. */
   onCloseRequest(handler: () => boolean): () => void
   /** Tell the main process the user chose to close anyway. */
   forceClose(): void
   mail: MailBridge
+  recovery: RecoveryBridge
 }
 
 declare global {

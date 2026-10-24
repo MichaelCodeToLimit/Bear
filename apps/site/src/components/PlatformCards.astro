@@ -1,0 +1,485 @@
+---
+import type { Edition } from '@bear/core'
+import OsGlyph from './OsGlyph.astro'
+import PlatformButton from './PlatformButton.astro'
+import { platformCards, type DownloadFile, type ReleaseInfo } from '../lib/releases'
+
+interface Props {
+  release: ReleaseInfo | null
+}
+const { release } = Astro.props
+const pending = release === null
+const version = release?.version ?? null
+const osName: Record<string, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux', android: 'Android' }
+const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip' : 'Intel .zip')
+
+// One panel per edition, all rendered here; the switcher script shows one. Without script only Everything shows.
+// `stem`/`deb` are the file-name prefixes from release.yml, used for the install hints when a file is missing.
+const EDITIONS: { id: Edition; choice: string; product: string; blurb: string; stem: string; deb: string }[] = [
+  { id: 'all', choice: 'Everything', product: 'Bear', blurb: 'Bear: every app, office and creative, in one install.', stem: 'Bear', deb: 'bear' },
+  {
+    id: 'office',
+    choice: 'Office only',
+    product: 'Bear Office',
+    blurb: 'Bear Office: Write, Sheets, Slides, Notes, Mail and the other office apps.',
+    stem: 'Bear-Office',
+    deb: 'bear-office'
+  },
+  { id: 'studio', choice: 'Studio only', product: 'Bear Studio', blurb: 'Bear Studio: the creative apps. First up: Photo.', stem: 'Bear-Studio', deb: 'bear-studio' }
+]
+
+// Real file names when the release has them, otherwise the pattern electron-builder will produce.
+const v = version ?? '<version>'
+const panels = EDITIONS.map((ed) => {
+  const cards = platformCards(release, ed.id)
+  const linux = cards[2]
+  const nameOf = (id: string, fallback: string): string => linux.slots.find((s) => s.id === id)?.file?.name ?? fallback
+  const rpmFile = linux.other.find((f) => f.kind === 'rpm')
+  const appImage = nameOf('appimage', `${ed.stem}-${v}-x64.AppImage`)
+  const hints = [
+    `sudo apt install ./${nameOf('deb', `${ed.deb}_${v}_amd64.deb`)}`,
+    `chmod +x ${appImage} && ./${appImage}`,
+    `flatpak install --user ./${nameOf('flatpak', `${ed.stem}-${v}-x64.flatpak`)}`,
+    `sudo dnf install ./${rpmFile?.name ?? `${ed.stem}-${v}-x64.rpm`}`
+  ]
+  const otherItems = [
+    { label: '.rpm (Fedora, openSUSE)', file: rpmFile ?? null },
+    { label: '.tar.gz (any distro)', file: linux.other.find((f) => f.kind === 'targz') ?? null }
+  ]
+  // Everything and Office end with the Android card (the one .apk, the same for both); Studio has none.
+  const apkFile = cards.find((c) => c.os === 'android')?.slots[0].file ?? null
+  const adbCmd = `adb install ${apkFile?.name ?? `Bear-${v}-debug.apk`}`
+  // A release exists but has no desktop files for this edition: its cards show Coming soon and this line says why.
+  // The Android card is left out of the check, since its .apk is shared and may be there when the edition isn't.
+  const absent = release !== null && cards.every((c) => c.os === 'android' || !c.available)
+  return { ...ed, cards, hints, otherItems, adbCmd, absent }
+})
+---
+
+<section class="pc" aria-label="Download Bear">
+  <div class="pc-switch" role="radiogroup" aria-label="Edition" data-edition-switch>
+    {
+      EDITIONS.map((ed) => (
+        <button type="button" role="radio" class="pc-switch__opt" aria-checked={ed.id === 'all' ? 'true' : 'false'} tabindex={ed.id === 'all' ? 0 : -1} data-edition-choice={ed.id}>
+          {ed.choice}
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    panels.map((ed) => (
+      <div class="pc-panel" data-edition-panel={ed.id} hidden={ed.id !== 'all'}>
+        <p class="pc-blurb">{ed.blurb}</p>
+        {ed.absent && <p class="pc-absent">{ed.product} is not in Bear {version} yet. It comes in a later release.</p>}
+        <div class="pc-grid">
+          {ed.cards.map((card) => {
+            const sums = card.slots.filter((s) => s.file?.sha256)
+            const hid = `pc-${ed.id}-${card.os}`
+            return (
+              <article class="glass pc-card" data-os-group={card.os} aria-labelledby={hid}>
+                <div class="pc-top">
+                  <span class="pc-tile" aria-hidden="true">
+                    <OsGlyph os={card.os} size={26} />
+                  </span>
+                  <div class="pc-flags">
+                    <span class="pc-badge" data-your-device hidden>
+                      Your device
+                    </span>
+                    <span class="pill pc-status" data-status={card.available ? 'available' : 'soon'}>
+                      <span class="pc-dot" aria-hidden="true" />
+                      {card.available ? 'Available' : 'Coming soon'}
+                    </span>
+                  </div>
+                </div>
+
+                <h2 class="pc-name" id={hid}>{card.title}</h2>
+                <p class="pc-desc">{card.description}</p>
+
+                <div class="pc-actions">
+                  {card.slots.map((s, i) => (
+                    <PlatformButton
+                      product={ed.product}
+                      label={s.label}
+                      osName={osName[card.os]}
+                      file={s.file}
+                      pending={pending}
+                      version={version}
+                      primary={card.os === 'mac' || i === 0}
+                    />
+                  ))}
+                </div>
+
+                {card.os === 'linux' && (
+                  <details class="pc-more">
+                    <summary class="btn btn--ghost pc-more__summary">
+                      Other <span aria-hidden="true">▾</span>
+                    </summary>
+                    <ul class="pc-more__list">
+                      {ed.otherItems.map((o) => (
+                        <li>
+                          <PlatformButton product={ed.product} label={o.label} osName="Linux" file={o.file} pending={pending} version={version} link />
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                {card.os === 'mac' && card.extras.length > 0 && (
+                  <p class="pc-zips">
+                    Or a zip:{' '}
+                    {card.extras.map((f, i) => (
+                      <>
+                        {i > 0 && ', '}
+                        <PlatformButton product={ed.product} label={zipLabel(f)} osName="macOS" file={f} pending={false} version={version} link />
+                      </>
+                    ))}
+                  </p>
+                )}
+                {card.os === 'mac' && (
+                  <p class="pc-help">Not sure which? Apple menu → About This Mac shows Chip (Apple silicon) or Processor (Intel).</p>
+                )}
+
+                {card.meta && <p class="pc-meta">{card.meta}</p>}
+                {pending && <p class="pc-note">First release coming soon</p>}
+
+                {sums.length > 0 && (
+                  <div class="pc-sha">
+                    {sums.map((s) => (
+                      <div class="pc-sha__row">
+                        <span class="pc-sha__label">SHA-256 · {s.file!.name}</span>
+                        <code class="pc-sha__hash">{s.file!.sha256}</code>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {card.os === 'android' && (
+                  <>
+                    <p class="pc-help">Open the .apk on your device (or run it from a computer):</p>
+                    <ul class="pc-cmds" aria-label="Install command">
+                      <li>
+                        <code>{ed.adbCmd}</code>
+                      </li>
+                    </ul>
+                  </>
+                )}
+
+                {card.os === 'linux' && (
+                  <ul class="pc-cmds" aria-label="Install commands">
+                    {ed.hints.map((h) => (
+                      <li>
+                        <code>{h}</code>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <p class="pc-foot">
+                  {card.os === 'windows' && 'Not code-signed yet. If SmartScreen warns you, choose More info → Run anyway.'}
+                  {card.os === 'mac' && 'Not notarized yet. The first time, open System Settings → Privacy & Security and choose Open Anyway.'}
+                  {card.os === 'linux' && 'Run the command for the file you downloaded. AppImage needs no install.'}
+                  {card.os === 'android' &&
+                    'Test build signed with a debug key, so it isn’t on Google Play. Open the downloaded file and allow installs from this source when Android asks; Play Protect may ask to scan it.'}
+                </p>
+              </article>
+            )
+          })}
+        </div>
+      </div>
+    ))
+  }
+</section>
+
+<style is:global>
+  .pc {
+    margin: 0 0 2.5rem;
+  }
+  /* Edition switcher: a segmented control. It needs script, so it only shows once html.js is set. */
+  .pc-switch {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto 1rem;
+    padding: 0.25rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    background: var(--glass);
+  }
+  html:not(.js) .pc-switch {
+    display: none;
+  }
+  .pc-switch__opt {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.5rem clamp(0.7rem, 3vw, 1.2rem);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--dur-fast),
+      color var(--dur-fast);
+  }
+  .pc-switch__opt:hover {
+    color: var(--ink);
+  }
+  .pc-switch__opt[aria-checked=true] {
+    background: var(--btn-bg);
+    color: var(--btn-ink);
+  }
+  [data-motion=off] .pc-switch__opt {
+    transition: none;
+  }
+  .pc-panel[hidden] {
+    display: none;
+  }
+  /* Once html[data-edition] is set (before first paint by BaseLayout, then kept in sync by editionSwitch.ts), it decides
+     which panel shows and which option looks checked, so a saved Office or Studio choice never flashes Everything first.
+     Without it (no script, nothing saved) the hidden attributes and aria-checked from the server apply. */
+  html[data-edition] .pc-panel {
+    display: none;
+  }
+  html[data-edition=all] .pc-panel[data-edition-panel=all],
+  html[data-edition=office] .pc-panel[data-edition-panel=office],
+  html[data-edition=studio] .pc-panel[data-edition-panel=studio] {
+    display: block;
+  }
+  html[data-edition] .pc-switch__opt[aria-checked=true] {
+    background: transparent;
+    color: var(--ink-muted);
+  }
+  html[data-edition=all] .pc-switch__opt[data-edition-choice=all],
+  html[data-edition=office] .pc-switch__opt[data-edition-choice=office],
+  html[data-edition=studio] .pc-switch__opt[data-edition-choice=studio] {
+    background: var(--btn-bg);
+    color: var(--btn-ink);
+  }
+  .pc-blurb,
+  .pc-absent {
+    margin: 0 auto 1rem;
+    max-width: 40rem;
+    color: var(--ink-muted);
+    text-align: center;
+  }
+  .pc-absent {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .pc-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  @media (min-width: 900px) {
+    .pc-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .pc-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 1.4rem;
+    text-align: left;
+  }
+  .pc-card[data-yours] {
+    border-color: var(--accent);
+    box-shadow:
+      0 0 0 1px var(--accent),
+      0 0 36px var(--glow);
+    animation: pc-glow 3.2s ease-in-out infinite;
+  }
+  .pc-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .pc-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    flex: none;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: var(--glass);
+    color: var(--accent);
+  }
+  .pc-flags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .pc-status {
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .pc-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #22c55e;
+  }
+  .pc-status[data-status='soon'] .pc-dot {
+    background: #f59e0b;
+  }
+  .pc-status[data-status='available'] .pc-dot {
+    animation: pc-pulse 2.4s ease-in-out infinite;
+  }
+  .pc-badge {
+    padding: 0.2rem 0.65rem;
+    border-radius: var(--r-pill);
+    background: #1d4ed8;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .pc-badge[hidden] {
+    display: none;
+  }
+  .pc-name {
+    margin: 0.25rem 0 0;
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  .pc-desc {
+    margin: 0;
+    color: var(--ink-muted);
+    line-height: 1.55;
+  }
+  .pc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+  .pc-actions > * {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+  .pc-card .btn {
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .pc-off {
+    border-style: dashed;
+    color: var(--ink-muted);
+    cursor: not-allowed;
+  }
+  .pc-off:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--edge);
+  }
+  .pc-link {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .pc-link.pc-off {
+    text-decoration: line-through;
+    color: var(--ink-muted);
+  }
+  .pc-more__summary {
+    list-style: none;
+    cursor: pointer;
+    width: 100%;
+  }
+  .pc-more__summary::-webkit-details-marker {
+    display: none;
+  }
+  .pc-more__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.2rem;
+    margin: 0.6rem 0 0;
+    padding: 0 0.25rem;
+    list-style: none;
+  }
+  .pc-zips,
+  .pc-help,
+  .pc-meta,
+  .pc-note,
+  .pc-foot {
+    margin: 0;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .pc-meta {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .pc-note {
+    font-weight: 600;
+  }
+  .pc-foot {
+    margin-top: auto;
+    padding-top: 0.25rem;
+  }
+  .pc-sha,
+  .pc-cmds {
+    margin: 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: #0f0a07;
+    color: #f6ead9;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    line-height: 1.5;
+    list-style: none;
+    min-width: 0;
+  }
+  .pc-sha__row + .pc-sha__row {
+    margin-top: 0.55rem;
+  }
+  .pc-sha__label {
+    display: block;
+    color: #b8a48e;
+    overflow-wrap: anywhere;
+  }
+  .pc-sha__hash,
+  .pc-cmds code {
+    display: block;
+    background: none;
+    color: inherit;
+    font: inherit;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .pc-cmds li + li {
+    margin-top: 0.4rem;
+  }
+  @keyframes pc-pulse {
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @keyframes pc-glow {
+    50% {
+      box-shadow:
+        0 0 0 1px var(--accent),
+        0 0 52px var(--glow);
+    }
+  }
+  [data-motion='off'] .pc-card[data-yours],
+  [data-motion='off'] .pc-status .pc-dot {
+    animation: none;
+  }
+</style>

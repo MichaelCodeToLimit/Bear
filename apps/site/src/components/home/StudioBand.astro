@@ -1,0 +1,153 @@
+---
+import { APPS } from '@bear/core'
+import { url } from '../../site.config'
+
+// Bear Studio: Photo is ready; the rest of the creative apps are listed as coming next.
+const studio = APPS.filter((a) => a.suite === 'studio')
+const next = studio.filter((a) => !a.ready).map((a) => a.name)
+const nextText = `${next.slice(0, -1).join(', ')} and ${next.at(-1)}`
+---
+
+<section class="section studio glass" aria-labelledby="studio-title" data-studio-band>
+  <div class="studio__copy" data-reveal>
+    <p class="eyebrow">Bear Studio</p>
+    <h2 id="studio-title" class="studio__title">Creative apps, free forever. <span class="grad">First up: Photo.</span></h2>
+    <p class="studio__lead">
+      Layers with blend modes, selections, brushes, curves and filters. Photo opens .psd files and saves them too. {nextText} come next.
+    </p>
+    <div class="studio__actions">
+      <a class="btn btn--primary" href={url('tour/#photo')}>See Photo in the tour</a>
+      <a class="btn btn--ghost" href={url('docs/apps/photo/')}>Read the Photo guide</a>
+    </div>
+  </div>
+
+  <div class="studio__art" aria-hidden="true" data-reveal data-reveal-delay="100">
+    <span class="studio__layer studio__layer--bg"></span>
+    <span class="studio__layer studio__layer--mid"><i class="studio__sun"></i></span>
+    <span class="studio__layer studio__layer--top">
+      <svg viewBox="0 0 120 80" class="studio__stroke">
+        <path d="M12 52 C30 20 50 66 70 38 S100 30 110 50" pathLength="1" />
+      </svg>
+    </span>
+  </div>
+</section>
+
+<style>
+  .studio {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+    align-items: center;
+    margin: clamp(1rem, 4vw, 2rem) 0;
+    padding: clamp(1.5rem, 5vw, 3rem);
+    overflow: hidden;
+    box-shadow:
+      var(--shadow-md),
+      0 0 80px -30px var(--app-photo);
+  }
+  @media (min-width: 800px) {
+    .studio {
+      grid-template-columns: 1.4fr 1fr;
+    }
+  }
+  .studio__title {
+    margin-bottom: 0.4em;
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+  }
+  .studio__lead {
+    max-width: 36rem;
+    margin: 0 0 1.5rem;
+    color: var(--ink-muted);
+    line-height: 1.6;
+  }
+  .studio__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  /* Three stacked layers with a brush stroke on the top one. Decorative, so the app colour is never text. */
+  .studio__art {
+    position: relative;
+    width: min(85%, 300px);
+    aspect-ratio: 4 / 3;
+    margin: 0 auto;
+  }
+  .studio__layer {
+    position: absolute;
+    inset: 12% 8%;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+  }
+  .studio__layer--bg {
+    background: linear-gradient(#7dd3fc, #e0f2fe 58%, #4ade80 58%, #16a34a);
+    transform: translate(-10%, 10%) rotate(-6deg);
+  }
+  .studio__layer--mid {
+    background: color-mix(in srgb, var(--surface) 40%, transparent);
+    transform: rotate(-1deg);
+  }
+  .studio__sun {
+    position: absolute;
+    top: 14%;
+    right: 14%;
+    width: 22%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #fbbf24;
+  }
+  .studio__layer--top {
+    background: color-mix(in srgb, var(--app-photo) 8%, transparent);
+    border-color: var(--app-photo);
+    transform: translate(10%, -10%) rotate(4deg);
+  }
+  .studio__stroke {
+    width: 100%;
+    height: 100%;
+  }
+  .studio__stroke path {
+    fill: none;
+    stroke: var(--app-photo);
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+
+  /* Motion: the stroke paints itself and the top layer drifts. Off with the motion toggle or reduced motion. */
+  :global(html:not([data-motion='off'])) .studio__stroke path {
+    animation: studio-paint calc(6s * var(--motion-speed)) ease-in-out infinite both;
+  }
+  :global(html:not([data-motion='off'])) .studio__layer--top {
+    animation: studio-drift calc(6s * var(--motion-speed)) ease-in-out infinite;
+  }
+  /* Without script there is no data-motion; base.css would pause the stroke on its blank first frame, so drop it. */
+  @media (prefers-reduced-motion: reduce) {
+    :global(html:not([data-motion])) .studio__stroke path,
+    :global(html:not([data-motion])) .studio__layer--top {
+      animation: none;
+    }
+  }
+  @keyframes studio-paint {
+    0%,
+    10% {
+      stroke-dashoffset: 1;
+    }
+    50%,
+    90% {
+      stroke-dashoffset: 0;
+    }
+    100% {
+      stroke-dashoffset: 1;
+    }
+  }
+  @keyframes studio-drift {
+    50% {
+      transform: translate(12%, -13%) rotate(5deg);
+    }
+  }
+</style>

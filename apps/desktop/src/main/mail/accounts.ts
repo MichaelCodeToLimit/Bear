@@ -53,10 +53,20 @@ export class AccountStore {
     return (await this.load()).accounts.find((a) => a.id === id)
   }
 
+  /**
+   * The account's saved password or tokens, or null when there are none or they can't be read here.
+   * Another Bear edition may have encrypted them under a different keychain entry (macOS, Linux), so a
+   * decrypt failure counts as "no saved password" and the user is asked to sign in again.
+   */
   async secret(id: string): Promise<Secret | null> {
     const enc = (await this.load()).secrets[id]
     if (!enc) return null
-    return JSON.parse(this.box.decrypt(enc)) as Secret
+    try {
+      return JSON.parse(this.box.decrypt(enc)) as Secret
+    } catch (e) {
+      console.warn('Mail: could not read the saved credentials of an account; asking to sign in again', e)
+      return null
+    }
   }
 
   async setSecret(id: string, secret: Secret) {

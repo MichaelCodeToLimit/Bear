@@ -1,0 +1,8 @@
+{
+  "appId": "org.bearsuite.android",
+  "appName": "Bear",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#f5f4f1"
+  }
+}

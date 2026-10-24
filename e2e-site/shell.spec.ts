@@ -156,12 +156,25 @@ test('the starfield keeps its stars when only the height changes', async ({ page
   await expect(canvas).toHaveAttribute('data-stars', /.+/)
   const before = await canvas.getAttribute('data-stars')
   await page.setViewportSize({ width: 390, height: 700 })
-  await page.waitForTimeout(500)
+  // The resize is debounced; wait until the canvas bitmap has actually been resized instead of sleeping a fixed time.
+  const dpr = await page.evaluate(() => Math.min(window.devicePixelRatio || 1, 2))
+  await expect.poll(() => canvas.evaluate((c) => (c as HTMLCanvasElement).height)).toBe(Math.round(700 * dpr))
   const after = await canvas.getAttribute('data-stars')
-  // Stars that were already inside the shorter viewport keep their place.
-  const inside = (s: string): string[] => s.split(';').filter((p) => Number(p.split(',')[1]) <= 700)
-  expect(inside(before!).length).toBeGreaterThan(0)
-  expect(inside(after!)).toEqual(inside(before!))
+  // Compare star by star (the fingerprint lists the first six stars in a fixed order):
+  // a star that was already inside the shorter viewport keeps its place, and one that was below the new bottom edge
+  // is moved up into view. Filtering by y first would be flaky, because those moved stars would then join the "kept" set.
+  const stars = (s: string): { x: number; y: number }[] =>
+    s.split(';').map((p) => {
+      const [x, y] = p.split(',').map(Number)
+      return { x, y }
+    })
+  const b = stars(before!)
+  const a = stars(after!)
+  expect(a).toHaveLength(b.length)
+  b.forEach((star, i) => {
+    if (star.y <= 700) expect(a[i]).toEqual(star)
+    else expect(a[i].y).toBeLessThanOrEqual(700)
+  })
   // A width change does rebuild.
   await page.setViewportSize({ width: 500, height: 700 })
   await expect.poll(() => canvas.getAttribute('data-stars')).not.toBe(after)
@@ -192,6 +205,6 @@ test('calm docs pages render no starfield', async ({ page }) => {
 test('footer carries the independence note', async ({ page }) => {
   await page.goto('./')
   await expect(page.locator('footer')).toContainText(
-    'Bear is an independent project. It is not affiliated with or endorsed by Microsoft.'
+    'Bear is an independent project. It is not affiliated with or endorsed by Microsoft or Adobe.'
   )
 })

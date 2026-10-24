@@ -1,4 +1,5 @@
-import { APPS, type AppId } from './apps'
+import type { AppId } from './apps'
+import { enabledApps } from './editions'
 
 export function baseName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path
@@ -18,7 +19,7 @@ export function stripExtension(name: string): string {
 /** Which ready app opens a given file path, or null if none can. */
 export function appForFile(path: string): AppId | null {
   const ext = extensionOf(path)
-  const app = APPS.find((a) => a.ready && a.extensions.includes(ext))
+  const app = enabledApps().find((a) => a.ready && a.extensions.includes(ext))
   return app ? app.id : null
 }
 

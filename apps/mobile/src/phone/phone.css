@@ -1,0 +1,178 @@
+/* Phone layout on top of the shared Bear theme (colours, Tailwind, document typography). */
+
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body {
+  font-family: Roboto, 'Google Sans', system-ui, sans-serif;
+  font-size: 15px;
+}
+
+/* Edge-to-edge Android draws behind the status and navigation bars. */
+.phone-bar {
+  min-height: calc(56px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.phone-hero {
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+}
+
+.phone-nav,
+.phone-formatbar,
+.phone-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.phone-fab-zone {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.phone-sheet {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.phone-toast {
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+}
+
+.phone-page {
+  position: relative;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes phone-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes phone-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.phone-slide-up {
+  animation: phone-slide-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.phone-fade-in {
+  animation: phone-fade-in 0.2s ease-out;
+}
+
+/* ---------- Documents on a phone: reflowed to the screen, no page edges ---------- */
+
+.phone-doc {
+  font-size: 12pt;
+  line-height: 1.45;
+  /* Taps below the text land on DocSurface, which puts the cursor at the end. */
+  min-height: 0;
+  caret-color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.dark .phone-doc {
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+.phone-doc img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+.phone-doc table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.phone-doc .tableWrapper {
+  overflow-x: auto;
+}
+.phone-doc p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted);
+}
+.phone-doc ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+.phone-doc ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.6em;
+  align-items: flex-start;
+}
+.phone-doc ul[data-type='taskList'] li > label input {
+  width: 1.15em;
+  height: 1.15em;
+  margin-top: 0.25em;
+  accent-color: var(--accent);
+}
+.phone-doc ul[data-type='taskList'] li[data-checked='true'] > div {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* Read-only rich text (site pages, news) */
+.phone-prose {
+  font-size: 15.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.phone-prose h1,
+.phone-prose h2 {
+  font-size: 1.35em;
+  font-weight: 650;
+  margin: 0.6em 0 0.35em;
+}
+.phone-prose h3 {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+}
+.phone-prose p {
+  margin: 0 0 0.7em;
+}
+.phone-prose ul {
+  list-style: disc;
+  padding-left: 1.3em;
+}
+.phone-prose ol {
+  list-style: decimal;
+  padding-left: 1.3em;
+}
+.phone-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+.phone-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ---------- Sheets ---------- */
+
+.phone-grid {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Board: Excalidraw fills the screen under Bear's bar ---------- */
+
+.phone-board .excalidraw {
+  --ui-font: Roboto, system-ui, sans-serif;
+}

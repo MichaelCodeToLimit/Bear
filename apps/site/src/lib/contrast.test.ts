@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { APPS } from '@bear/core'
+import { SITE_APPS as APPS } from './officeApps'
 import { contrastRatio, LIGHT, DARK } from './themeMixer'
 
 // App colours render as text only on the light card surface; on dark they render in --ink.
 describe('app colours as text', () => {
-  it('has 12 apps to check', () => {
-    expect(APPS).toHaveLength(12)
+  it('has 13 apps to check, Photo among them', () => {
+    expect(APPS).toHaveLength(13)
+    expect(APPS.map((a) => a.id)).toContain('photo')
   })
   it.each(APPS.map((a) => [a.id, a.color]))('%s (%s) meets 4.5:1 as text on the light card surface', (_id, color) => {
     expect(contrastRatio(color, LIGHT.surface)).toBeGreaterThanOrEqual(4.5)
@@ -62,17 +63,32 @@ describe('tokens.css matches the palettes tested above', () => {
   })
 })
 
-describe('Windows download button sub-line', () => {
-  const src = readFileSync(new URL('../components/WindowsDownload.astro', import.meta.url), 'utf8')
-  const rule = /\.windl__sub\s*\{([^}]*)\}/.exec(src)?.[1] ?? ''
-  it('inherits the primary button ink (no own colour or opacity)', () => {
-    expect(rule).not.toBe('')
-    expect(rule).not.toMatch(/color|opacity/)
+describe('primary button', () => {
+  it.each([
+    ['light', LIGHT],
+    ['dark', DARK]
+  ])('its text is readable on its background in the %s theme', (_n, t) => {
+    expect(contrastRatio(t.btnInk, t.btnBg)).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+describe('Download cards (PlatformCards.astro)', () => {
+  const css = readFileSync(new URL('../components/PlatformCards.astro', import.meta.url), 'utf8').toLowerCase()
+  it('the "Your device" badge (white on blue) meets 4.5:1', () => {
+    expect(css).toContain('background: #1d4ed8')
+    expect(contrastRatio('#ffffff', '#1d4ed8')).toBeGreaterThanOrEqual(4.5)
+  })
+  it('the SHA-256 and install-command boxes stay dark in both themes: main and muted text meet 4.5:1', () => {
+    expect(css).toContain('background: #0f0a07')
+    expect(css).toContain('color: #f6ead9')
+    expect(css).toContain('color: #b8a48e')
+    expect(contrastRatio('#f6ead9', '#0f0a07')).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio('#b8a48e', '#0f0a07')).toBeGreaterThanOrEqual(4.5)
   })
   it.each([
     ['light', LIGHT],
     ['dark', DARK]
-  ])('is readable on the primary button in the %s theme', (_n, t) => {
-    expect(contrastRatio(t.btnInk, t.btnBg)).toBeGreaterThanOrEqual(4.5)
+  ])('footnotes, hints and the pill text (muted/ink on the page and card surfaces) are readable in the %s theme', (_n, t) => {
+    for (const fg of [t.ink, t.muted]) for (const bg of [t.bg, t.bgTo, t.surface]) expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(4.5)
   })
 })

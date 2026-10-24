@@ -1,7 +1,7 @@
 {
   "name": "bear-suite",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Bear: a free, open-source desktop productivity suite.",
   "license": "MIT",
   "packageManager": "pnpm@12.6.0",
@@ -17,6 +17,9 @@
     "site:build": "pnpm --filter @bear/site build",
     "site:preview": "pnpm --filter @bear/site preview",
     "site:test": "playwright test -c playwright.site.config.ts",
+    "web:dev": "pnpm --filter @bear/web dev",
+    "web:build": "pnpm --filter @bear/web build",
+    "web:preview": "pnpm --filter @bear/web preview",
     "mail-server": "node tools/mail-server.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

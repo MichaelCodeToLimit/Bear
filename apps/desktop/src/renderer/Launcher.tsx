@@ -1,15 +1,29 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { FolderOpen, Home, Monitor, Moon, Plus, Sun } from 'lucide-react'
-import { APPS, getApp, type AppInfo, type OpenedFile, type RecentFile } from '@bear/core'
+import { EDITIONS, enabledApps, getApp, getEdition, type AppId, type AppInfo, type Suite, type OpenedFile, type RecentFile } from '@bear/core'
 import { AppMark, RecentList, useTheme } from '@bear/ui'
-import { TemplateGrid } from '@bear/app-write'
-import { SheetTemplateGrid } from '@bear/app-sheets'
-import { DeckTemplateGrid } from '@bear/app-slides'
 import type { OpenApp } from './App'
+
+// The template pickers come from the apps' own packages; loading them lazily keeps those apps out of
+// the start-up bundle, so the home screen appears before Write, Sheets and Slides have loaded.
+const TemplateGrid = lazy(() => import('@bear/app-write').then((m) => ({ default: m.TemplateGrid })))
+const SheetTemplateGrid = lazy(() => import('@bear/app-sheets').then((m) => ({ default: m.SheetTemplateGrid })))
+const DeckTemplateGrid = lazy(() => import('@bear/app-slides').then((m) => ({ default: m.DeckTemplateGrid })))
+
+/** Holds the templates' space while they load, so the page doesn't jump. */
+function Templates({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="h-36" />}>{children}</Suspense>
+}
 import logoUrl from '../../build/icon-128.png'
 
-const OPEN_ALL = [
-  { name: 'Supported files', extensions: APPS.filter((a) => a.ready).flatMap((a) => a.extensions) },
+const SUITES: { id: Suite; heading: string }[] = [
+  { id: 'office', heading: 'Apps' },
+  { id: 'studio', heading: 'Bear Studio' }
+]
+
+// Built when the dialog opens, not at import time: the edition is set after the modules load.
+const openFilters = () => [
+  { name: 'Supported files', extensions: enabledApps().filter((a) => a.ready).flatMap((a) => a.extensions) },
   { name: 'All files', extensions: ['*'] }
 ]
 
@@ -17,6 +31,8 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
   const [recent, setRecent] = useState<RecentFile[]>([])
   const [error, setError] = useState<string | null>(null)
   const [theme, setTheme] = useTheme()
+  const apps = enabledApps()
+  const has = (id: AppId) => apps.some((a) => a.id === id)
 
   useEffect(() => {
     window.bear.getRecent().then(setRecent)
@@ -29,7 +45,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
       if (e.key.toLowerCase() === 'o') {
         e.preventDefault()
         void browse()
-      } else if (e.key.toLowerCase() === 'n') {
+      } else if (e.key.toLowerCase() === 'n' && has('write')) {
         e.preventDefault()
         open({ app: 'write', input: { kind: 'template' }, key: Date.now() })
       }
@@ -39,11 +55,11 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
   })
 
   function openFile(file: OpenedFile) {
-    if (!route(file)) setError(`${file.name} can't be opened in Bear yet. Bear opens documents, spreadsheets and presentations.`)
+    if (!route(file)) setError(`${file.name} can't be opened in ${EDITIONS[getEdition()].productName} yet.`)
   }
 
   async function browse() {
-    const file = await window.bear.openFile(OPEN_ALL)
+    const file = await window.bear.openFile(openFilters())
     if (file) openFile(file)
   }
 
@@ -61,6 +77,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
     if (app.id === 'write') open({ app: 'write', input: { kind: 'template' }, key })
     if (app.id === 'sheets') open({ app: 'sheets', input: { kind: 'template' }, key })
     if (app.id === 'slides') open({ app: 'slides', input: { kind: 'template' }, key })
+    if (app.id === 'photo') open({ app: 'photo', input: { kind: 'new' }, key })
     if (app.id === 'notes' || app.id === 'tasks' || app.id === 'board' || app.id === 'sites' || app.id === 'mail') open({ app: app.id, key })
   }
 
@@ -69,7 +86,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
       <aside className="flex w-[72px] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-4">
         <Logo />
         <NavButton icon={<Home size={20} />} label="Home" active />
-        <NavButton icon={<Plus size={20} />} label="New" onClick={() => open({ app: 'write', input: { kind: 'template' }, key: Date.now() })} />
+        {has('write') && <NavButton icon={<Plus size={20} />} label="New" onClick={() => open({ app: 'write', input: { kind: 'template' }, key: Date.now() })} />}
         <NavButton icon={<FolderOpen size={20} />} label="Open" onClick={() => void browse()} />
         <div className="flex-1" />
         <NavButton
@@ -93,40 +110,48 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
             </div>
           )}
 
-          <section className="mb-10">
-            <h2 className="mb-3 text-sm font-semibold text-muted">Apps</h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-              {APPS.map((app) => (
-                <button
-                  key={app.id}
-                  onClick={() => launch(app)}
-                  disabled={!app.ready}
-                  className="group flex items-center gap-3 rounded-lg border border-line bg-surface p-3 text-left transition enabled:hover:-translate-y-0.5 enabled:hover:shadow-md disabled:cursor-default"
-                >
-                  <span className={app.ready ? '' : 'opacity-50 grayscale-[40%]'}><AppMark app={app} size={36} /></span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{app.name}</span>
-                    <span className="block truncate text-xs text-muted">{app.ready ? app.tagline : 'Coming soon'}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
+          {SUITES.filter((suite) => apps.some((a) => a.suite === suite.id)).map((suite) => (
+            <section key={suite.id} data-testid={`suite-${suite.id}`} className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold text-muted">{suite.heading}</h2>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+                {apps.filter((a) => a.suite === suite.id).map((app) => (
+                  <button
+                    key={app.id}
+                    onClick={() => launch(app)}
+                    disabled={!app.ready}
+                    className="group flex items-center gap-3 rounded-lg border border-line bg-surface p-3 text-left transition enabled:hover:-translate-y-0.5 enabled:hover:shadow-md disabled:cursor-default"
+                  >
+                    <span className={app.ready ? '' : 'opacity-50 grayscale-[40%]'}><AppMark app={app} size={36} /></span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{app.name}</span>
+                      <span className="block truncate text-xs text-muted">{app.ready ? app.tagline : 'Coming soon'}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
 
-          <section className="mb-10" style={{ ['--accent' as string]: getApp('write').color }}>
-            <h2 className="mb-3 text-sm font-semibold text-muted">New document</h2>
-            <TemplateGrid onPick={(template) => open({ app: 'write', input: { kind: 'template', template }, key: Date.now() })} />
-          </section>
+          {has('write') && (
+            <section className="mb-10" style={{ ['--accent' as string]: getApp('write').color }}>
+              <h2 className="mb-3 text-sm font-semibold text-muted">New document</h2>
+              <Templates><TemplateGrid onPick={(template) => open({ app: 'write', input: { kind: 'template', template }, key: Date.now() })} /></Templates>
+            </section>
+          )}
 
-          <section className="mb-10" style={{ ['--accent' as string]: getApp('sheets').color }}>
-            <h2 className="mb-3 text-sm font-semibold text-muted">New spreadsheet</h2>
-            <SheetTemplateGrid onPick={(template) => open({ app: 'sheets', input: { kind: 'template', template }, key: Date.now() })} />
-          </section>
+          {has('sheets') && (
+            <section className="mb-10" style={{ ['--accent' as string]: getApp('sheets').color }}>
+              <h2 className="mb-3 text-sm font-semibold text-muted">New spreadsheet</h2>
+              <Templates><SheetTemplateGrid onPick={(template) => open({ app: 'sheets', input: { kind: 'template', template }, key: Date.now() })} /></Templates>
+            </section>
+          )}
 
-          <section className="mb-10" style={{ ['--accent' as string]: getApp('slides').color }}>
-            <h2 className="mb-3 text-sm font-semibold text-muted">New presentation</h2>
-            <DeckTemplateGrid onPick={(template) => open({ app: 'slides', input: { kind: 'template', template }, key: Date.now() })} />
-          </section>
+          {has('slides') && (
+            <section className="mb-10" style={{ ['--accent' as string]: getApp('slides').color }}>
+              <h2 className="mb-3 text-sm font-semibold text-muted">New presentation</h2>
+              <Templates><DeckTemplateGrid onPick={(template) => open({ app: 'slides', input: { kind: 'template', template }, key: Date.now() })} /></Templates>
+            </section>
+          )}
 
           <section>
             <div className="mb-3 flex items-center justify-between">
@@ -135,7 +160,8 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
                 <FolderOpen size={15} /> Open other files
               </button>
             </div>
-            <RecentList items={recent} onOpen={(r) => void openRecent(r)} empty="No recent files yet." />
+            {/* The recent list is shared by every edition; show only files this edition can open. */}
+            <RecentList items={recent.filter((r) => has(r.app))} onOpen={(r) => void openRecent(r)} empty="No recent files yet." />
           </section>
         </div>
       </main>

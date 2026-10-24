@@ -1,8 +1,8 @@
 # Bear
 
-A free, open-source desktop productivity suite. Documents, spreadsheets, slides, notes, mail, chat and dashboards, all in one app, with no subscription.
+A free, open-source desktop productivity suite. Documents, spreadsheets, slides, notes, mail, chat and dashboards, all in one app, with no subscription. Bear Studio adds creative apps, starting with Photo.
 
-> Bear is an independent project. It is not affiliated with or endorsed by Microsoft. It reads and writes common Office file formats (.docx, .xlsx and .pptx) for compatibility.
+> Bear is an independent project. It is not affiliated with or endorsed by Microsoft or Adobe. It reads and writes common Office file formats (.docx, .xlsx and .pptx) and layered .psd images for compatibility.
 
 ## Status
 
@@ -20,6 +20,20 @@ A free, open-source desktop productivity suite. Documents, spreadsheets, slides,
 | **Tasks** | To-dos & plans | ✅ MVP |
 | **Board** | Whiteboard | ✅ MVP |
 | Forms | Surveys & quizzes | Planned |
+
+### Bear Studio
+
+Creative apps, free forever.
+
+| App | What it does | Status |
+|---|---|---|
+| **Photo** | Photo editing | ✅ MVP |
+| Vector | Vector graphics | Planned |
+| PDF | PDF documents | Planned |
+| Video | Video editing | Planned |
+| Motion | Motion graphics | Planned |
+| Audio | Audio editing | Planned |
+| Layout | Page layout | Planned |
 
 ### Write features
 
@@ -77,6 +91,27 @@ These keep their data in Bear's data folder and save automatically (atomic write
 - **Board**: a gallery of whiteboards built on [Excalidraw](https://github.com/excalidraw/excalidraw) (MIT) — pens, shapes, arrows, text, sticky-note style shapes, PNG/SVG export; fonts ship inside the app
 - **Sites**: team sites with a home page (welcome text, news, quick links, recent documents, a linked Tasks list), pages and news posts, a document library connected to any folder (Bear files open in Bear), and settings
 
+### Photo features
+
+- Layers with blend modes and opacity
+- Selections: marquee, lasso and magic wand
+- Brush, eraser, fill, gradient, shape and text tools
+- Adjustments: brightness/contrast, levels, curves, hue/saturation, invert, black & white
+- Filters: blurs, sharpen, unsharp mask, noise, pixelate
+- Crop, rotate, flip, resize and trim
+- Open **.psd**, PNG, JPG, WebP, GIF, BMP and AVIF. Save as **.bearphoto** (keeps every layer) or **.psd**. Export PNG, JPG or WebP
+- Crash recovery: a recovery copy is kept as you work and offered back after a crash
+
+## Downloads
+
+Every release comes in three editions. Pick one on the [Download page](https://michaelcodetolimit.github.io/Bear/download/):
+
+- **Bear**: everything, the office apps and Bear Studio in one install (`Bear-…`, `bear_…` files)
+- **Bear Office**: only the office apps (`Bear-Office-…`, `bear-office_…`)
+- **Bear Studio**: only the creative apps (`Bear-Studio-…`, `bear-studio_…`)
+
+The editions are separate apps: you can install any of them side by side and run them at the same time. They share Bear's data folder, so notebooks, tasks, boards, sites, mail and the recent files list are the same in each (each app lists only the recent files it can open). On macOS and Linux a mail password saved by one edition may have to be entered again in another, because each app has its own keychain entry. `.github/workflows/release.yml` lists every file name.
+
 ## Development
 
 Requires Node 20+ and pnpm.
@@ -100,13 +135,31 @@ Each command builds the installers for one OS into `apps/desktop/release/`. Run 
 | `pnpm build:linux:main` | `Bear-<version>-x64.AppImage`, `bear_<version>_amd64.deb`, `Bear-<version>-x64.rpm` and `Bear-<version>-x64.tar.gz` (the rpm needs `rpmbuild`) |
 | `pnpm build:linux:flatpak` | `Bear-<version>-x64.flatpak` (needs `flatpak-builder` plus the 24.08 Freedesktop runtime, SDK and Electron BaseApp from Flathub) |
 
-The installers register Bear for .docx, .xlsx and .pptx files. Opening one of those files starts Bear on it, and if Bear is already running the file opens in a new Bear window. The MSI's `upgradeCode` in `apps/desktop/electron-builder.yml` must never change, because Windows uses it to upgrade older installs in place. To release a new version, bump `version` in `apps/desktop/package.json`.
+### Building an edition
+
+Set `BEAR_EDITION` to `all` (the default when it's unset), `office` or `studio`; any other value stops the build. For example, on Windows (Git Bash or any POSIX shell):
+
+```bash
+BEAR_EDITION=studio pnpm build:win    # Bear-Studio-Setup-<version>.exe and Bear-Studio-<version>.msi
+BEAR_EDITION=office pnpm build:dir    # an unpacked Bear Office in apps/desktop/release/win-unpacked
+```
+
+In PowerShell, set it first: `$env:BEAR_EDITION = 'studio'; pnpm build:win`. The end-to-end tests run against whatever `pnpm build` produced last; the test that checks a Studio build only runs when `BEAR_EDITION_BUILD` is set:
+
+```bash
+BEAR_EDITION=studio pnpm build && BEAR_EDITION_BUILD=studio npx playwright test e2e/editions.spec.ts
+pnpm build    # back to the full suite before running the rest of the suite
+```
+
+The installers register Bear for .docx, .xlsx and .pptx files (Bear Office: those; Bear Studio: .bearphoto and .psd; Bear: all five). Opening one of those files starts Bear on it, and if Bear is already running the file opens in a new Bear window. The MSI's `upgradeCode` in `apps/desktop/electron-builder.config.cjs` must never change, because Windows uses it to upgrade older installs in place. To release a new version, bump `version` in `apps/desktop/package.json`.
 
 Unsigned builds work, but Windows SmartScreen and macOS Gatekeeper warn on first launch. To sign them, set `CSC_LINK`/`CSC_KEY_PASSWORD` (plus the `APPLE_*` notarization variables on macOS) as repository secrets for the workflow.
 
 ## Website
 
 The Bear website lives in `apps/site` (Astro and React) and is published at <https://michaelcodetolimit.github.io/Bear/>. It has a home page, an app tour, the docs, a playground and a download page.
+
+**Android.** The Download page lists the `.apk` attached to the latest GitHub release. If the release has none, it serves the newest `*.apk` in `apps/site/public/downloads/` (the site computes its size and SHA-256 at build time). To publish a new Android build, copy the new `Bear-<version>-debug.apk` into that folder, delete the old one and push. (The Android app project is not in this repository yet.) Each committed APK stays in git history, so keep only the latest.
 
 | Command | Does |
 |---|---|
@@ -115,7 +168,7 @@ The Bear website lives in `apps/site` (Astro and React) and is published at <htt
 | `pnpm site:preview` | Serve the built site locally |
 | `pnpm site:test` | Browser tests (Playwright); run `pnpm site:build` first |
 
-`.github/workflows/site.yml` tests and deploys the site to GitHub Pages when `main` changes the site, when a release is published, or when you run it by hand. The repo's Pages source must be set to "GitHub Actions". In Settings > Environments > github-pages, the deployment branches must include `main` (the default). The release event also builds from `main` rather than the release tag, so no tag rule is needed.
+`.github/workflows/site.yml` tests and deploys the site to GitHub Pages when `main` changes the site, when a release is published, or when you run it by hand. The repo's Pages source must be set to "GitHub Actions". In Settings > Environments > github-pages, the deployment branches must include `main` (the default). A published release does not deploy by itself (a release run's ref is the tag, which that environment rejects); it re-runs the workflow on `main`, which builds with the new release and deploys, so no tag rule is needed.
 
 To publish installers:
 
@@ -137,6 +190,7 @@ packages/app-notes/   Notebooks (uses Write's PageEditor)
 packages/app-tasks/   To-dos and boards
 packages/app-board/   Whiteboards (Excalidraw)
 packages/app-sites/   Team sites
+packages/app-photo/   Photo editor (Bear Studio)
 e2e/                  Playwright end-to-end tests
 ```
 

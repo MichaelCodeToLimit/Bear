@@ -7,17 +7,17 @@ import { BearMail } from './bear-mail'
 import { MailImporter } from './import'
 import { ENDPOINTS, interactiveSignIn } from './oauth'
 
-/** Wire every MailBridge method to an IPC handler named mail:<method>. */
-export function registerMailIpc(): MailService {
+/** Wire every MailBridge method to an IPC handler named mail:<method>. Mail lives in <dataDir>/mail. */
+export function registerMailIpc(dataDir: string): MailService {
   const box = {
     available: () => safeStorage.isEncryptionAvailable(),
     encrypt: (s: string) => safeStorage.encryptString(s).toString('base64'),
     decrypt: (s: string) => safeStorage.decryptString(Buffer.from(s, 'base64'))
   }
-  const store = new AccountStore(join(app.getPath('userData'), 'mail'), box)
-  const bear = new BearMail(join(app.getPath('userData'), 'mail', 'bear'))
+  const store = new AccountStore(join(dataDir, 'mail'), box)
+  const bear = new BearMail(join(dataDir, 'mail', 'bear'))
   const mail = new MailService(store, bear)
-  const importer = new MailImporter(mail, bear, join(app.getPath('userData'), 'mail', 'imports.json'))
+  const importer = new MailImporter(mail, bear, join(dataDir, 'mail', 'imports.json'))
   void importer.startSyncing()
 
   const handlers: { [K in keyof MailBridge]: (...args: Parameters<MailBridge[K]>) => ReturnType<MailBridge[K]> } = {
