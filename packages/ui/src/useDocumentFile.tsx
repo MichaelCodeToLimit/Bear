@@ -101,7 +101,7 @@ export function useDocumentFile(opts: DocumentFileOptions) {
       if (!isAbort(e)) setError(`Could not save: ${(e as Error).message}`)
       return false
     }
-  }), [app.id, edits, setDirty])
+  }, path), [app.id, edits, setDirty])
 
   const saveAs = useCallback(async () => {
     const suggested = withExtension(stripExtension(doc.path ?? doc.name), defaultExt)

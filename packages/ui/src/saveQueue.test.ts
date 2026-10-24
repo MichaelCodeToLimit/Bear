@@ -135,6 +135,23 @@ describe('SaveQueue', () => {
     expect(h.queue.busy).toBe(false)
   })
 
+  it('a pending Save As to another file is not swallowed by a later save of the open file', async () => {
+    const queue = new SaveQueue()
+    const written: string[] = []
+    const gate = deferred()
+    const write = (file: string, wait?: Promise<void>) => async () => { if (wait) await wait; written.push(file); return true }
+    const auto = queue.request(true, write('a.bearphoto', gate.promise), 'a.bearphoto')
+    const saveAs = queue.request(false, write('b.bearphoto'), 'b.bearphoto')
+    const ctrlS = queue.request(false, write('a.bearphoto'), 'a.bearphoto')
+    gate.resolve()
+    expect(await auto).toBe(true)
+    expect(await saveAs).toBe(true)
+    expect(await ctrlS).toBe(true)
+    // Both files are written, in the order asked.
+    expect(written).toEqual(['a.bearphoto', 'b.bearphoto', 'a.bearphoto'])
+    expect(queue.busy).toBe(false)
+  })
+
   it('a run that throws rejects its callers and the queue keeps going', async () => {
     const queue = new SaveQueue()
     const order: string[] = []
