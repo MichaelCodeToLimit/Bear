@@ -1,9 +1,9 @@
 import type { Edition } from '@bear/core'
 import { SITE } from '../site.config'
 
-export type OS = 'windows' | 'mac' | 'linux'
+export type OS = 'windows' | 'mac' | 'linux' | 'android'
 
-export type FileKind = 'exe' | 'msi' | 'dmg' | 'zip' | 'deb' | 'appimage' | 'flatpak' | 'rpm' | 'targz'
+export type FileKind = 'exe' | 'msi' | 'dmg' | 'zip' | 'deb' | 'appimage' | 'flatpak' | 'rpm' | 'targz' | 'apk'
 export type Arch = 'arm64' | 'x64'
 
 export interface DownloadFile {
@@ -59,6 +59,7 @@ function classifyKind(n: string): Omit<Classified, 'edition'> | null {
   if (n.endsWith('.deb')) return { os: 'linux', kind: 'deb', arch: null, label: '.deb (Debian, Ubuntu)', recommended: false }
   if (n.endsWith('.flatpak')) return { os: 'linux', kind: 'flatpak', arch: null, label: 'Flatpak', recommended: false }
   if (n.endsWith('.rpm')) return { os: 'linux', kind: 'rpm', arch: null, label: '.rpm (Fedora, openSUSE)', recommended: false }
+  if (n.endsWith('.apk')) return { os: 'android', kind: 'apk', arch: null, label: 'APK (Android 7 or later)', recommended: true }
   if (n.endsWith('.tar.gz')) return { os: 'linux', kind: 'targz', arch: null, label: '.tar.gz (any distro)', recommended: false }
   return null
 }
@@ -119,8 +120,15 @@ export async function fetchLatestRelease(
   }
 }
 
+/**
+ * Guess the visitor's system from the user agent, for the "Your device" badge only (every download stays one click away).
+ * Limits: Android Chrome in "desktop site" mode and Chrome OS send a Linux user agent, so they match Linux; iPadOS 13+
+ * in desktop mode reports a Macintosh user agent and matches Mac. iPhone/iPad/iPod (old-style agents) get no badge.
+ * The Android check comes before Linux because Android user agents also contain "Linux".
+ */
 export function detectOS(userAgent: string): OS | null {
-  if (/android|iphone|ipad|ipod/i.test(userAgent)) return null
+  if (/iphone|ipad|ipod/i.test(userAgent)) return null
+  if (/android/i.test(userAgent)) return 'android'
   if (/windows/i.test(userAgent)) return 'windows'
   if (/macintosh|mac os x/i.test(userAgent)) return 'mac'
   if (/linux|x11/i.test(userAgent)) return 'linux'
@@ -128,7 +136,7 @@ export function detectOS(userAgent: string): OS | null {
 }
 
 export interface CardSlot {
-  id: 'exe' | 'msi' | 'arm64' | 'x64' | 'deb' | 'appimage' | 'flatpak'
+  id: 'exe' | 'msi' | 'arm64' | 'x64' | 'deb' | 'appimage' | 'flatpak' | 'apk'
   /** Visible button text. */
   label: string
   /** Short name used in the size line. */
@@ -152,15 +160,23 @@ export interface PlatformCard {
   meta: string | null
 }
 
+/** Editions that get an Android card. The phone app is one build that runs as Bear Office; Bear Studio has none. */
+export const ANDROID_EDITIONS: readonly Edition[] = ['all', 'office']
+
 /**
- * The three download cards in order: windows, mac, linux, for one edition. Pure; a null release, or a release without
- * that edition, gives empty, unavailable cards.
+ * The download cards for one edition, in order: windows, mac, linux, then android for the editions in
+ * ANDROID_EDITIONS (four cards for Everything and Office, three for Studio). Pure; a null release, or a release
+ * without that edition, gives empty, unavailable cards. The Android card always shows the release's .apk, which is
+ * classified as edition 'all': the phone app is the same for every edition that offers it.
  */
 export function platformCards(release: ReleaseInfo | null, edition: Edition = 'all'): PlatformCard[] {
-  const files = (release?.files ?? []).filter((f) => f.edition === edition)
+  const releaseFiles = release?.files ?? []
+  const desktopFiles = releaseFiles.filter((f) => f.os !== 'android' && f.edition === edition)
+  const androidFiles = releaseFiles.filter((f) => f.os === 'android' && f.edition === 'all')
+  const filesFor = (os: OS): DownloadFile[] => (os === 'android' ? androidFiles : desktopFiles)
   const pick = (os: OS, kind: FileKind, arch?: Arch): DownloadFile | null =>
-    files.find((f) => f.os === os && f.kind === kind && (arch === undefined || f.arch === arch)) ?? null
-  const all = (os: OS, kind: FileKind): DownloadFile[] => files.filter((f) => f.os === os && f.kind === kind)
+    filesFor(os).find((f) => f.os === os && f.kind === kind && (arch === undefined || f.arch === arch)) ?? null
+  const all = (os: OS, kind: FileKind): DownloadFile[] => filesFor(os).filter((f) => f.os === os && f.kind === kind)
   const build = (
     os: OS,
     title: string,
@@ -169,7 +185,7 @@ export function platformCards(release: ReleaseInfo | null, edition: Edition = 'a
     extras: DownloadFile[] = [],
     other: DownloadFile[] = []
   ): PlatformCard => {
-    const available = files.some((f) => f.os === os)
+    const available = filesFor(os).some((f) => f.os === os)
     let meta: string | null = null
     if (available && release) {
       const filled = slots.filter((s) => s.file)
@@ -178,7 +194,7 @@ export function platformCards(release: ReleaseInfo | null, edition: Edition = 'a
     }
     return { os, title, description, available, version: available && release ? release.version : null, slots, extras, other, meta }
   }
-  return [
+  const cards = [
     build('windows', 'Windows', 'Windows 10 and 11, 64-bit. The installer sets Bear up for your account in seconds, without admin rights.', [
       { id: 'exe', label: 'Download .exe', short: '.exe', file: pick('windows', 'exe') },
       { id: 'msi', label: '.msi for IT', short: '.msi', file: pick('windows', 'msi') }
@@ -206,4 +222,12 @@ export function platformCards(release: ReleaseInfo | null, edition: Edition = 'a
       [...all('linux', 'rpm'), ...all('linux', 'targz')]
     )
   ]
+  if (ANDROID_EDITIONS.includes(edition)) {
+    cards.push(
+      build('android', 'Android', 'Android 7.0 or later. Install the APK file straight onto your phone or tablet.', [
+        { id: 'apk', label: 'Download .apk', short: '.apk', file: pick('android', 'apk') }
+      ])
+    )
+  }
+  return cards
 }

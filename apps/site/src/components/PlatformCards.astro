@@ -10,7 +10,7 @@ interface Props {
 const { release } = Astro.props
 const pending = release === null
 const version = release?.version ?? null
-const osName: Record<string, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux' }
+const osName: Record<string, string> = { windows: 'Windows', mac: 'macOS', linux: 'Linux', android: 'Android' }
 const zipLabel = (f: DownloadFile) => (f.arch === 'arm64' ? 'Apple silicon .zip' : 'Intel .zip')
 
 // One panel per edition, all rendered here; the switcher script shows one. Without script only Everything shows.
@@ -46,9 +46,13 @@ const panels = EDITIONS.map((ed) => {
     { label: '.rpm (Fedora, openSUSE)', file: rpmFile ?? null },
     { label: '.tar.gz (any distro)', file: linux.other.find((f) => f.kind === 'targz') ?? null }
   ]
-  // A release exists but has no files for this edition: its cards show Coming soon and this line says why.
-  const absent = release !== null && cards.every((c) => !c.available)
-  return { ...ed, cards, hints, otherItems, absent }
+  // Everything and Office end with the Android card (the one .apk, the same for both); Studio has none.
+  const apkFile = cards.find((c) => c.os === 'android')?.slots[0].file ?? null
+  const adbCmd = `adb install ${apkFile?.name ?? `Bear-${v}-debug.apk`}`
+  // A release exists but has no desktop files for this edition: its cards show Coming soon and this line says why.
+  // The Android card is left out of the check, since its .apk is shared and may be there when the edition isn't.
+  const absent = release !== null && cards.every((c) => c.os === 'android' || !c.available)
+  return { ...ed, cards, hints, otherItems, adbCmd, absent }
 })
 ---
 
@@ -150,6 +154,17 @@ const panels = EDITIONS.map((ed) => {
                   </div>
                 )}
 
+                {card.os === 'android' && (
+                  <>
+                    <p class="pc-help">Open the .apk on your device (or run it from a computer):</p>
+                    <ul class="pc-cmds" aria-label="Install command">
+                      <li>
+                        <code>{ed.adbCmd}</code>
+                      </li>
+                    </ul>
+                  </>
+                )}
+
                 {card.os === 'linux' && (
                   <ul class="pc-cmds" aria-label="Install commands">
                     {ed.hints.map((h) => (
@@ -164,6 +179,8 @@ const panels = EDITIONS.map((ed) => {
                   {card.os === 'windows' && 'Not code-signed yet. If SmartScreen warns you, choose More info → Run anyway.'}
                   {card.os === 'mac' && 'Not notarized yet. The first time, open System Settings → Privacy & Security and choose Open Anyway.'}
                   {card.os === 'linux' && 'Run the command for the file you downloaded. AppImage needs no install.'}
+                  {card.os === 'android' &&
+                    'Test build signed with a debug key, so it isn’t on Google Play. Open the downloaded file and allow installs from this source when Android asks; Play Protect may ask to scan it.'}
                 </p>
               </article>
             )
@@ -261,7 +278,7 @@ const panels = EDITIONS.map((ed) => {
   }
   @media (min-width: 900px) {
     .pc-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
   .pc-card {

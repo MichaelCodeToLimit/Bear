@@ -1,0 +1,48 @@
+{
+  "name": "@bear/mobile",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Bear for Android: a phone-first suite built on the desktop apps' file formats and data",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "sync": "vite build && cap sync android",
+    "build:apk": "vite build && cap sync android && node scripts/gradle.mjs assembleDebug",
+    "build:apk:release": "vite build && cap sync android && node scripts/gradle.mjs assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.5"
+  },
+  "devDependencies": {
+    "@bear/app-board": "workspace:*",
+    "@bear/app-mail": "workspace:*",
+    "@bear/app-notes": "workspace:*",
+    "@bear/app-photo": "workspace:*",
+    "@bear/app-sheets": "workspace:*",
+    "@bear/app-sites": "workspace:*",
+    "@bear/app-slides": "workspace:*",
+    "@bear/app-tasks": "workspace:*",
+    "@bear/app-write": "workspace:*",
+    "@bear/core": "workspace:*",
+    "@bear/ui": "workspace:*",
+    "@capacitor/cli": "^8.5.3",
+    "@excalidraw/excalidraw": "^0.18.1",
+    "@tailwindcss/vite": "^4.0.0",
+    "@tiptap/core": "2.27.3",
+    "@tiptap/extension-task-item": "2.27.3",
+    "@tiptap/extension-task-list": "2.27.3",
+    "@tiptap/pm": "2.27.3",
+    "@tiptap/react": "2.27.3",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^4.0.0",
+    "vite": "^6.0.0"
+  }
+}

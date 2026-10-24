@@ -65,6 +65,10 @@ export interface BearBridge {
   listFolder(path: string): Promise<FolderEntry[]>
   /** Open a file with the system's default app. */
   openExternal(path: string): Promise<void>
+  /** How many screens are connected (presenter view uses the second one for the audience). */
+  screenCount(): Promise<number>
+  /** PNG of a part of this window, in CSS pixels (captured at the screen's full density). */
+  capture(rect: { x: number; y: number; width: number; height: number }): Promise<Uint8Array>
   /** Called when the window is about to close. Return false to cancel the close. */
   onCloseRequest(handler: () => boolean): () => void
   /** Tell the main process the user chose to close anyway. */

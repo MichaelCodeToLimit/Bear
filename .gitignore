@@ -8,6 +8,7 @@ e2e/shots/
 test-results/
 playwright-report/
 apps/desktop/src/renderer/public/excalidraw/
+apps/web/public/excalidraw/
 .superpowers/
 .claude/worktrees/
 .astro/

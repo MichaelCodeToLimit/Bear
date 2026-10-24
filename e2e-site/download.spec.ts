@@ -1,17 +1,19 @@
+import { createHash } from 'node:crypto'
 import { test, expect, type Page } from '@playwright/test'
 
 const RELEASES = 'https://github.com/MichaelCodeToLimit/Bear/releases'
 // The cards of the edition panel on show (Everything by default). The other two panels are rendered but hidden.
 const SHOWN = '[data-edition-panel]:not([hidden])'
+const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
 const WINDOWS_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 
 // These tests describe the no-release state (no release exists yet). Once a real release is built into the site,
 // the state-specific assertions skip themselves; the release-present markup is covered by PlatformCards.render.test.ts.
 async function noRelease(page: Page): Promise<boolean> {
-  return (await page.locator(`${SHOWN} [data-os-group] [data-status="soon"]`).count()) === 3
+  return (await page.locator(`${SHOWN} [data-os-group] [data-status="soon"]`).count()) === 4
 }
 
-test('download page renders the three platform cards with no console errors', async ({ page }) => {
+test('download page renders the four platform cards with no console errors', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text())
@@ -21,8 +23,8 @@ test('download page renders the three platform cards with no console errors', as
   const response = await page.goto('download/')
   expect(response?.status()).toBe(200)
   await expect(page.locator('h1')).toHaveCount(1)
-  await expect(page.locator(`${SHOWN} [data-os-group]`)).toHaveCount(3)
-  expect(await page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-os-group')))).toEqual(['windows', 'mac', 'linux'])
+  await expect(page.locator(`${SHOWN} [data-os-group]`)).toHaveCount(4)
+  expect(await page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-os-group')))).toEqual(['windows', 'mac', 'linux', 'android'])
   await expect(page.getByText('pnpm install').first()).toBeVisible()
   expect(errors).toEqual([])
 })
@@ -32,7 +34,7 @@ test('no release: every card says Coming soon with the right buttons, all pointi
   test.skip(!(await noRelease(page)), 'a release is built into the site')
 
   const card = (os: string) => page.locator(`${SHOWN} [data-os-group="${os}"]`)
-  for (const os of ['windows', 'mac', 'linux']) {
+  for (const os of ['windows', 'mac', 'linux', 'android']) {
     await expect(card(os)).toContainText('Coming soon')
     await expect(card(os)).toContainText('First release coming soon')
   }
@@ -44,11 +46,12 @@ test('no release: every card says Coming soon with the right buttons, all pointi
   await expect(card('linux').getByRole('link', { name: /^AppImage for/ })).toBeVisible()
   await expect(card('linux').getByRole('link', { name: /^Flatpak for/ })).toBeVisible()
   await expect(card('linux').locator('details summary')).toContainText('Other')
+  await expect(card('android').getByRole('link', { name: /^Download \.apk for Android/ })).toBeVisible()
 
   // The "Other" list works without script: open it and its links go to Releases too.
   await card('linux').locator('details summary').click()
   const links = page.locator(`${SHOWN} [data-os-group] a[data-download]`)
-  expect(await links.count()).toBe(2 + 2 + 3 + 2)
+  expect(await links.count()).toBe(2 + 2 + 3 + 2 + 1)
   for (const a of await links.all()) {
     expect(await a.getAttribute('href')).toBe(RELEASES)
     expect(await a.getAttribute('data-state')).toBe('pending')
@@ -58,6 +61,26 @@ test('no release: every card says Coming soon with the right buttons, all pointi
     const href = await a.getAttribute('href')
     expect(href && href !== '#').toBeTruthy()
   }
+})
+
+// The live release has Windows, Mac and Linux files but (until the owner attaches it) no .apk.
+test('a release without an .apk: only the Android card says Coming soon, with a disabled button', async ({ page }) => {
+  await page.goto('download/')
+  const soon = await page.locator(`${SHOWN} [data-os-group] [data-status="soon"]`).count()
+  const androidSoon = await page.locator(`${SHOWN} [data-os-group="android"] [data-status="soon"]`).count()
+  test.skip(soon !== 1 || androidSoon !== 1, 'no release, or the release has an .apk')
+
+  const android = page.locator(`${SHOWN} [data-os-group="android"]`)
+  await expect(android).toContainText('Coming soon')
+  await expect(android).not.toContainText('First release coming soon')
+  const off = android.locator('span[data-state="missing"]')
+  await expect(off).toHaveCount(1)
+  await expect(off).toHaveAttribute('aria-disabled', 'true')
+  await expect(off).toHaveAttribute('title', 'Not in this release')
+  await expect(off).toContainText('Download .apk')
+  await expect(android.locator('a[data-download]')).toHaveCount(0)
+  await expect(android).toContainText('Test build signed with a debug key')
+  for (const os of ['windows', 'mac', 'linux']) await expect(page.locator(`${SHOWN} [data-os-group="${os}"] [data-status="available"]`)).toHaveCount(1)
 })
 
 test('the cards come before the Build from source block', async ({ page }) => {
@@ -90,16 +113,51 @@ test('the cards stack on a phone without horizontal scroll, in dark and light', 
     await page.locator(`${SHOWN} [data-os-group="linux"] details summary`).click()
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
     const boxes = await page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => e.getBoundingClientRect()))
-    expect(boxes[1].top).toBeGreaterThan(boxes[0].bottom - 1)
+    expect(boxes).toHaveLength(4)
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i].top).toBeGreaterThan(boxes[i - 1].bottom - 1)
     for (const b of boxes) expect(b.right).toBeLessThanOrEqual(375)
   }
 })
 
-test('three columns on a wide screen', async ({ page }) => {
+// The .apk comes from the GitHub release when it is attached there, otherwise from apps/site/public/downloads.
+test('the Android button downloads the real .apk (and, when the site serves it, the card shows its true SHA-256)', async ({ page, request }) => {
+  await page.goto('download/')
+  const button = page.locator(`${SHOWN} [data-os-group="android"] a[data-state="ready"]`)
+  test.skip((await button.count()) === 0, 'no .apk is available in this build')
+
+  const href = (await button.first().getAttribute('href')) ?? ''
+  expect(href).toMatch(/\.apk$/i)
+  await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toContainText('Available')
+  if (href.startsWith('/')) {
+    const res = await request.get(href)
+    expect(res.status()).toBe(200)
+    const body = await res.body()
+    expect(body.length).toBeGreaterThan(1_000_000)
+    // An .apk is a zip file: it starts with "PK".
+    expect(body.subarray(0, 2).toString('latin1')).toBe('PK')
+    const sha = createHash('sha256').update(body).digest('hex')
+    await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toContainText(sha)
+  }
+})
+
+test.describe('on Android', () => {
+  test.use({ userAgent: ANDROID_UA })
+  test('"Your device" shows on exactly the Android card', async ({ page }) => {
+    await page.goto('download/')
+    await expect(page.locator('[data-your-device]:visible')).toHaveCount(1)
+    await expect(page.locator(`${SHOWN} [data-os-group="android"] [data-your-device]`)).toBeVisible()
+    await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toHaveAttribute('data-yours', '')
+    await expect(page.locator(`${SHOWN} [data-yours]`)).toHaveCount(1)
+  })
+})
+
+test('two columns of two on a wide screen', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto('download/')
   const tops = await page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
-  expect(new Set(tops).size).toBe(1)
+  expect(tops[0]).toBe(tops[1])
+  expect(tops[2]).toBe(tops[3])
+  expect(tops[2]).toBeGreaterThan(tops[0])
 })
 
 test.describe('edition switcher', () => {
@@ -129,6 +187,20 @@ test.describe('edition switcher', () => {
     await expect(radio(page, 'Studio only')).toHaveAttribute('aria-checked', 'true')
     await expect(page.locator('[data-edition-panel="studio"]')).toBeVisible()
     expect(errors).toEqual([])
+  })
+
+  test('Everything and Office have the Android card; Studio has none', async ({ page }) => {
+    await page.goto('download/')
+    const groups = () => page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-os-group')))
+    expect(await groups()).toEqual(['windows', 'mac', 'linux', 'android'])
+    await radio(page, 'Office only').click()
+    await expect(page.locator('[data-edition-panel="office"]')).toBeVisible()
+    expect(await groups()).toEqual(['windows', 'mac', 'linux', 'android'])
+    await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toContainText('Download .apk')
+    await radio(page, 'Studio only').click()
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeVisible()
+    expect(await groups()).toEqual(['windows', 'mac', 'linux'])
+    await expect(page.locator('[data-edition-panel="studio"] [data-os-group="android"]')).toHaveCount(0)
   })
 
   test('arrow keys move the choice', async ({ page }) => {

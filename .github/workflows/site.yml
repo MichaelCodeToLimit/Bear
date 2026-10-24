@@ -2,7 +2,7 @@
 #
 # The Download page lists the files of the latest GitHub release, so publishing a release must rebuild the site.
 # A release event runs with the TAG as its ref, and the `github-pages` environment only accepts deployments from
-# main ("Tag v0.1.1 is not allowed to deploy to github-pages"). So a published release only re-runs this workflow
+# main ("Tag v0.1.1 is not allowed to deploy to github-pages"). So a published (or edited, which is what attaching a file in the web UI is) release only re-runs this workflow
 # on main (workflow_dispatch is the one event GITHUB_TOKEN is allowed to trigger); main then builds and deploys.
 name: Site
 
@@ -18,7 +18,7 @@ on:
       - 'e2e-site/**'
       - 'pnpm-lock.yaml'
   release:
-    types: [published]
+    types: [published, edited]
   workflow_dispatch:
 
 permissions:
