@@ -1,8 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import { appForFile, type OpenedFile } from '@bear/core'
+import { EDITIONS, appForFile, getEdition, type OpenedFile } from '@bear/core'
 import type { WriteInput } from '@bear/app-write'
 import type { SheetsInput } from '@bear/app-sheets'
 import type { SlidesInput } from '@bear/app-slides'
+import type { PhotoInput } from '@bear/app-photo'
 import { Launcher } from './Launcher'
 
 // Each app is loaded the first time it's opened, so starting Bear only loads the launcher. This
@@ -16,6 +17,8 @@ const TasksApp = lazy(() => import('@bear/app-tasks').then((m) => ({ default: m.
 const BoardApp = lazy(() => import('@bear/app-board').then((m) => ({ default: m.BoardApp })))
 const SitesApp = lazy(() => import('@bear/app-sites').then((m) => ({ default: m.SitesApp })))
 const MailApp = lazy(() => import('@bear/app-mail').then((m) => ({ default: m.MailApp })))
+// Photo brings its PSD and image libraries along.
+const PhotoApp = lazy(() => import('@bear/app-photo').then((m) => ({ default: m.PhotoApp })))
 
 /** Shown for the moment an app's code takes to load. */
 function Loading(): ReactNode {
@@ -27,6 +30,7 @@ export type Screen =
   | { app: 'write'; input: WriteInput; key: number }
   | { app: 'sheets'; input: SheetsInput; key: number }
   | { app: 'slides'; input: SlidesInput; key: number }
+  | { app: 'photo'; input: PhotoInput; key: number }
   | { app: 'notes' | 'tasks' | 'board' | 'sites' | 'mail'; key: number }
 
 export type OpenApp = (screen: Exclude<Screen, { app: 'home' }>) => void
@@ -35,7 +39,7 @@ export function App() {
   const [screen, setScreen] = useState<Screen>({ app: 'home' })
 
   const home = useCallback(() => {
-    window.bear.setTitle('Bear')
+    window.bear.setTitle(EDITIONS[getEdition()].productName)
     setScreen({ app: 'home' })
   }, [])
 
@@ -46,6 +50,7 @@ export function App() {
     if (app === 'write') setScreen({ app, input: { kind: 'file', file }, key })
     else if (app === 'sheets') setScreen({ app, input: { kind: 'file', file }, key })
     else if (app === 'slides') setScreen({ app, input: { kind: 'file', file }, key })
+    else if (app === 'photo') setScreen({ app, input: { kind: 'file', file }, key })
     else return false
     return true
   }, [])
@@ -79,6 +84,8 @@ export function App() {
         return <SheetsApp key={screen.key} input={screen.input} onHome={home} />
       case 'slides':
         return <SlidesApp key={screen.key} input={screen.input} onHome={home} />
+      case 'photo':
+        return <PhotoApp key={screen.key} input={screen.input} onHome={home} />
       case 'notes':
         return <NotesApp key={screen.key} onHome={home} />
       case 'tasks':

@@ -1,3 +1,4 @@
+import type { Edition } from '@bear/core'
 import { SITE } from '../site.config'
 
 export type OS = 'windows' | 'mac' | 'linux' | 'android'
@@ -15,6 +16,8 @@ export interface DownloadFile {
   kind: FileKind
   /** Mac only: the chip the file is built for. A mac file with no arch in its name is Intel. */
   arch: Arch | null
+  /** Which build of Bear the file is: the full suite, Bear Office or Bear Studio. */
+  edition: Edition
   /** Lowercase hex SHA-256 from the GitHub asset digest, or null when it is missing or malformed. */
   sha256: string | null
 }
@@ -26,9 +29,23 @@ export interface ReleaseInfo {
   files: DownloadFile[]
 }
 
-/** Map an asset file name to a system and label. Returns null for files that should not be shown. */
-export function classifyAsset(name: string): Pick<DownloadFile, 'os' | 'label' | 'recommended' | 'kind' | 'arch'> | null {
+type Classified = Pick<DownloadFile, 'os' | 'label' | 'recommended' | 'kind' | 'arch' | 'edition'>
+
+/** The edition is in the name: Bear-Office-… or bear-office_…, Bear-Studio-… or bear-studio_… (any case); anything else is the full suite. */
+function editionOf(n: string): Edition {
+  if (n.includes('bear-office')) return 'office'
+  if (n.includes('bear-studio')) return 'studio'
+  return 'all'
+}
+
+/** Map an asset file name to a system, label and edition. Returns null for files that should not be shown. */
+export function classifyAsset(name: string): Classified | null {
   const n = name.toLowerCase()
+  const kind = classifyKind(n)
+  return kind ? { ...kind, edition: editionOf(n) } : null
+}
+
+function classifyKind(n: string): Omit<Classified, 'edition'> | null {
   // electron-builder puts the architecture in the file name; only mac needs it.
   const arch: Arch = /arm64/.test(n) ? 'arm64' : 'x64'
   const macArch = /arm64/.test(n) ? ' (Apple silicon)' : /x64|x86_64|amd64/.test(n) ? ' (Intel)' : ''
@@ -143,12 +160,23 @@ export interface PlatformCard {
   meta: string | null
 }
 
-/** The four download cards in order: windows, mac, linux, android. Pure; a null release gives empty, unavailable cards. */
-export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
-  const files = release?.files ?? []
+/** Editions that get an Android card. The phone app is one build that runs as Bear Office; Bear Studio has none. */
+export const ANDROID_EDITIONS: readonly Edition[] = ['all', 'office']
+
+/**
+ * The download cards for one edition, in order: windows, mac, linux, then android for the editions in
+ * ANDROID_EDITIONS (four cards for Everything and Office, three for Studio). Pure; a null release, or a release
+ * without that edition, gives empty, unavailable cards. The Android card always shows the release's .apk, which is
+ * classified as edition 'all': the phone app is the same for every edition that offers it.
+ */
+export function platformCards(release: ReleaseInfo | null, edition: Edition = 'all'): PlatformCard[] {
+  const releaseFiles = release?.files ?? []
+  const desktopFiles = releaseFiles.filter((f) => f.os !== 'android' && f.edition === edition)
+  const androidFiles = releaseFiles.filter((f) => f.os === 'android' && f.edition === 'all')
+  const filesFor = (os: OS): DownloadFile[] => (os === 'android' ? androidFiles : desktopFiles)
   const pick = (os: OS, kind: FileKind, arch?: Arch): DownloadFile | null =>
-    files.find((f) => f.os === os && f.kind === kind && (arch === undefined || f.arch === arch)) ?? null
-  const all = (os: OS, kind: FileKind): DownloadFile[] => files.filter((f) => f.os === os && f.kind === kind)
+    filesFor(os).find((f) => f.os === os && f.kind === kind && (arch === undefined || f.arch === arch)) ?? null
+  const all = (os: OS, kind: FileKind): DownloadFile[] => filesFor(os).filter((f) => f.os === os && f.kind === kind)
   const build = (
     os: OS,
     title: string,
@@ -157,7 +185,7 @@ export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
     extras: DownloadFile[] = [],
     other: DownloadFile[] = []
   ): PlatformCard => {
-    const available = files.some((f) => f.os === os)
+    const available = filesFor(os).some((f) => f.os === os)
     let meta: string | null = null
     if (available && release) {
       const filled = slots.filter((s) => s.file)
@@ -166,7 +194,7 @@ export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
     }
     return { os, title, description, available, version: available && release ? release.version : null, slots, extras, other, meta }
   }
-  return [
+  const cards = [
     build('windows', 'Windows', 'Windows 10 and 11, 64-bit. The installer sets Bear up for your account in seconds, without admin rights.', [
       { id: 'exe', label: 'Download .exe', short: '.exe', file: pick('windows', 'exe') },
       { id: 'msi', label: '.msi for IT', short: '.msi', file: pick('windows', 'msi') }
@@ -192,7 +220,14 @@ export function platformCards(release: ReleaseInfo | null): PlatformCard[] {
       ],
       [],
       [...all('linux', 'rpm'), ...all('linux', 'targz')]
-    ),
-    build('android', 'Android', 'Android 7.0 or later. Install the APK file straight onto your phone or tablet.', [{ id: 'apk', label: 'Download .apk', short: '.apk', file: pick('android', 'apk') }])
+    )
   ]
+  if (ANDROID_EDITIONS.includes(edition)) {
+    cards.push(
+      build('android', 'Android', 'Android 7.0 or later. Install the APK file straight onto your phone or tablet.', [
+        { id: 'apk', label: 'Download .apk', short: '.apk', file: pick('android', 'apk') }
+      ])
+    )
+  }
+  return cards
 }

@@ -16,6 +16,7 @@ const releaseApk: DownloadFile = {
   recommended: true,
   kind: 'apk',
   arch: null,
+  edition: 'all',
   sha256: null
 }
 
@@ -56,6 +57,7 @@ describe('withLocalApk', () => {
       size: 23_004_236,
       os: 'android',
       kind: 'apk',
+      edition: 'all',
       sha256: 'a'.repeat(64)
     })
   })

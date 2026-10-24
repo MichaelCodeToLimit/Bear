@@ -1,5 +1,6 @@
 ---
-import { APPS } from '@bear/core'
+import { SITE_APPS as APPS } from '../../lib/officeApps'
+import { numberWord } from '../../lib/numberWord'
 import Bear from '../Bear.astro'
 import { url } from '../../site.config'
 
@@ -20,7 +21,7 @@ const checks = [
 <section class="section suite" aria-labelledby="suite-title">
   <div class="suite__copy" data-reveal>
     <p class="eyebrow">The suite</p>
-    <h2 id="suite-title" class="display suite__title">Twelve apps. <span class="grad">One download.</span></h2>
+    <h2 id="suite-title" class="display suite__title">{numberWord(APPS.length)} apps. <span class="grad">One download.</span></h2>
     <ul class="checks">
       {checks.map((c) => <li>{c}</li>)}
     </ul>

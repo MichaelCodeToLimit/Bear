@@ -139,5 +139,12 @@ export const androidBridge: BearBridge = {
   // Android apps aren't "closed" with unsaved work the way desktop windows are; AutoSave covers it.
   onCloseRequest: () => () => {},
   forceClose: () => {},
-  mail: Object.fromEntries(MAIL_METHODS.map((m) => [m, unsupported('Mail')])) as unknown as BearBridge['mail']
+  mail: Object.fromEntries(MAIL_METHODS.map((m) => [m, unsupported('Mail')])) as unknown as BearBridge['mail'],
+  // Crash-recovery copies are for Photo, which this version doesn't include (it runs as Bear Office): nothing to recover.
+  recovery: {
+    write: unsupported('Crash recovery'),
+    list: async () => [],
+    read: unsupported('Crash recovery'),
+    remove: async () => {}
+  }
 }
