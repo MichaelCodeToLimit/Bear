@@ -10,10 +10,27 @@ const { builderConfig, parseBuildEdition } = require('../../build-config/edition
 
 const exts = (c: any): string[] => c.fileAssociations.map((f: any) => f.ext)
 
+/** electron-builder's own config check, which otherwise only runs in the (slow) installer build. */
+function validateWithBuilder(): (config: unknown) => Promise<void> {
+  const builder = require.resolve('electron-builder')
+  const lib = createRequire(require.resolve('app-builder-lib/package.json', { paths: [builder] }))
+  const { validateConfiguration } = lib('./out/util/config/config.js')
+  const { DebugLogger } = lib('builder-util')
+  return (config) => validateConfiguration(config, new DebugLogger(false))
+}
+
 describe('builderConfig', () => {
   const all = builderConfig('all')
   const office = builderConfig('office')
   const studio = builderConfig('studio')
+
+  it('passes electron-builder validation for every edition', async () => {
+    const validate = validateWithBuilder()
+    for (const edition of ['all', 'office', 'studio']) await validate(builderConfig(edition))
+    const bad = builderConfig('office')
+    bad.linux.packageName = 'bear-office' // not a linux option: the mistake this test exists for
+    await expect(validate(bad)).rejects.toThrow()
+  })
 
   it('keeps the full suite identity unchanged', () => {
     expect(all.appId).toBe('org.bearsuite.desktop')
@@ -22,7 +39,7 @@ describe('builderConfig', () => {
     expect(all.nsis.artifactName).toBe('Bear-Setup-${version}.${ext}')
     expect(all.deb.artifactName).toBe('bear_${version}_amd64.${ext}')
     expect(all.linux.executableName).toBe('bear')
-    expect(all.linux.packageName).toBeUndefined() // electron-builder's default: the product name, Bear
+    expect(all.deb.packageName ?? all.rpm.packageName).toBeUndefined() // electron-builder's default: the product name, Bear
     expect(all.linux.category).toBe('Office')
     expect(all.extraMetadata).toBeUndefined()
   })
@@ -50,8 +67,8 @@ describe('builderConfig', () => {
     expect(studio.nsis.uninstallDisplayName).toBe('Bear Studio')
     expect(studio.linux.category).toBe('Graphics')
     // deb/rpm package names: rpm refuses a space, so not the product name.
-    expect(office.linux.packageName).toBe('bear-office')
-    expect(studio.linux.packageName).toBe('bear-studio')
+    expect([office.deb.packageName, office.rpm.packageName]).toEqual(['bear-office', 'bear-office'])
+    expect([studio.deb.packageName, studio.rpm.packageName]).toEqual(['bear-studio', 'bear-studio'])
     expect(office.linux.category).toBe('Office')
     for (const key of ['rpm', 'flatpak', 'appImage'] as const) {
       expect(office[key].artifactName).toMatch(/^Bear-Office-/)
