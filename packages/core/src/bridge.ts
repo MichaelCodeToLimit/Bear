@@ -18,6 +18,22 @@ export interface FolderEntry {
 /** Names usable with readData/writeData: letters, digits, dash, underscore, dot. */
 export const DATA_NAME = /^[a-z0-9][a-z0-9._-]{0,80}$/i
 
+/** Names usable with the recovery API: one Photo recovery copy per window session. */
+export const RECOVERY_NAME = /^[a-z0-9-]{1,64}\.bearphoto$/
+
+/** Crash-recovery copies of unsaved work, stored in Bear's data folder (userData/recovery). */
+export interface RecoveryBridge {
+  /** Write (or replace) a recovery copy, atomically. */
+  write(name: string, data: Uint8Array): Promise<void>
+  /**
+   * Recovery copies left behind, newest first. Copies another open window is still writing are left out,
+   * and so are those of another Bear process that is still running (another edition sharing the data folder).
+   */
+  list(): Promise<{ name: string; savedAt: number }[]>
+  read(name: string): Promise<Uint8Array>
+  remove(name: string): Promise<void>
+}
+
 export interface OpenedFile {
   path: string
   name: string
@@ -58,6 +74,7 @@ export interface BearBridge {
   /** Tell the main process the user chose to close anyway. */
   forceClose(): void
   mail: MailBridge
+  recovery: RecoveryBridge
 }
 
 declare global {

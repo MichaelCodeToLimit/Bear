@@ -1,14 +1,41 @@
-import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron'
-import { promises as fs, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { app, BrowserWindow, dialog, ipcMain, screen, shell, webContents } from 'electron'
+import { promises as fs, rmdirSync, rmSync, statSync, type Dirent } from 'node:fs'
+import { dirname, join } from 'node:path'
 import {
-  DATA_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent,
+  DATA_NAME, EDITIONS, RECOVERY_NAME, addRecent, appForFile, baseName, launchFiles, parseRecent, removeRecent, setEdition,
   type AppId, type FileFilter, type RecentFile
 } from '@bear/core'
+import { buildEdition } from '../edition'
+import { bearDataDir } from './data-dir'
 import { registerMailIpc } from './mail'
 import { writeFileAtomic } from './mail/atomic'
+import { KeyedQueue } from './keyed-queue'
+import { copyOwnership, ownerFolderName, parseOwnerFolder, probeProcess, thisProcess, type ProbeResult } from './recovery-owners'
 
-const recentPath = () => join(app.getPath('userData'), 'recent.json')
+const edition = buildEdition()
+setEdition(edition)
+
+// Tests only: Electron doesn't take appData from %APPDATA%, so a test that checks the real (no
+// --user-data-dir) folder layout points it at a temporary folder with BEAR_TEST_APPDATA. The profile
+// moves with it, exactly as Electron would place it there. With --user-data-dir as well, the profile
+// stays there and only Bear's data folder moves (<BEAR_TEST_APPDATA>/@bear/desktop): two test processes
+// with their own profiles then share one data folder, like two editions side by side. Never set outside tests.
+const testAppData = process.env.BEAR_TEST_APPDATA
+const userDataSwitch = app.commandLine.hasSwitch('user-data-dir')
+if (testAppData) {
+  app.setPath('appData', testAppData)
+  if (!userDataSwitch) app.setPath('userData', join(testAppData, app.getName()))
+}
+
+// Bear's own files are shared by every edition; each edition keeps Electron's default Chromium
+// profile, so the editions can run side by side (see data-dir.ts).
+const dataDir = bearDataDir({
+  appData: app.getPath('appData'),
+  userData: app.getPath('userData'),
+  userDataSwitch: userDataSwitch && !testAppData
+})
+
+const recentPath = () => join(dataDir, 'recent.json')
 
 async function readRecent(): Promise<RecentFile[]> {
   try {
@@ -30,6 +57,58 @@ async function readOpened(path: string) {
 
 /** Windows that the user has confirmed may close despite unsaved changes. */
 const forceClosing = new WeakSet<BrowserWindow>()
+
+const recoveryDir = () => join(dataDir, 'recovery')
+
+// This process's copies go in recovery/<pid>-<start>/, so another edition running at the same time can
+// tell they are still live (see recovery-owners.ts).
+const self = thisProcess()
+const ownRecoveryDir = () => join(recoveryDir(), ownerFolderName(self))
+
+function checkRecoveryName(name: string): void {
+  if (typeof name !== 'string' || !RECOVERY_NAME.test(name)) throw new Error(`Invalid recovery name: ${name}`)
+}
+
+/** Where this process keeps the copy called `name`. */
+function recoveryFile(name: string): string {
+  checkRecoveryName(name)
+  return join(ownRecoveryDir(), name)
+}
+
+/** Copies left by a crashed process (or a flat copy from an earlier build) that recovery:list offered: name → path. */
+const orphanCopies = new Map<string, string>()
+
+/** Which window (webContents id) last wrote each recovery copy. */
+const recoveryOwners = new Map<string, number>()
+
+/** Windows that closed normally: a write of theirs still in flight is deleted again when it lands. */
+const cleanlyClosed = new Set<number>()
+
+/** Writes and removals of one recovery file run one at a time, so a removal can't be overtaken by a write. */
+const recoveryQueue = new KeyedQueue()
+
+const MAX_RECOVERY_BYTES = 2 * 2 ** 30
+
+/** A window that closed normally leaves no recovery copies behind; a crash or kill keeps them. */
+function removeRecoveriesOf(ownerId: number): void {
+  cleanlyClosed.add(ownerId)
+  for (const [name, owner] of recoveryOwners) {
+    if (owner !== ownerId) continue
+    recoveryOwners.delete(name)
+    // Synchronous: this can be the last window, and the app quits right after.
+    try {
+      rmSync(recoveryFile(name), { force: true })
+    } catch (err) {
+      console.warn('Could not remove recovery copy', name, err)
+    }
+  }
+  // The folder goes too once it's empty (another window's copy, or a write in flight, keeps it).
+  try {
+    rmdirSync(ownRecoveryDir())
+  } catch {
+    // Not empty, or never made.
+  }
+}
 
 /** The document each new window should open on start, keyed by webContents id. */
 const launchFileFor = new Map<number, string>()
@@ -64,7 +143,7 @@ function createWindow(launchFile?: string): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    title: 'Bear',
+    title: EDITIONS[edition].productName,
     backgroundColor: '#f5f4f1',
     // Packaged builds take the icon from the .exe; in development use the source PNG.
     icon: app.isPackaged ? undefined : join(__dirname, '../../build/icon.png'),
@@ -85,6 +164,12 @@ function createWindow(launchFile?: string): BrowserWindow {
     if (forceClosing.has(win)) return
     e.preventDefault()
     win.webContents.send('window:close-request')
+  })
+
+  // Only a close the renderer agreed to counts as clean ('close' is not emitted for destroy()).
+  const contentsId = win.webContents.id
+  win.on('closed', () => {
+    if (forceClosing.has(win)) removeRecoveriesOf(contentsId)
   })
 
   // Open external links in the default browser, never inside the app. The one window Bear opens
@@ -141,7 +226,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('file:save', async (_e, path: string, data: Uint8Array) => {
-    await fs.writeFile(path, data)
+    await writeFileAtomic(path, data)
   })
 
   ipcMain.handle('file:chooseSavePath', async (e, defaultName: string, filters: FileFilter[]) => {
@@ -185,11 +270,12 @@ function registerIpc(): void {
     if (err) throw new Error(err)
   })
 
-  // ---------- App data (JSON documents in userData/data) ----------
+  // ---------- App data (JSON documents in <Bear data>/data) ----------
+  // Two editions open at the same time may both write one file: the last write wins (no locking).
 
   const dataFile = (name: string) => {
     if (!DATA_NAME.test(name)) throw new Error(`Invalid data name: ${name}`)
-    return join(app.getPath('userData'), 'data', `${name}.json`)
+    return join(dataDir, 'data', `${name}.json`)
   }
 
   ipcMain.handle('data:read', async (_e, name: string) => {
@@ -206,6 +292,113 @@ function registerIpc(): void {
 
   ipcMain.handle('data:delete', async (_e, name: string) => {
     await fs.rm(dataFile(name), { force: true })
+  })
+
+  // ---------- Crash recovery (Photo copies in <Bear data>/recovery) ----------
+
+  ipcMain.handle('recovery:write', (e, name: string, data: Uint8Array) => {
+    const file = recoveryFile(name)
+    if (!(data instanceof Uint8Array)) throw new Error('Recovery data must be bytes')
+    if (data.byteLength > MAX_RECOVERY_BYTES) throw new Error('Recovery copy is too large')
+    const owner = e.sender.id
+    const gone = () => cleanlyClosed.has(owner) || e.sender.isDestroyed()
+    return recoveryQueue.run(name, async () => {
+      if (gone()) return
+      await writeFileAtomic(file, data)
+      // The window closed normally while this was being written: the copy must not outlive it.
+      if (gone()) {
+        if (cleanlyClosed.has(owner)) await fs.rm(file, { force: true })
+        return
+      }
+      recoveryOwners.set(name, owner)
+    })
+  })
+
+  // Copies in this process's folder, folders of processes that are gone, and flat copies from an earlier
+  // build. A folder whose process is still running (another edition with Photo open) is never looked into.
+  ipcMain.handle('recovery:list', async (e) => {
+    let entries: Dirent[]
+    try {
+      entries = await fs.readdir(recoveryDir(), { withFileTypes: true })
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+      throw err
+    }
+    // Copies that another open window of this process is still keeping up to date are not left over from a crash.
+    const liveElsewhere = (name: string) => {
+      const owner = recoveryOwners.get(name)
+      return owner !== undefined && owner !== e.sender.id && !!webContents.fromId(owner)
+    }
+    const copiesIn = async (folder: string) => {
+      try {
+        return (await fs.readdir(folder)).filter((n) => RECOVERY_NAME.test(n))
+      } catch {
+        return []
+      }
+    }
+    const groups = await Promise.all(
+      entries.map(async (ent): Promise<{ name: string; path: string; own: boolean }[]> => {
+        if (ent.isFile()) return RECOVERY_NAME.test(ent.name) ? [{ name: ent.name, path: join(recoveryDir(), ent.name), own: false }] : []
+        if (!ent.isDirectory()) return []
+        const owner = parseOwnerFolder(ent.name)
+        const probe: ProbeResult | undefined = owner && owner.pid !== self.pid ? await probeProcess(owner.pid) : undefined
+        const who = copyOwnership(ent.name, self, probe)
+        if (who === 'live') return []
+        const folder = join(recoveryDir(), ent.name)
+        const names = await copiesIn(folder)
+        if (who === 'self') return names.filter((n) => !liveElsewhere(n)).map((name) => ({ name, path: join(folder, name), own: true }))
+        // A crashed process's folder with no copies left (only a half-written temp file, say) is just tidied away.
+        if (!names.length) await fs.rm(folder, { recursive: true, force: true }).catch(() => {})
+        return names.map((name) => ({ name, path: join(folder, name), own: false }))
+      })
+    )
+    const found = await Promise.all(
+      groups.flat().map(async (c) => {
+        try {
+          return { ...c, savedAt: (await fs.stat(c.path)).mtimeMs }
+        } catch {
+          return null
+        }
+      })
+    )
+    const out: { name: string; savedAt: number }[] = []
+    const seen = new Set<string>()
+    for (const c of found.filter((f) => f !== null).sort((a, b) => b.savedAt - a.savedAt)) {
+      // Names are random per window session; if two folders ever hold the same one, the newer is offered.
+      if (seen.has(c.name)) continue
+      seen.add(c.name)
+      if (c.own) orphanCopies.delete(c.name)
+      else orphanCopies.set(c.name, c.path)
+      out.push({ name: c.name, savedAt: c.savedAt })
+    }
+    return out
+  })
+
+  // A name is read from where recovery:list found it (a crashed process's folder), else from this process's own.
+  ipcMain.handle('recovery:read', async (_e, name: string) => {
+    checkRecoveryName(name)
+    return new Uint8Array(await fs.readFile(orphanCopies.get(name) ?? recoveryFile(name)))
+  })
+
+  ipcMain.handle('recovery:remove', (_e, name: string) => {
+    checkRecoveryName(name)
+    const orphan = orphanCopies.get(name)
+    if (orphan) {
+      return recoveryQueue.run(name, async () => {
+        await fs.rm(orphan, { force: true })
+        orphanCopies.delete(name)
+        // The crashed process's folder goes with its last copy (restored or discarded).
+        const folder = dirname(orphan)
+        if (folder === recoveryDir()) return
+        const rest = await fs.readdir(folder).catch(() => [] as string[])
+        if (!rest.some((n) => RECOVERY_NAME.test(n))) await fs.rm(folder, { recursive: true, force: true }).catch(() => {})
+      })
+    }
+    const file = recoveryFile(name)
+    return recoveryQueue.run(name, async () => {
+      await fs.rm(file, { force: true })
+      recoveryOwners.delete(name)
+    })
   })
 
   // ---------- Folders (Sites document libraries) ----------
@@ -261,9 +454,9 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(() => {
-    app.setAppUserModelId('org.bearsuite.desktop')
+    app.setAppUserModelId(EDITIONS[edition].appId)
     registerIpc()
-    registerMailIpc()
+    registerMailIpc(dataDir)
     const files = [...pendingLaunchFiles.splice(0), ...launchFiles(process.argv, isFile)]
     if (files.length) files.forEach((f) => createWindow(f))
     else createWindow()

@@ -63,10 +63,11 @@ test('how it works has three cards', async ({ page }) => {
   await expect(page.locator('.how-card')).toHaveCount(3)
 })
 
-test('suite diagram links all 12 apps and marks the 4 not ready as soon', async ({ page }) => {
+test('suite diagram links all 13 apps and marks the 4 not ready as soon', async ({ page }) => {
   await page.goto('./')
-  await expect(page.locator('.suite-diagram a[href*="tour/#"]')).toHaveCount(12)
+  await expect(page.locator('.suite-diagram a[href*="tour/#"]')).toHaveCount(13)
   await expect(page.locator('.suite-diagram a[data-soon]')).toHaveCount(4)
+  await expect(page.locator('#suite-title')).toHaveText('Thirteen apps. One download.')
 })
 
 test('the hero and final CTA each have one plain Download button linking to the full download page', async ({ page }) => {
@@ -124,4 +125,35 @@ test('home ships at most 60 KB of gzipped JavaScript', async ({ page }) => {
     inline.reduce((sum, s) => sum + gzipSync(s).length, 0)
   console.log(`home js gzipped bytes: ${total}`)
   expect(total).toBeLessThanOrEqual(60 * 1024)
+})
+
+test('the Bear Studio band introduces Photo and links to its tour entry and guide', async ({ page }) => {
+  await page.goto('./')
+  const band = page.locator('[data-studio-band]')
+  await expect(band.locator('.eyebrow')).toHaveText('Bear Studio')
+  await expect(band.locator('h2')).toHaveText('Creative apps, free forever. First up: Photo.')
+  await expect(band.getByRole('link', { name: 'See Photo in the tour' })).toHaveAttribute('href', '/Bear/tour/#photo')
+  await expect(band.getByRole('link', { name: 'Read the Photo guide' })).toHaveAttribute('href', '/Bear/docs/apps/photo/')
+  await expect(band).not.toContainText(/Adobe|Photoshop/)
+})
+
+test('the Bear Studio band fits a phone in dark and light', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 })
+  for (const theme of ['dark', 'light']) {
+    await page.goto('./')
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    const box = await page.locator('[data-studio-band]').boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(375)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+  }
+})
+
+test('the Bear Studio stroke stops animating with motion off', async ({ page }) => {
+  await page.goto('./')
+  const stroke = page.locator('.studio__stroke path')
+  await expect(stroke).toHaveCSS('animation-name', 'studio-paint')
+  await page.locator('[data-motion-toggle]').first().click()
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'off')
+  await expect(stroke).toHaveCSS('animation-name', 'none')
 })

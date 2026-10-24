@@ -30,6 +30,12 @@ const bridge: BearBridge = {
     return () => ipcRenderer.removeListener('window:close-request', listener)
   },
   forceClose: () => ipcRenderer.send('window:forceClose'),
+  recovery: {
+    write: (name, data) => ipcRenderer.invoke('recovery:write', name, data),
+    list: () => ipcRenderer.invoke('recovery:list'),
+    read: (name) => ipcRenderer.invoke('recovery:read', name),
+    remove: (name) => ipcRenderer.invoke('recovery:remove', name)
+  },
   // Each mail call maps to an ipcMain handler named mail:<method> (see main/mail). contextBridge copies
   // plain properties only, so the methods are listed rather than produced by a Proxy.
   mail: Object.fromEntries(

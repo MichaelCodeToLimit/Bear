@@ -1,4 +1,5 @@
 export * from './apps'
+export * from './editions'
 export * from './files'
 export * from './recent'
 export * from './bridge'

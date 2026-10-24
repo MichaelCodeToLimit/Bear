@@ -15,7 +15,7 @@ test('sidebar has 4 group headings and marks the current page', async ({ page })
 test('every sidebar link returns 200', async ({ page, request }) => {
   await page.goto('docs/get-started/install/')
   const hrefs = await page.locator('.docs-nav a').evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href))
-  expect(hrefs.length).toBe(15)
+  expect(hrefs.length).toBe(16)
   for (const href of hrefs) {
     const res = await request.get(href)
     expect(res.status(), href).toBe(200)

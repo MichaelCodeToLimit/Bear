@@ -3,7 +3,7 @@ import {
   AppWindow, FileSpreadsheet, FileText, Folder, FolderOpen, Globe, Home, LayoutGrid, ListTodo, Moon, NotebookPen,
   Pencil, Plus, Presentation, Search, Sun, SunMoon, Trash2, Upload, type LucideIcon
 } from 'lucide-react'
-import { APPS, appForFile, baseName, getApp, stripExtension, type AppId, type FolderEntry, type OpenedFile, type RecentFile } from '@bear/core'
+import { appForFile, baseName, enabledApps, getApp, stripExtension, type AppId, type FolderEntry, type OpenedFile, type RecentFile } from '@bear/core'
 import { useTheme, type ThemeMode } from '@bear/ui/src/theme'
 import { TEMPLATES } from '@bear/app-write/src/templates'
 import { SHEET_TEMPLATES } from '@bear/app-sheets/src/templates'
@@ -328,7 +328,7 @@ function FilesTab({ ctx }: { ctx: ShellCtx }) {
   }, [dir, ctx.refresh])
 
   const importFile = async () => {
-    const f = await window.bear.openFile([{ name: 'Documents', extensions: APPS.filter((a) => a.ready).flatMap((a) => a.extensions) }])
+    const f = await window.bear.openFile([{ name: 'Documents', extensions: enabledApps().filter((a) => a.ready).flatMap((a) => a.extensions) }])
     if (!f) return
     ctx.bump()
     void ctx.openPath(f.path)

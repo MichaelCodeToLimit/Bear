@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { launchFiles } from './files'
 
 describe('launchFiles', () => {
-  const files = new Set(['C:\\docs\\report.docx', 'C:\\docs\\budget.XLSX', 'C:\\docs\\photo.jpg'])
+  const files = new Set(['C:\\docs\\report.docx', 'C:\\docs\\budget.XLSX', 'C:\\docs\\archive.zip'])
   const isFile = (p: string) => files.has(p)
 
   it('picks Bear documents from a packaged launch', () => {
@@ -15,6 +15,6 @@ describe('launchFiles', () => {
   })
 
   it('ignores files no Bear app opens', () => {
-    expect(launchFiles(['Bear.exe', 'C:\\docs\\photo.jpg'], isFile)).toEqual([])
+    expect(launchFiles(['Bear.exe', 'C:\\docs\\archive.zip'], isFile)).toEqual([])
   })
 })

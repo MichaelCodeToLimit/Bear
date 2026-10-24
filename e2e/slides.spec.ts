@@ -55,6 +55,8 @@ test('adds a slide from a layout and types bullets', async () => {
 
 test('inserts, moves and resizes a shape with text', async () => {
   await page.getByRole('button', { name: 'Insert', exact: true }).click()
+  // Slides v2 keeps the shapes in the Insert tab's Shapes gallery.
+  await page.getByTitle('Shapes', { exact: true }).first().click()
   await page.getByTitle('Oval').click()
   await expect(stage().locator('[data-selected]')).toHaveCount(1)
   await page.keyboard.type('Go!')

@@ -2,13 +2,15 @@ import { createHash } from 'node:crypto'
 import { test, expect, type Page } from '@playwright/test'
 
 const RELEASES = 'https://github.com/MichaelCodeToLimit/Bear/releases'
+// The cards of the edition panel on show (Everything by default). The other two panels are rendered but hidden.
+const SHOWN = '[data-edition-panel]:not([hidden])'
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
 const WINDOWS_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 
 // These tests describe the no-release state (no release exists yet). Once a real release is built into the site,
 // the state-specific assertions skip themselves; the release-present markup is covered by PlatformCards.render.test.ts.
 async function noRelease(page: Page): Promise<boolean> {
-  return (await page.locator('[data-os-group] [data-status="soon"]').count()) === 4
+  return (await page.locator(`${SHOWN} [data-os-group] [data-status="soon"]`).count()) === 4
 }
 
 test('download page renders the four platform cards with no console errors', async ({ page }) => {
@@ -21,8 +23,8 @@ test('download page renders the four platform cards with no console errors', asy
   const response = await page.goto('download/')
   expect(response?.status()).toBe(200)
   await expect(page.locator('h1')).toHaveCount(1)
-  await expect(page.locator('[data-os-group]')).toHaveCount(4)
-  expect(await page.locator('[data-os-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-os-group')))).toEqual(['windows', 'mac', 'linux', 'android'])
+  await expect(page.locator(`${SHOWN} [data-os-group]`)).toHaveCount(4)
+  expect(await page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-os-group')))).toEqual(['windows', 'mac', 'linux', 'android'])
   await expect(page.getByText('pnpm install').first()).toBeVisible()
   expect(errors).toEqual([])
 })
@@ -31,7 +33,7 @@ test('no release: every card says Coming soon with the right buttons, all pointi
   await page.goto('download/')
   test.skip(!(await noRelease(page)), 'a release is built into the site')
 
-  const card = (os: string) => page.locator(`[data-os-group="${os}"]`)
+  const card = (os: string) => page.locator(`${SHOWN} [data-os-group="${os}"]`)
   for (const os of ['windows', 'mac', 'linux', 'android']) {
     await expect(card(os)).toContainText('Coming soon')
     await expect(card(os)).toContainText('First release coming soon')
@@ -48,14 +50,14 @@ test('no release: every card says Coming soon with the right buttons, all pointi
 
   // The "Other" list works without script: open it and its links go to Releases too.
   await card('linux').locator('details summary').click()
-  const links = page.locator('[data-os-group] a[data-download]')
+  const links = page.locator(`${SHOWN} [data-os-group] a[data-download]`)
   expect(await links.count()).toBe(2 + 2 + 3 + 2 + 1)
   for (const a of await links.all()) {
     expect(await a.getAttribute('href')).toBe(RELEASES)
     expect(await a.getAttribute('data-state')).toBe('pending')
   }
   // No dead or hash links anywhere in the cards.
-  for (const a of await page.locator('[data-os-group] a').all()) {
+  for (const a of await page.locator(`${SHOWN} [data-os-group] a`).all()) {
     const href = await a.getAttribute('href')
     expect(href && href !== '#').toBeTruthy()
   }
@@ -64,11 +66,11 @@ test('no release: every card says Coming soon with the right buttons, all pointi
 // The live release has Windows, Mac and Linux files but (until the owner attaches it) no .apk.
 test('a release without an .apk: only the Android card says Coming soon, with a disabled button', async ({ page }) => {
   await page.goto('download/')
-  const soon = await page.locator('[data-os-group] [data-status="soon"]').count()
-  const androidSoon = await page.locator('[data-os-group="android"] [data-status="soon"]').count()
+  const soon = await page.locator(`${SHOWN} [data-os-group] [data-status="soon"]`).count()
+  const androidSoon = await page.locator(`${SHOWN} [data-os-group="android"] [data-status="soon"]`).count()
   test.skip(soon !== 1 || androidSoon !== 1, 'no release, or the release has an .apk')
 
-  const android = page.locator('[data-os-group="android"]')
+  const android = page.locator(`${SHOWN} [data-os-group="android"]`)
   await expect(android).toContainText('Coming soon')
   await expect(android).not.toContainText('First release coming soon')
   const off = android.locator('span[data-state="missing"]')
@@ -78,13 +80,13 @@ test('a release without an .apk: only the Android card says Coming soon, with a 
   await expect(off).toContainText('Download .apk')
   await expect(android.locator('a[data-download]')).toHaveCount(0)
   await expect(android).toContainText('Test build signed with a debug key')
-  for (const os of ['windows', 'mac', 'linux']) await expect(page.locator(`[data-os-group="${os}"] [data-status="available"]`)).toHaveCount(1)
+  for (const os of ['windows', 'mac', 'linux']) await expect(page.locator(`${SHOWN} [data-os-group="${os}"] [data-status="available"]`)).toHaveCount(1)
 })
 
 test('the cards come before the Build from source block', async ({ page }) => {
   await page.goto('download/')
   const cardsFirst = await page.evaluate(() => {
-    const card = document.querySelector('[data-os-group]')!
+    const card = document.querySelector('[data-edition-panel]:not([hidden]) [data-os-group]')!
     const source = document.getElementById('dl-source-title')!
     return !!(card.compareDocumentPosition(source) & Node.DOCUMENT_POSITION_FOLLOWING)
   })
@@ -97,9 +99,9 @@ test.describe('on Windows', () => {
     await page.goto('download/')
     const badges = page.locator('[data-your-device]:visible')
     await expect(badges).toHaveCount(1)
-    await expect(page.locator('[data-os-group="windows"] [data-your-device]')).toBeVisible()
-    await expect(page.locator('[data-os-group="windows"]')).toHaveAttribute('data-yours', '')
-    await expect(page.locator('[data-yours]')).toHaveCount(1)
+    await expect(page.locator(`${SHOWN} [data-os-group="windows"] [data-your-device]`)).toBeVisible()
+    await expect(page.locator(`${SHOWN} [data-os-group="windows"]`)).toHaveAttribute('data-yours', '')
+    await expect(page.locator(`${SHOWN} [data-yours]`)).toHaveCount(1)
   })
 })
 
@@ -108,9 +110,9 @@ test('the cards stack on a phone without horizontal scroll, in dark and light', 
   for (const theme of ['dark', 'light']) {
     await page.goto('download/')
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
-    await page.locator('[data-os-group="linux"] details summary').click()
+    await page.locator(`${SHOWN} [data-os-group="linux"] details summary`).click()
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
-    const boxes = await page.locator('[data-os-group]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()))
+    const boxes = await page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => e.getBoundingClientRect()))
     expect(boxes).toHaveLength(4)
     for (let i = 1; i < boxes.length; i++) expect(boxes[i].top).toBeGreaterThan(boxes[i - 1].bottom - 1)
     for (const b of boxes) expect(b.right).toBeLessThanOrEqual(375)
@@ -120,12 +122,12 @@ test('the cards stack on a phone without horizontal scroll, in dark and light', 
 // The .apk comes from the GitHub release when it is attached there, otherwise from apps/site/public/downloads.
 test('the Android button downloads the real .apk (and, when the site serves it, the card shows its true SHA-256)', async ({ page, request }) => {
   await page.goto('download/')
-  const button = page.locator('[data-os-group="android"] a[data-state="ready"]')
+  const button = page.locator(`${SHOWN} [data-os-group="android"] a[data-state="ready"]`)
   test.skip((await button.count()) === 0, 'no .apk is available in this build')
 
   const href = (await button.first().getAttribute('href')) ?? ''
   expect(href).toMatch(/\.apk$/i)
-  await expect(page.locator('[data-os-group="android"]')).toContainText('Available')
+  await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toContainText('Available')
   if (href.startsWith('/')) {
     const res = await request.get(href)
     expect(res.status()).toBe(200)
@@ -134,7 +136,7 @@ test('the Android button downloads the real .apk (and, when the site serves it, 
     // An .apk is a zip file: it starts with "PK".
     expect(body.subarray(0, 2).toString('latin1')).toBe('PK')
     const sha = createHash('sha256').update(body).digest('hex')
-    await expect(page.locator('[data-os-group="android"]')).toContainText(sha)
+    await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toContainText(sha)
   }
 })
 
@@ -143,17 +145,153 @@ test.describe('on Android', () => {
   test('"Your device" shows on exactly the Android card', async ({ page }) => {
     await page.goto('download/')
     await expect(page.locator('[data-your-device]:visible')).toHaveCount(1)
-    await expect(page.locator('[data-os-group="android"] [data-your-device]')).toBeVisible()
-    await expect(page.locator('[data-os-group="android"]')).toHaveAttribute('data-yours', '')
-    await expect(page.locator('[data-yours]')).toHaveCount(1)
+    await expect(page.locator(`${SHOWN} [data-os-group="android"] [data-your-device]`)).toBeVisible()
+    await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toHaveAttribute('data-yours', '')
+    await expect(page.locator(`${SHOWN} [data-yours]`)).toHaveCount(1)
   })
 })
 
 test('two columns of two on a wide screen', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto('download/')
-  const tops = await page.locator('[data-os-group]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
+  const tops = await page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
   expect(tops[0]).toBe(tops[1])
   expect(tops[2]).toBe(tops[3])
   expect(tops[2]).toBeGreaterThan(tops[0])
+})
+
+test.describe('edition switcher', () => {
+  const radio = (page: Page, name: string) => page.getByRole('radiogroup', { name: 'Edition' }).getByRole('radio', { name })
+
+  test('Everything is checked by default; Studio only shows the Studio panel and is remembered', async ({ page }) => {
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(String(e)))
+    await page.goto('download/')
+    await expect(page.getByRole('radio')).toHaveText(['Everything', 'Office only', 'Studio only'])
+    await expect(radio(page, 'Everything')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.locator('[data-edition-panel="all"]')).toBeVisible()
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeHidden()
+
+    await radio(page, 'Studio only').click()
+    await expect(radio(page, 'Studio only')).toHaveAttribute('aria-checked', 'true')
+    await expect(radio(page, 'Everything')).toHaveAttribute('aria-checked', 'false')
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeVisible()
+    await expect(page.locator('[data-edition-panel="all"]')).toBeHidden()
+    await expect(page.locator(`${SHOWN} [data-os-group]`)).toHaveCount(3)
+    // Every Studio link (if the release has any) is a Studio file; with none, the cards say Coming soon.
+    for (const a of await page.locator(`${SHOWN} a[data-state="ready"]`).all()) expect(await a.getAttribute('href')).toMatch(/Bear-Studio|bear-studio/)
+    if ((await page.locator(`${SHOWN} a[data-state="ready"]`).count()) === 0) await expect(page.locator(`${SHOWN} [data-status="soon"]`)).toHaveCount(3)
+    expect(await page.evaluate(() => localStorage.getItem('bear-edition'))).toBe('studio')
+
+    await page.reload()
+    await expect(radio(page, 'Studio only')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test('Everything and Office have the Android card; Studio has none', async ({ page }) => {
+    await page.goto('download/')
+    const groups = () => page.locator(`${SHOWN} [data-os-group]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-os-group')))
+    expect(await groups()).toEqual(['windows', 'mac', 'linux', 'android'])
+    await radio(page, 'Office only').click()
+    await expect(page.locator('[data-edition-panel="office"]')).toBeVisible()
+    expect(await groups()).toEqual(['windows', 'mac', 'linux', 'android'])
+    await expect(page.locator(`${SHOWN} [data-os-group="android"]`)).toContainText('Download .apk')
+    await radio(page, 'Studio only').click()
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeVisible()
+    expect(await groups()).toEqual(['windows', 'mac', 'linux'])
+    await expect(page.locator('[data-edition-panel="studio"] [data-os-group="android"]')).toHaveCount(0)
+  })
+
+  test('arrow keys move the choice', async ({ page }) => {
+    await page.goto('download/')
+    await radio(page, 'Everything').focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(radio(page, 'Office only')).toBeFocused()
+    await expect(radio(page, 'Office only')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.locator('[data-edition-panel="office"]')).toBeVisible()
+    await page.keyboard.press('ArrowLeft')
+    await expect(radio(page, 'Everything')).toHaveAttribute('aria-checked', 'true')
+    await page.keyboard.press('End')
+    await expect(radio(page, 'Studio only')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('a broken saved value falls back to Everything', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'banana'))
+    await page.goto('download/')
+    await expect(radio(page, 'Everything')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.locator('[data-edition-panel="all"]')).toBeVisible()
+  })
+
+  test('the switcher fits a phone without sideways scroll', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 })
+    await page.goto('download/')
+    for (const name of ['Everything', 'Office only', 'Studio only']) {
+      await radio(page, name).click()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+    }
+    const box = await page.getByRole('radiogroup', { name: 'Edition' }).boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(375)
+  })
+})
+
+test.describe('without JavaScript', () => {
+  test.use({ javaScriptEnabled: false })
+  test('Everything shows and the switcher is hidden', async ({ page }) => {
+    await page.goto('download/')
+    await expect(page.locator('[data-edition-panel="all"]')).toBeVisible()
+    await expect(page.locator('[data-edition-panel="office"]')).toBeHidden()
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeHidden()
+    await expect(page.locator('[data-edition-switch]')).toBeHidden()
+  })
+})
+
+test.describe('saved edition on first paint', () => {
+  test('with bear-edition=studio saved, the Studio panel shows before any module script runs', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'studio'))
+    // Strip the page's module scripts so only the inline pre-paint step and CSS can choose the panel.
+    await page.route('**/download/', async (route) => {
+      const res = await route.fetch()
+      const html = (await res.text()).replace(/<script type="module"[\s\S]*?<\/script>/g, '')
+      await route.fulfill({ response: res, body: html })
+    })
+    await page.goto('download/', { waitUntil: 'domcontentloaded' })
+    expect(await page.evaluate(() => document.querySelectorAll('script[type="module"]').length)).toBe(0)
+    expect(await page.evaluate(() => document.documentElement.dataset.edition)).toBe('studio')
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeVisible()
+    await expect(page.locator('[data-edition-panel="all"]')).toBeHidden()
+    await expect(page.locator('[data-edition-panel="office"]')).toBeHidden()
+    const bg = (choice: string) => page.locator(`[data-edition-choice="${choice}"]`).evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(await bg('studio')).not.toBe(await bg('all'))
+    expect(await bg('all')).toBe('rgba(0, 0, 0, 0)')
+  })
+
+  test('with bear-edition=studio saved, the Studio panel is visible right after domcontentloaded', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'studio'))
+    await page.goto('download/', { waitUntil: 'domcontentloaded' })
+    expect(await page.locator('[data-edition-panel="studio"]').isVisible()).toBe(true)
+    expect(await page.locator('[data-edition-panel="all"]').isVisible()).toBe(false)
+  })
+
+  test('switching after load keeps html[data-edition] and the panels in step', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'studio'))
+    await page.goto('download/')
+    await page.getByRole('radio', { name: 'Office only' }).click()
+    expect(await page.evaluate(() => document.documentElement.dataset.edition)).toBe('office')
+    await expect(page.locator('[data-edition-panel="office"]')).toBeVisible()
+    await expect(page.locator('[data-edition-panel="studio"]')).toBeHidden()
+    await expect(page.getByRole('radio', { name: 'Office only' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('a junk saved value leaves no data-edition, so Everything shows', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bear-edition', 'banana'))
+    await page.route('**/download/', async (route) => {
+      const res = await route.fetch()
+      await route.fulfill({ response: res, body: (await res.text()).replace(/<script type="module"[\s\S]*?<\/script>/g, '') })
+    })
+    await page.goto('download/', { waitUntil: 'domcontentloaded' })
+    expect(await page.evaluate(() => document.documentElement.dataset.edition)).toBeUndefined()
+    await expect(page.locator('[data-edition-panel="all"]')).toBeVisible()
+  })
 })

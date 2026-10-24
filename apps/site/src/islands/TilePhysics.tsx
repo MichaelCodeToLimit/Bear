@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { APPS } from '@bear/core'
+import { SITE_APPS as APPS } from '../lib/officeApps'
+import { numberWord } from '../lib/numberWord'
 import { useMotion } from './useMotion'
 import { IslandBoundary } from './IslandBoundary'
 
@@ -205,7 +206,7 @@ function TilePhysicsInner() {
         ref={canvasRef}
         className="tp__canvas"
         role="img"
-        aria-label="Twelve app tiles tumbling in a box. Drag them around."
+        aria-label={`${numberWord(APPS.length)} app tiles tumbling in a box. Drag them around.`}
       />
       {!ready && <p className="tp__loading">Loading…</p>}
       <button type="button" className="btn" onClick={() => controller.current?.reset()}>

@@ -9,7 +9,8 @@ interface TitleBarProps {
   dirty: boolean
   /** Replaces the Edited/Saved text (apps that save automatically). */
   status?: string
-  autosave?: { enabled: boolean; available: boolean; onToggle: () => void }
+  /** `reason`: why AutoSave is unavailable, when it is not just an unsaved file. */
+  autosave?: { enabled: boolean; available: boolean; reason?: string | null; onToggle: () => void }
   onHome: () => void
   right?: ReactNode
 }
@@ -32,7 +33,7 @@ export function TitleBar({ app, docName, dirty, status, autosave, onHome, right 
       {autosave && (
         <label
           className={`flex items-center gap-1.5 text-xs ${autosave.available ? '' : 'opacity-60'}`}
-          title={autosave.available ? 'Save automatically every few seconds' : 'Save the file once to turn on AutoSave'}
+          title={autosave.available ? 'Save automatically every few seconds' : autosave.reason || 'Save the file once to turn on AutoSave'}
         >
           AutoSave
           <button

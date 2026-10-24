@@ -8,9 +8,9 @@ order: 1
 
 Yes. Bear is open source under the MIT license. There is no subscription, no account and no trial period.
 
-## Is Bear affiliated with Microsoft?
+## Is Bear affiliated with another company?
 
-No. Bear is an independent project. It is not affiliated with or endorsed by Microsoft. It reads and writes the common `.docx`, `.xlsx` and `.pptx` file formats so you can swap files with other people.
+No. Bear is an independent project. It is not affiliated with or endorsed by Microsoft or Adobe. It reads and writes the common `.docx`, `.xlsx` and `.pptx` file formats, and layered `.psd` images, so you can swap files with other people.
 
 ## Which systems does Bear run on?
 

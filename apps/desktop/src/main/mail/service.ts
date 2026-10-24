@@ -150,7 +150,7 @@ export class MailService {
 
   private async authFor(account: Pick<MailAccount, 'id' | 'auth' | 'username'>, secret?: Secret | null): Promise<Auth> {
     const s = secret ?? (await this.store.secret(account.id))
-    if (!s) throw new Error('No saved password for this account. Edit the account and sign in again.')
+    if (!s) throw new Error("There's no saved password for this account that Bear can use. Edit the account and sign in again.")
     if (s.kind === 'password') return { user: account.username, pass: s.password }
     let tokens = s.tokens
     if (tokens.expiresAt - 60_000 < Date.now()) {

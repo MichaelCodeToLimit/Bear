@@ -205,6 +205,6 @@ test('calm docs pages render no starfield', async ({ page }) => {
 test('footer carries the independence note', async ({ page }) => {
   await page.goto('./')
   await expect(page.locator('footer')).toContainText(
-    'Bear is an independent project. It is not affiliated with or endorsed by Microsoft.'
+    'Bear is an independent project. It is not affiliated with or endorsed by Microsoft or Adobe.'
   )
 })

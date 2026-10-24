@@ -1,3 +1,5 @@
+// Must stay the first import: it sets the edition before the app modules load.
+import './edition'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { androidBridge } from './bridge'
