@@ -1,0 +1,53 @@
+# One-time: publishes release v0.1.2 from the installers that Release run 43034106439 already built
+# (Windows, macOS, Linux), without waiting for its slow Flatpak job. Runs when the ci/publish-once branch
+# is pushed; it never runs from main. Safe to delete afterwards.
+name: Publish once
+
+on:
+  push:
+    branches: ['ci/publish-once']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    env:
+      VERSION: '0.1.2'
+      # The commit the installers were built from (main when 0.1.2 was pushed).
+      BUILT_SHA: 9995496b37c5c0633abccfc09b5cb7cb3c45c0f6
+    steps:
+      # Whatever the old run has uploaded by now; Flatpak is simply absent if it hasn't finished.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bear-*
+          path: dist
+          merge-multiple: true
+          run-id: 43034106439
+          github-token: ${{ github.token }}
+      - run: ls -l dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ env.BUILT_SHA }}
+          draft: false
+          generate_release_notes: true
+          files: dist/*
+
+      # Same website refresh as the Release workflow: Pages through its own workflow, Render by a new commit.
+      - name: Refresh the website
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run site.yml --repo "$GITHUB_REPOSITORY" --ref main
+          git clone --depth 1 --branch main "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" site-refresh
+          cd site-refresh
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: refresh the website for v${VERSION}"
+          git push origin main
