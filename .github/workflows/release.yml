@@ -1,4 +1,10 @@
-# Builds every Bear download and, for v* tags, drafts a GitHub release with all of them.
+# Builds every Bear download and publishes them as a GitHub release.
+#
+# Automatic: a push to main whose apps/desktop/package.json version has no v<version> tag yet builds every
+# installer, publishes the release (tag v<version>), then refreshes the website so its Download page lists the
+# new files. To ship a new version, bump "version" in apps/desktop/package.json (and the root package.json)
+# and push to main. Pushes that don't change the version stop after the first job.
+# Manual: pushing a v* tag still builds and drafts a release for you to publish by hand.
 #
 # Files produced (the website's Download page classifies them by name, so keep these stable):
 #   Windows  Bear-Setup-<v>.exe, Bear-<v>.msi
@@ -6,21 +12,48 @@
 #   Linux    Bear-<v>-x64.AppImage, bear_<v>_amd64.deb, Bear-<v>-x64.rpm, Bear-<v>-x64.tar.gz,
 #            Bear-<v>-x64.flatpak (own job; a failure there never blocks the release)
 #
-# Triggers: a v* tag (builds, then drafts the release), a manual run, or a push to the
-# ci/release-dry-run branch (builds everything and uploads workflow artifacts, but creates no release).
+# Triggers: a push to main (see above), a v* tag (builds, then drafts the release), a manual run, or a push to
+# the ci/release-dry-run branch (builds everything and uploads workflow artifacts, but creates no release).
 name: Release
 
 on:
   push:
     tags: ['v*']
-    branches: ['ci/release-dry-run']
+    branches: ['main', 'ci/release-dry-run']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  # Decides whether this run builds anything. A push to main only does when its version is new.
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.v.outputs.run }}
+      auto: ${{ steps.v.outputs.auto }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          run=true
+          auto=false
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            auto=true
+            if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null 2>&1; then
+              run=false
+              echo "v$version is already released; nothing to build."
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "auto=$auto" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: prepare
+    if: needs.prepare.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +143,8 @@ jobs:
   # Flatpak needs flatpak-builder and the Freedesktop runtime from Flathub, which is the part most
   # likely to break, so it runs on its own and never blocks the release.
   flatpak:
+    needs: prepare
+    if: needs.prepare.outputs.run == 'true'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -134,13 +169,18 @@ jobs:
           path: apps/desktop/release/*.flatpak
           if-no-files-found: error
 
-  # One draft release, assembled after every build has finished (no parallel-upload race).
+  # One release, assembled after every build has finished (no parallel-upload race). A v* tag push makes a
+  # draft for you to publish; a push to main with a new version publishes it and refreshes the website.
   release:
-    needs: [build, flatpak]
-    if: ${{ always() && needs.build.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    needs: [prepare, build, flatpak]
+    if: ${{ always() && needs.build.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || needs.prepare.outputs.auto == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
+    env:
+      AUTO: ${{ needs.prepare.outputs.auto }}
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       # The flatpak artifact is simply missing when that job failed; the pattern match tolerates that.
       - uses: actions/download-artifact@v4
@@ -151,6 +191,24 @@ jobs:
       - run: ls -l dist
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: ${{ env.AUTO == 'true' && format('v{0}', env.VERSION) || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          draft: ${{ env.AUTO != 'true' }}
           generate_release_notes: true
           files: dist/*
+
+      # Events made by GITHUB_TOKEN (like publishing this release) don't start other workflows, so the website
+      # refresh is started by hand: GitHub Pages through its own workflow, and the Render copy by a new commit
+      # on main (Render deploys every push, and its Download page is built from the latest release).
+      - name: Refresh the website
+        if: env.AUTO == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run site.yml --repo "$GITHUB_REPOSITORY" --ref main
+          git clone --depth 1 --branch main "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" site-refresh
+          cd site-refresh
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: refresh the website for v${VERSION}"
+          git push origin main
