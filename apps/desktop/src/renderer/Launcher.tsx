@@ -114,7 +114,7 @@ export function Launcher({ open, openFile: route }: { open: OpenApp; openFile: (
                   <span className={app.ready ? '' : 'opacity-50 grayscale-[40%]'}><AppMark app={app} size={36} /></span>
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{app.name}</span>
-                    <span className="block truncate text-xs text-muted">{app.ready ? app.tagline : 'Coming soon'}</span>
+                    <span className="block truncate text-xs text-muted">{!app.ready ? 'Coming soon' : app.id === 'mail' ? 'In development' : app.tagline}</span>
                   </span>
                 </button>
               ))}
