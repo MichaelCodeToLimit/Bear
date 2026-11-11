@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { MAIL_METHODS, type BearBridge } from '@bear/core'
 
+// The main process cancels a window close and asks the page to confirm it. Pages that can hold
+// unsaved work register a handler through onCloseRequest(); the home screen registers none, so with
+// nobody listening the window would never close. This first listener closes it in that case.
+ipcRenderer.on('window:close-request', () => {
+  if (ipcRenderer.listenerCount('window:close-request') === 1) ipcRenderer.send('window:forceClose')
+})
+
 const bridge: BearBridge = {
   platform: process.platform,
   openFile: (filters) => ipcRenderer.invoke('file:open', filters),

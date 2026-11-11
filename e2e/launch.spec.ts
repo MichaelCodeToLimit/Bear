@@ -18,6 +18,16 @@ function writeDoc(name: string, text: string): string {
   return path
 }
 
+test('the window closes from the home screen', async () => {
+  const launched = await launch()
+  app = launched.app
+  const closed = launched.page.waitForEvent('close')
+  // Same path as clicking the window's X: the main process asks the page, which has nothing to save.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
+  await closed
+  app = undefined
+})
+
 test('a document on the command line opens straight into its app', async () => {
   const doc = writeDoc('welcome.txt', 'Opened from Explorer')
   const launched = await launch(undefined, [doc])
